@@ -1,0 +1,10 @@
+rootProject.name = 'cc-service'
+include 'libs:common'
+
+include 'infra:config-server'
+include 'infra:eureka-server'
+include 'infra:gateway'
+
+include 'apps:user-service'
+include 'apps:product-service'
+include 'apps:order-service'

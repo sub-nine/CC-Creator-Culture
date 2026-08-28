@@ -1,0 +1,12 @@
+plugins {
+    id 'org.springframework.boot'
+}
+
+description = 'eureka-server'
+
+dependencies {
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-server'
+    testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-zipkin-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
