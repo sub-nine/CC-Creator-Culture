@@ -1,0 +1,10 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/sub-nine/CC-Creator-Culture.git
+          default-label: ${CONFIG_GIT_DEFAULT_LABEL:main}

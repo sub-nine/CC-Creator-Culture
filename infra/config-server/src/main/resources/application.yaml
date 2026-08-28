@@ -1,3 +1,8 @@
+server:
+  port: ${SERVER_PORT:8888}
+
 spring:
   application:
     name: config-server
+  profiles:
+    default: local # active 없다면 local로 fallback

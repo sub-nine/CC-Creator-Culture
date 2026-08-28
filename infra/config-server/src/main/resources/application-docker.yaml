@@ -1,0 +1,9 @@
+spring:
+  config:
+    activate:
+      on-profile: docker
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: file:${CONFIG_REPO_PATH:/config-repo}
