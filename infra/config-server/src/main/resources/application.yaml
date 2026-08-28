@@ -6,3 +6,9 @@ spring:
     name: config-server
   profiles:
     default: local # active 없다면 local로 fallback
+
+    group:
+      local:
+        - native
+      docker:
+        - native
