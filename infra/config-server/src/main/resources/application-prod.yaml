@@ -8,3 +8,5 @@ spring:
         git:
           uri: https://github.com/sub-nine/CC-Creator-Culture.git
           default-label: ${CONFIG_GIT_DEFAULT_LABEL:main}
+          search-paths:
+            - config-repo
