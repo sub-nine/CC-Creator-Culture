@@ -90,6 +90,47 @@ services:
       kafka:
         condition: service_healthy
 
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    ports:
+      - "127.0.0.1:9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/ready >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  grafana:
+    image: grafana/grafana:13.1.0
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?GRAFANA_ADMIN_USER is required}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana/provisioning/datasources/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+  zipkin:
+    image: openzipkin/zipkin:3.6.1
+    ports:
+      - "127.0.0.1:9411:9411"
+    environment:
+      STORAGE_TYPE: mem
+
 volumes:
   postgres-data:
   kafka-data:
+  prometheus-data:
+  grafana-data:
