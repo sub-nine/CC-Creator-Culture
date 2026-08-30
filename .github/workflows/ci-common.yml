@@ -1,0 +1,42 @@
+name: CI - Common
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "libs/common/**"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradlew"
+      - "gradlew.bat"
+      - "gradle/**"
+      - ".github/workflows/ci-module.yml"
+      - ".github/workflows/ci-common.yml"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "libs/common/**"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradlew"
+      - "gradlew.bat"
+      - "gradle/**"
+      - ".github/workflows/ci-module.yml"
+      - ".github/workflows/ci-common.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-common-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci-module.yml
+    with:
+      module-name: common
+      gradle-task: ":libs:common:build"
+      test-report-path: libs/common/build/reports/tests/
+      use-postgres: false
