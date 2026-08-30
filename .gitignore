@@ -299,6 +299,9 @@ GEMINI.md
 work/
 outputs/
 
+# Local environment
+.env
+
 # etc.
 docs/
 
