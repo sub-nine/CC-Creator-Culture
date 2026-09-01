@@ -32,3 +32,9 @@ variable "release_manifest_bucket" {
   description = "Namespace-unique bucket for immutable release manifests."
   type        = string
 }
+
+variable "github_actions_user_email" {
+  description = "Primary email for the dedicated GitHub Actions OCI API user."
+  type        = string
+  sensitive   = true
+}

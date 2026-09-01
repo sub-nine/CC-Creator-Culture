@@ -24,3 +24,12 @@ output "vault_key_ocid" {
 output "existing_instance_name" {
   value = data.oci_core_instance.existing.display_name
 }
+
+output "github_actions_user_ocid" {
+  value     = oci_identity_user.github_actions.id
+  sensitive = true
+}
+
+output "github_actions_user_name" {
+  value = oci_identity_user.github_actions.name
+}

@@ -169,3 +169,36 @@ resource "oci_identity_policy" "dev_instance" {
     "Allow dynamic-group ${oci_identity_dynamic_group.dev_instance.name} to read secret-bundles in compartment id ${var.cc_compartment_ocid}",
   ]
 }
+
+resource "oci_identity_user" "github_actions" {
+  compartment_id = var.tenancy_ocid
+  name           = "cc-dev-github-actions"
+  description    = "Dedicated API user for the cc-service development deployment workflow."
+  email          = var.github_actions_user_email
+  freeform_tags  = local.common_tags
+}
+
+resource "oci_identity_group" "github_actions" {
+  compartment_id = var.tenancy_ocid
+  name           = "cc-dev-github-actions-group"
+  description    = "Least-privilege group for the cc-service development deployment workflow."
+  freeform_tags  = local.common_tags
+}
+
+resource "oci_identity_user_group_membership" "github_actions" {
+  compartment_id = var.tenancy_ocid
+  group_id       = oci_identity_group.github_actions.id
+  user_id        = oci_identity_user.github_actions.id
+}
+
+resource "oci_identity_policy" "github_actions" {
+  compartment_id = var.tenancy_ocid
+  name           = "cc-dev-github-actions-policy"
+  description    = "GitHub Actions can publish cc-service images and release manifests without reading Terraform state."
+  statements = [
+    "Allow group ${oci_identity_group.github_actions.name} to read objectstorage-namespaces in tenancy",
+    "Allow group ${oci_identity_group.github_actions.name} to read buckets in compartment id ${var.cc_compartment_ocid}",
+    "Allow group ${oci_identity_group.github_actions.name} to manage objects in compartment id ${var.cc_compartment_ocid} where target.bucket.name='${oci_objectstorage_bucket.release_manifest.name}'",
+    "Allow group ${oci_identity_group.github_actions.name} to manage repos in compartment id ${var.cc_compartment_ocid}",
+  ]
+}
