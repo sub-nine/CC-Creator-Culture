@@ -57,4 +57,10 @@ public class Product extends BaseEntity {
 
     return product;
   }
+
+  public void validateOwner(UUID creatorId) {
+    if (!Objects.equals(creatorId, this.creatorId)) {
+      throw new BusinessException(ProductErrorCode.PRODUCT_ACCESS_DENIED);
+    }
+  }
 }
