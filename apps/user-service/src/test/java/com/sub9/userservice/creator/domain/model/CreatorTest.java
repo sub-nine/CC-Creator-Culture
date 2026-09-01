@@ -2,7 +2,7 @@ package com.sub9.userservice.creator.domain.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.sub9.userservice.shared.infrastructure.persistence.UuidV7Generator;
+import com.sub9.common.identifier.UuidV7Generator;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;

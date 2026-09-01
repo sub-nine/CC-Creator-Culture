@@ -3,9 +3,9 @@ package com.sub9.userservice.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.userservice.creator.domain.model.Creator;
 import com.sub9.userservice.creator.domain.repository.CreatorRepository;
-import com.sub9.userservice.shared.infrastructure.persistence.UuidV7Generator;
 import com.sub9.userservice.user.domain.model.User;
 import com.sub9.userservice.user.domain.model.UserRole;
 import com.sub9.userservice.user.domain.repository.UserRepository;

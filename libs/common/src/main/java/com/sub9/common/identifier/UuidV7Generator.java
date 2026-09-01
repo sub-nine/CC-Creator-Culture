@@ -1,10 +1,8 @@
-package com.sub9.userservice.shared.infrastructure.persistence;
+package com.sub9.common.identifier;
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import java.util.UUID;
-import org.springframework.stereotype.Component;
 
-@Component
 public class UuidV7Generator {
 
     public UUID generate() {

@@ -1,4 +1,4 @@
-package com.sub9.userservice.shared.infrastructure.persistence;
+package com.sub9.common.identifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
