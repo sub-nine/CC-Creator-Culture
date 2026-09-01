@@ -6,9 +6,4 @@ spring:
     url: ${PRODUCT_DATASOURCE_URL:jdbc:postgresql://localhost:5432/product_db}
     username: ${PRODUCT_DB_USERNAME}
     password: ${PRODUCT_DB_PASSWORD}
-kafka:
-  bootstrap-servers: localhost:9092
-  auto-offset-reset: latest
-  product-group-id: product-group
-  category-group-id: category-group
 
