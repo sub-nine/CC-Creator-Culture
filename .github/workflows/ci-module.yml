@@ -1,0 +1,91 @@
+name: Reusable Gradle Module CI
+
+on:
+  workflow_call:
+    inputs:
+      module-name:
+        description: Module name used in job and artifact names
+        required: true
+        type: string
+      gradle-task:
+        description: Fully qualified Gradle build task
+        required: true
+        type: string
+      test-report-path:
+        description: Module test report directory
+        required: true
+        type: string
+      use-postgres:
+        description: Start PostgreSQL for service integration tests
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test (${{ inputs.module-name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: ${{ inputs.use-postgres && 'postgres:17-alpine' || '' }}
+        env:
+          POSTGRES_DB: cc_test
+          POSTGRES_USER: cc_test
+          POSTGRES_PASSWORD: cc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cc_test -d cc_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      SPRING_CLOUD_CONFIG_ENABLED: "false"
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
+      EUREKA_CLIENT_FETCH_REGISTRY: "false"
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Build and test with PostgreSQL
+        if: inputs.use-postgres
+        env:
+          GRADLE_TASK: ${{ inputs.gradle-task }}
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/cc_test
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+          SPRING_DATASOURCE_USERNAME: cc_test
+          SPRING_DATASOURCE_PASSWORD: cc_test
+        run: bash ./gradlew "$GRADLE_TASK" --no-daemon
+
+      - name: Build and test
+        if: ${{ !inputs.use-postgres }}
+        env:
+          GRADLE_TASK: ${{ inputs.gradle-task }}
+        run: bash ./gradlew "$GRADLE_TASK" --no-daemon
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ inputs.module-name }}
+          path: ${{ inputs.test-report-path }}
+          if-no-files-found: ignore
+          retention-days: 7
