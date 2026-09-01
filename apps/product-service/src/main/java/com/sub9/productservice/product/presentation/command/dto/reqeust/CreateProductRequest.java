@@ -18,8 +18,10 @@ public record CreateProductRequest(
             hashTags,
     @NotBlank(message = "상품명은 필수입니다.") String name,
     @NotBlank(message = "상품 설명은 필수입니다.") String content,
-    @NotEmpty(message = "상품 옵션은 최소 1개 이상 등록해야합니다.") List<CreateSkuCommand> skus) {
+    @NotEmpty(message = "상품 옵션은 최소 1개 이상 등록해야합니다.") List<CreateSkuRequest> skus) {
   public CreateProductCommand toCommand(UUID creatorId) {
-    return new CreateProductCommand(hashTags, creatorId, name, content, skus);
+    List<CreateSkuCommand> skuCommands = skus.stream().map(CreateSkuRequest::toCommand).toList();
+
+    return new CreateProductCommand(hashTags, creatorId, name, content, skuCommands);
   }
 }
