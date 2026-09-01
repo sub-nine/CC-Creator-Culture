@@ -20,6 +20,11 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
+    public void flush() {
+        userJpaRepository.flush();
+    }
+
+    @Override
     public Optional<User> findActiveById(UUID userId) {
         return userJpaRepository.findByUserIdAndDeletedAtIsNull(userId);
     }
