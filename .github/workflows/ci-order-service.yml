@@ -1,0 +1,48 @@
+name: CI - Order Service
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "apps/order-service/**"
+      - "libs/common/**"
+      - "config-repo/order-service*.yaml"
+      - "config-repo/application*.yaml"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradlew"
+      - "gradlew.bat"
+      - "gradle/**"
+      - ".github/workflows/ci-module.yml"
+      - ".github/workflows/ci-order-service.yml"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "apps/order-service/**"
+      - "libs/common/**"
+      - "config-repo/order-service*.yaml"
+      - "config-repo/application*.yaml"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradlew"
+      - "gradlew.bat"
+      - "gradle/**"
+      - ".github/workflows/ci-module.yml"
+      - ".github/workflows/ci-order-service.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-order-service-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci-module.yml
+    with:
+      module-name: order-service
+      gradle-task: ":apps:order-service:build"
+      test-report-path: apps/order-service/build/reports/tests/
+      use-postgres: true

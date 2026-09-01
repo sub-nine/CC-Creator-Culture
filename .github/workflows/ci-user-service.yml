@@ -1,0 +1,48 @@
+name: CI - User Service
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "apps/user-service/**"
+      - "libs/common/**"
+      - "config-repo/user-service*.yaml"
+      - "config-repo/application*.yaml"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradlew"
+      - "gradlew.bat"
+      - "gradle/**"
+      - ".github/workflows/ci-module.yml"
+      - ".github/workflows/ci-user-service.yml"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "apps/user-service/**"
+      - "libs/common/**"
+      - "config-repo/user-service*.yaml"
+      - "config-repo/application*.yaml"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradlew"
+      - "gradlew.bat"
+      - "gradle/**"
+      - ".github/workflows/ci-module.yml"
+      - ".github/workflows/ci-user-service.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-user-service-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci-module.yml
+    with:
+      module-name: user-service
+      gradle-task: ":apps:user-service:build"
+      test-report-path: apps/user-service/build/reports/tests/
+      use-postgres: true

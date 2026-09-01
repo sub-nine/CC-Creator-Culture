@@ -1,0 +1,42 @@
+name: CI - Config Server
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "infra/config-server/**"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradlew"
+      - "gradlew.bat"
+      - "gradle/**"
+      - ".github/workflows/ci-module.yml"
+      - ".github/workflows/ci-config-server.yml"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "infra/config-server/**"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradlew"
+      - "gradlew.bat"
+      - "gradle/**"
+      - ".github/workflows/ci-module.yml"
+      - ".github/workflows/ci-config-server.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-config-server-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci-module.yml
+    with:
+      module-name: config-server
+      gradle-task: ":infra:config-server:build"
+      test-report-path: infra/config-server/build/reports/tests/
+      use-postgres: false

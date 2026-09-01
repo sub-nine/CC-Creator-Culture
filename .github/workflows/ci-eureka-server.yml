@@ -1,0 +1,42 @@
+name: CI - Eureka Server
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "infra/eureka-server/**"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradlew"
+      - "gradlew.bat"
+      - "gradle/**"
+      - ".github/workflows/ci-module.yml"
+      - ".github/workflows/ci-eureka-server.yml"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "infra/eureka-server/**"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradlew"
+      - "gradlew.bat"
+      - "gradle/**"
+      - ".github/workflows/ci-module.yml"
+      - ".github/workflows/ci-eureka-server.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-eureka-server-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci-module.yml
+    with:
+      module-name: eureka-server
+      gradle-task: ":infra:eureka-server:build"
+      test-report-path: infra/eureka-server/build/reports/tests/
+      use-postgres: false

@@ -299,7 +299,10 @@ GEMINI.md
 work/
 outputs/
 
+# Local environment
+.env
+
 # etc.
-.docs/
+docs/
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,intellij+all,eclipse,macos,windows,gradle,java
