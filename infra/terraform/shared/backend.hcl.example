@@ -1,0 +1,4 @@
+bucket    = "replace-with-terraform-state-bucket"
+namespace = "replace-with-object-storage-namespace"
+key       = "cc-service/shared/terraform.tfstate"
+region    = "ap-tokyo-1"
