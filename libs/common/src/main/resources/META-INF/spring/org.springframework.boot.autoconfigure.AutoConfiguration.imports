@@ -1,1 +1,2 @@
 com.sub9.common.config.CommonWebExceptionAutoConfiguration
+com.sub9.common.config.CommonIdentifierAutoConfiguration
