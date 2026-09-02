@@ -14,6 +14,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Getter
@@ -54,13 +55,13 @@ public class Category extends BaseEntity {
                 .build();
     }
 
-    public CategoryHashtag linkManually(Hashtag hashtag, Double similarity) {
+    public CategoryHashtag linkManually(Hashtag hashtag, BigDecimal similarityScore) {
         return CategoryHashtag.create(
                 this,
                 hashtag,
                 CategoryHashtagMatchType.MANUAL,
                 CategoryHashtagStatus.MERGED,
-                similarity
+                similarityScore
         );
     }
 

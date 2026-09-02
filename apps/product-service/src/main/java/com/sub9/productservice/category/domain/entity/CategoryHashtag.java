@@ -18,6 +18,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Getter
@@ -50,7 +51,7 @@ public class CategoryHashtag extends BaseEntity {
     private CategoryHashtagStatus status;
 
     @Column(name = "similarity_score", precision = 5, scale = 4, nullable = false)
-    private Double similarityScore;
+    private BigDecimal similarityScore;
 
     @Column(name = "unique_version", nullable = false)
     private UUID uniqueVersion;
@@ -67,7 +68,7 @@ public class CategoryHashtag extends BaseEntity {
             Hashtag hashtag,
             CategoryHashtagMatchType matchType,
             CategoryHashtagStatus status,
-            Double similarityScore
+            BigDecimal similarityScore
     ) {
         return CategoryHashtag.builder()
                 .category(category)
@@ -99,7 +100,7 @@ public class CategoryHashtag extends BaseEntity {
             Hashtag hashtag,
             CategoryHashtagMatchType matchType,
             CategoryHashtagStatus status,
-            Double similarityScore,
+            BigDecimal similarityScore,
             UUID uniqueVersion
     ) {
         this.category = category;
