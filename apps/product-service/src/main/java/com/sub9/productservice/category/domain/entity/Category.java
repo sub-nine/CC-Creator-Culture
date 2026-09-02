@@ -14,12 +14,12 @@ import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
-
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "p_categories")
 public class Category extends BaseEntity {
+
     @Column(name = "merged_category_id")
     private UUID mergedCategoryId;
 
@@ -33,12 +33,30 @@ public class Category extends BaseEntity {
     @Column(name = "status", nullable = false)
     private CategoryStatus status;
 
-    public Category create(String name, String description) {
+    public static Category create(String name, String description) {
         return Category.builder()
                 .name(name)
                 .description(description)
                 .status(CategoryStatus.ACTIVE)
                 .build();
+    }
+
+    public void mergeInto(UUID targetCategoryId) {
+        this.mergedCategoryId = targetCategoryId;
+        this.status = CategoryStatus.MERGED;
+    }
+
+    public void inactivate() {
+        this.status = CategoryStatus.INACTIVE;
+    }
+
+    public void activate() {
+        this.status = CategoryStatus.ACTIVE;
+    }
+
+    public void update(String name, String description) {
+        this.name = name;
+        this.description = description;
     }
 
     @Builder
@@ -54,7 +72,6 @@ public class Category extends BaseEntity {
         this.status = status;
     }
 }
-
 /*
 id	식별자	uuid		PK	NOT NULL		카테고리 식별자	-
 merged_category_id	병합된 카테고리 식별자	uuid			-		해당 식별자를 갖는 카테고리로 통합	p_categories
