@@ -10,7 +10,10 @@ public enum CommonErrorCode implements ErrorCode {
     METHOD_NOT_ALLOWED("COMMON_0005", HttpStatus.METHOD_NOT_ALLOWED, "허용되지 않은 HTTP method입니다."),
     UNSUPPORTED_MEDIA_TYPE("COMMON_0006", HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 Content-Type입니다."),
     UNAUTHORIZED("COMMON_0007", HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
-    FORBIDDEN("COMMON_0008", HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
+    FORBIDDEN("COMMON_0008", HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
+    // redis 장애 시 사용
+    SERVICE_UNAVAILABLE(
+            "COMMON_0009", HttpStatus.SERVICE_UNAVAILABLE, "서비스를 일시적으로 사용할 수 없습니다.");
 
     private final String code;
     private final HttpStatus status;
