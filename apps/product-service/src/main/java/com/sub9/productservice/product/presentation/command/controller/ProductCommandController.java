@@ -2,6 +2,7 @@ package com.sub9.productservice.product.presentation.command.controller;
 
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.common.security.AuthUser;
+import com.sub9.productservice.common.security.annotation.Creator;
 import com.sub9.productservice.product.application.command.service.ProductCommandService;
 import com.sub9.productservice.product.presentation.command.dto.reqeust.CreateProductRequest;
 import com.sub9.productservice.product.presentation.command.dto.reqeust.UpdateProductRequest;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+@Creator
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/products")

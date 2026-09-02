@@ -2,6 +2,7 @@ package com.sub9.productservice.product.presentation.command.controller;
 
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.common.security.AuthUser;
+import com.sub9.productservice.common.security.annotation.Manager;
 import com.sub9.productservice.product.application.command.service.ProductCommandService;
 import com.sub9.productservice.product.presentation.command.dto.reqeust.UpdateAdminProductStatusRequest;
 import jakarta.validation.Valid;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 public class ProductAdminCommandController {
   private final ProductCommandService productCommandService;
 
+  @Manager
   @PatchMapping("/{productId}/status")
   public ApiResponse<Void> updateProductStatus(
       @AuthenticationPrincipal AuthUser authUser,
