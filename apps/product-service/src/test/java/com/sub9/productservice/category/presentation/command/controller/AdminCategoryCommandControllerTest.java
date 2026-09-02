@@ -19,11 +19,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(CategoryCommandController.class)
+@WebMvcTest(AdminCategoryCommandController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@DisplayName("CategoryCommandController MockMvc 테스트")
+@DisplayName("AdminCategoryCommandController MockMvc 테스트")
 @Disabled
-class CategoryCommandControllerTest {
+class AdminCategoryCommandControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
