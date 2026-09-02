@@ -1,7 +1,8 @@
-package com.sub9.productservice.common.domain;
+package com.sub9.productservice.common.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -20,6 +21,9 @@ import java.util.UUID;
 @EntityListeners(AuditingEntityListener.class)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public abstract class BaseEntity {
+    @Id
+    @Column(name = "id", nullable = false, updatable = false)
+    private UUID id;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -32,11 +36,16 @@ public abstract class BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    @CreatedBy @Column private UUID createdBy;
+    @CreatedBy
+    @Column
+    private UUID createdBy;
 
-    @LastModifiedBy @Column private UUID updatedBy;
+    @LastModifiedBy
+    @Column
+    private UUID updatedBy;
 
-    @Column private UUID deletedBy;
+    @Column
+    private UUID deletedBy;
 
     public void delete(UUID deletedBy) {
         this.deletedAt = LocalDateTime.now();
