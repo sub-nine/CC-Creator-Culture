@@ -1,4 +1,4 @@
-package com.sub9.productservice.category.infrastructure.persistence.command.entity;
+package com.sub9.productservice.category.domain.entity;
 
 import com.sub9.productservice.category.domain.model.CategoryStatus;
 import com.sub9.productservice.common.entity.BaseEntity;
@@ -8,6 +8,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -18,7 +19,7 @@ import java.util.UUID;
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "p_categories")
-public class CategoryJpaEntity extends BaseEntity {
+public class Category extends BaseEntity {
     @Column(name = "merged_category_id")
     private UUID mergedCategoryId;
 
@@ -32,10 +33,25 @@ public class CategoryJpaEntity extends BaseEntity {
     @Column(name = "status", nullable = false)
     private CategoryStatus status;
 
-    public CategoryJpaEntity(String name, String description) {
+    public Category create(String name, String description) {
+        return Category.builder()
+                .name(name)
+                .description(description)
+                .status(CategoryStatus.ACTIVE)
+                .build();
+    }
+
+    @Builder
+    private Category(
+            UUID mergedCategoryId,
+            String name,
+            String description,
+            CategoryStatus status
+    ) {
+        this.mergedCategoryId = mergedCategoryId;
         this.name = name;
         this.description = description;
-        this.status = CategoryStatus.ACTIVE;
+        this.status = status;
     }
 }
 

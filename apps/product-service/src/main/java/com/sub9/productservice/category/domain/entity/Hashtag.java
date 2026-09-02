@@ -1,4 +1,4 @@
-package com.sub9.productservice.category.infrastructure.persistence.command.entity;
+package com.sub9.productservice.category.domain.entity;
 
 import com.sub9.productservice.common.entity.BaseEntity;
 import jakarta.persistence.Column;
@@ -12,14 +12,14 @@ import lombok.NoArgsConstructor;
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "p_hashtags")
-public class HashtagJpaEntity extends BaseEntity {
+public class Hashtag extends BaseEntity {
     @Column(name = "name", nullable = false)
     private String name;
 
     @Column(name = "usage_count", nullable = false)
     private Long usageCount;
 
-    public HashtagJpaEntity(String name) {
+    public Hashtag(String name) {
         this.name = name;
         this.usageCount = 0L;
     }
