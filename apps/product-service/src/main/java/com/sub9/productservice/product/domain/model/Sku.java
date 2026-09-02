@@ -34,9 +34,7 @@ public class Sku extends BaseEntity {
   private boolean isDefault;
 
   public static Sku create(UUID productId, String name, Long price, boolean isDefault) {
-    if (price == null || price < 0) {
-      throw new BusinessException(ProductErrorCode.INVALID_SKU_PRICE);
-    }
+    validatePrice(price);
 
     Sku sku = new Sku();
     sku.productId = productId;
@@ -47,6 +45,8 @@ public class Sku extends BaseEntity {
   }
 
   public void update(String name, Long price, boolean isDefault) {
+    validatePrice(price);
+
     this.name = name;
     this.price = price;
     this.isDefault = isDefault;
@@ -54,5 +54,11 @@ public class Sku extends BaseEntity {
 
   public void unsetDefault() {
     this.isDefault = false;
+  }
+
+  private static void validatePrice(Long price) {
+    if (price == null || price < 0) {
+      throw new BusinessException(ProductErrorCode.INVALID_SKU_PRICE);
+    }
   }
 }

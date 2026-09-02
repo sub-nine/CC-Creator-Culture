@@ -12,6 +12,6 @@ public record UpdateAdminProductStatusRequest(
   }
 
   public UpdateProductStatusCommand toCommand(UUID adminId, UUID productId, String role) {
-    return new UpdateProductStatusCommand(adminId, productId, status.name(), role);
+    return new UpdateProductStatusCommand(adminId, productId, role, status.name());
   }
 }
