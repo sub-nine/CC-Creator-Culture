@@ -1,6 +1,5 @@
 package com.sub9.productservice.product.domain.model;
 
-import com.github.f4b6a3.uuid.UuidCreator;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.common.entity.BaseEntity;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
@@ -63,6 +62,7 @@ public class Product extends BaseEntity {
   }
 
   public void update(String name, String content) {
-
+    this.name = name;
+    this.content = content;
   }
 }
