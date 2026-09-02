@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.support;
+package com.sub9.productservice.support;
 
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
