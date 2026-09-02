@@ -1,5 +1,7 @@
 package com.sub9.productservice.category.domain.entity;
 
+import com.sub9.productservice.category.domain.model.CategoryHashtagMatchType;
+import com.sub9.productservice.category.domain.model.CategoryHashtagStatus;
 import com.sub9.productservice.category.domain.model.CategoryStatus;
 import com.sub9.productservice.common.entity.BaseEntity;
 import jakarta.persistence.Column;
@@ -33,12 +35,33 @@ public class Category extends BaseEntity {
     @Column(name = "status", nullable = false)
     private CategoryStatus status;
 
+    @Column(name = "unique_version", nullable = false)
+    private UUID uniqueVersion;
+
+    @Override
+    public void delete(UUID deletedBy) {
+        super.delete(deletedBy);
+
+        this.uniqueVersion = this.getId();
+    }
+
     public static Category create(String name, String description) {
         return Category.builder()
                 .name(name)
                 .description(description)
                 .status(CategoryStatus.ACTIVE)
+                .uniqueVersion(UUID.fromString("00000000-0000-0000-0000-000000000000"))
                 .build();
+    }
+
+    public CategoryHashtag linkManually(Hashtag hashtag, Double similarity) {
+        return CategoryHashtag.create(
+                this,
+                hashtag,
+                CategoryHashtagMatchType.MANUAL,
+                CategoryHashtagStatus.MERGED,
+                similarity
+        );
     }
 
     public void mergeInto(UUID targetCategoryId) {
@@ -64,12 +87,14 @@ public class Category extends BaseEntity {
             UUID mergedCategoryId,
             String name,
             String description,
-            CategoryStatus status
+            CategoryStatus status,
+            UUID uniqueVersion
     ) {
         this.mergedCategoryId = mergedCategoryId;
         this.name = name;
         this.description = description;
         this.status = status;
+        this.uniqueVersion = uniqueVersion;
     }
 }
 /*

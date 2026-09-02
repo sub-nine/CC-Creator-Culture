@@ -9,6 +9,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -16,7 +18,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 @Getter
@@ -32,12 +33,13 @@ import java.util.UUID;
         }
 )
 public class CategoryHashtag extends BaseEntity {
+    @JoinColumn(name = "category_id", nullable = false)
+    @ManyToOne
+    private Category category;
 
-    @Column(name = "category_id", nullable = false)
-    private UUID categoryId;
-
-    @Column(name = "hashtag_id", nullable = false)
-    private UUID hashtagId;
+    @JoinColumn(name = "hashtag_id", nullable = false)
+    @ManyToOne
+    private Hashtag hashtag;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "match_type", nullable = false)
@@ -48,21 +50,32 @@ public class CategoryHashtag extends BaseEntity {
     private CategoryHashtagStatus status;
 
     @Column(name = "similarity_score", precision = 5, scale = 4, nullable = false)
-    private BigDecimal similarityScore;
+    private Double similarityScore;
+
+    @Column(name = "unique_version", nullable = false)
+    private UUID uniqueVersion;
+
+    @Override
+    public void delete(UUID deletedBy) {
+        super.delete(deletedBy);
+
+        this.uniqueVersion = this.getId();
+    }
 
     public static CategoryHashtag create(
-            UUID categoryId,
-            UUID hashtagId,
+            Category category,
+            Hashtag hashtag,
             CategoryHashtagMatchType matchType,
             CategoryHashtagStatus status,
-            BigDecimal similarityScore
+            Double similarityScore
     ) {
         return CategoryHashtag.builder()
-                .categoryId(categoryId)
-                .hashtagId(hashtagId)
+                .category(category)
+                .hashtag(hashtag)
                 .matchType(matchType)
                 .status(status)
                 .similarityScore(similarityScore)
+                .uniqueVersion(UUID.fromString("00000000-0000-0000-0000-000000000000"))
                 .build();
     }
 
@@ -82,17 +95,19 @@ public class CategoryHashtag extends BaseEntity {
 
     @Builder
     private CategoryHashtag(
-            UUID categoryId,
-            UUID hashtagId,
+            Category category,
+            Hashtag hashtag,
             CategoryHashtagMatchType matchType,
             CategoryHashtagStatus status,
-            BigDecimal similarityScore
+            Double similarityScore,
+            UUID uniqueVersion
     ) {
-        this.categoryId = categoryId;
-        this.hashtagId = hashtagId;
+        this.category = category;
+        this.hashtag = hashtag;
         this.matchType = matchType;
         this.status = status;
         this.similarityScore = similarityScore;
+        this.uniqueVersion = uniqueVersion;
     }
 }
 /*
