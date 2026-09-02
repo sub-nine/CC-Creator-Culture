@@ -1,0 +1,356 @@
+name: Deploy Development
+
+on:
+  workflow_dispatch:
+    inputs:
+      first_cutover:
+        description: Allow the first guarded handoff of ports 80 and 443 to cc-service
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cc-dev-deploy
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Resolve dev HEAD
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      sha: ${{ steps.revision.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: dev
+          fetch-depth: 1
+
+      - id: revision
+        name: Record immutable revision
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  verify-common:
+    name: Verify common module
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SPRING_CLOUD_CONFIG_ENABLED: "false"
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
+      EUREKA_CLIENT_FETCH_REGISTRY: "false"
+      MANAGEMENT_TRACING_EXPORT_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Build and test
+        run: bash ./gradlew :libs:common:build --no-daemon
+
+  storage-budget:
+    name: Check OCI storage budget
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
+      OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
+      OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
+      OCI_CLI_REGION: ${{ vars.OCI_REGION }}
+      OCI_PRIVATE_KEY_B64: ${{ secrets.OCI_PRIVATE_KEY_B64 }}
+      OCI_COMPARTMENT_OCID: ${{ vars.CC_COMPARTMENT_OCID }}
+      OCI_NAMESPACE: ${{ vars.OCIR_NAMESPACE }}
+      OCIR_REPOSITORY_PREFIX: cc-dev/
+      MAX_STORAGE_BYTES: "8000000000"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install and configure OCI CLI
+        run: |
+          pipx install --force oci-cli
+          bash .github/scripts/configure-oci-cli.sh
+
+      - name: Enforce 8 GB storage guard
+        run: bash .github/scripts/check-oci-storage-budget.sh
+
+  image:
+    name: Test and build ARM64 ${{ matrix.service }}
+    needs: [prepare, verify-common, storage-budget]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: config-server
+            gradle-task: :infra:config-server:build
+            module-dir: infra/config-server
+            target: config-server
+          - service: eureka-server
+            gradle-task: :infra:eureka-server:build
+            module-dir: infra/eureka-server
+            target: service
+          - service: gateway
+            gradle-task: :infra:gateway:build
+            module-dir: infra/gateway
+            target: service
+          - service: user-service
+            gradle-task: :apps:user-service:build
+            module-dir: apps/user-service
+            target: service
+          - service: product-service
+            gradle-task: :apps:product-service:build
+            module-dir: apps/product-service
+            target: service
+          - service: order-service
+            gradle-task: :apps:order-service:build
+            module-dir: apps/order-service
+            target: service
+    env:
+      OCIR_REGISTRY: ${{ vars.OCIR_REGISTRY }}
+      OCIR_NAMESPACE: ${{ vars.OCIR_NAMESPACE }}
+      SPRING_CLOUD_CONFIG_ENABLED: "false"
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
+      EUREKA_CLIENT_FETCH_REGISTRY: "false"
+      MANAGEMENT_TRACING_EXPORT_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Build and test module
+        env:
+          GRADLE_TASK: ${{ matrix.gradle-task }}
+        run: bash ./gradlew "$GRADLE_TASK" --no-daemon
+
+      - name: Prepare bootJar for image packaging
+        env:
+          MODULE_DIR: ${{ matrix.module-dir }}
+        run: |
+          mapfile -t boot_jars < <(find "$MODULE_DIR/build/libs" -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar')
+          test "${#boot_jars[@]}" -eq 1
+          mkdir -p .image
+          cp "${boot_jars[0]}" .image/app.jar
+
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.OCIR_REGISTRY }}
+          username: ${{ secrets.OCIR_USERNAME }}
+          password: ${{ secrets.OCIR_AUTH_TOKEN }}
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          target: ${{ matrix.target }}
+          platforms: linux/arm64
+          push: true
+          build-args: |
+            JAR_FILE=.image/app.jar
+          tags: ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_NAMESPACE }}/cc-dev/${{ matrix.service }}:${{ needs.prepare.outputs.sha }}
+
+      - name: Record immutable image reference
+        env:
+          SERVICE: ${{ matrix.service }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE_BASE: ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_NAMESPACE }}/cc-dev/${{ matrix.service }}
+        run: |
+          jq -n --arg service "$SERVICE" --arg image "${IMAGE_BASE}@${DIGEST}" \
+            '{service: $service, image: $image}' > "$RUNNER_TEMP/${SERVICE}.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-digest-${{ matrix.service }}
+          path: ${{ runner.temp }}/${{ matrix.service }}.json
+          retention-days: 7
+
+  manifest:
+    name: Publish release manifest
+    needs: [prepare, image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
+      OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
+      OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
+      OCI_CLI_REGION: ${{ vars.OCI_REGION }}
+      OCI_PRIVATE_KEY_B64: ${{ secrets.OCI_PRIVATE_KEY_B64 }}
+      OCI_NAMESPACE: ${{ vars.OCIR_NAMESPACE }}
+      RELEASE_MANIFEST_BUCKET: ${{ vars.RELEASE_MANIFEST_BUCKET }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: image-digest-*
+          path: image-digests
+          merge-multiple: true
+
+      - name: Build candidate manifest
+        run: |
+          jq -s \
+            --arg commit_sha "${{ needs.prepare.outputs.sha }}" \
+            --arg config_sha "${{ needs.prepare.outputs.sha }}" \
+            --arg ci_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{commit_sha: $commit_sha, config_sha: $config_sha, ci_url: $ci_url, images: (map({key: .service, value: .image}) | from_entries)}' \
+            image-digests/*.json > candidate.json
+          test "$(jq '.images | length' candidate.json)" -eq 6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install and configure OCI CLI
+        run: |
+          pipx install --force oci-cli
+          bash .github/scripts/configure-oci-cli.sh
+
+      - name: Persist CI-passed manifest
+        run: |
+          oci os object put --namespace "$OCI_NAMESPACE" --bucket-name "$RELEASE_MANIFEST_BUCKET" \
+            --name "candidates/${{ needs.prepare.outputs.sha }}.json" --file candidate.json --force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dev-release-manifest
+          path: candidate.json
+          retention-days: 7
+
+  deploy:
+    name: Deploy approved dev HEAD
+    needs: [prepare, manifest]
+    runs-on: [self-hosted, linux, arm64, cc-dev-deploy]
+    timeout-minutes: 45
+    environment: development
+    env:
+      DEV_DOMAIN: ${{ vars.DEV_DOMAIN }}
+      OCIR_REGISTRY: ${{ vars.OCIR_REGISTRY }}
+      USER_DB_ADMIN_PASSWORD_SECRET_OCID: ${{ secrets.USER_DB_ADMIN_PASSWORD_SECRET_OCID }}
+      PRODUCT_DB_ADMIN_PASSWORD_SECRET_OCID: ${{ secrets.PRODUCT_DB_ADMIN_PASSWORD_SECRET_OCID }}
+      ORDER_DB_ADMIN_PASSWORD_SECRET_OCID: ${{ secrets.ORDER_DB_ADMIN_PASSWORD_SECRET_OCID }}
+      USER_DB_PASSWORD_SECRET_OCID: ${{ secrets.USER_DB_PASSWORD_SECRET_OCID }}
+      PRODUCT_DB_PASSWORD_SECRET_OCID: ${{ secrets.PRODUCT_DB_PASSWORD_SECRET_OCID }}
+      ORDER_DB_PASSWORD_SECRET_OCID: ${{ secrets.ORDER_DB_PASSWORD_SECRET_OCID }}
+      GRAFANA_ADMIN_PASSWORD_SECRET_OCID: ${{ secrets.GRAFANA_ADMIN_PASSWORD_SECRET_OCID }}
+      ENABLE_MESSAGING_PROFILE: "true"
+      ENABLE_OBSERVABILITY_PROFILE: "true"
+      ALLOW_FIRST_CUTOVER: ${{ inputs.first_cutover }}
+      PULL_TIMEOUT_SECONDS: "600"
+      DEPLOY_TIMEOUT_SECONDS: "1200"
+      ROLLBACK_TIMEOUT_SECONDS: "600"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dev-release-manifest
+          path: .deploy
+
+      - name: Pull, start, validate, or roll back
+        run: |
+          bash deploy/scripts/deploy.sh \
+            --manifest .deploy/candidate.json \
+            --compose deploy/compose.dev.yml \
+            --base-images deploy/base-images.lock \
+            --state-dir /opt/cc-service \
+            --retained-images-output .deploy/retained-images.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: retained-images
+          path: .deploy/retained-images.json
+          retention-days: 7
+
+  external-smoke:
+    name: Verify public HTTPS
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DEV_DOMAIN: ${{ vars.DEV_DOMAIN }}
+    steps:
+      - name: Wait for public health endpoint
+        run: |
+          for _ in $(seq 1 36); do
+            if curl --connect-timeout 3 --max-time 10 --fail --silent --show-error \
+              "https://${DEV_DOMAIN}/actuator/health" >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Public HTTPS health verification failed." >&2
+          exit 1
+
+  cleanup-ocir:
+    name: Retain current and previous OCIR images
+    needs: [prepare, external-smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
+      OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
+      OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
+      OCI_CLI_REGION: ${{ vars.OCI_REGION }}
+      OCI_PRIVATE_KEY_B64: ${{ secrets.OCI_PRIVATE_KEY_B64 }}
+      OCI_COMPARTMENT_OCID: ${{ vars.CC_COMPARTMENT_OCID }}
+      OCIR_REPOSITORY_PREFIX: cc-dev/
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: retained-images
+          path: .deploy
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install and configure OCI CLI
+        run: |
+          pipx install --force oci-cli
+          bash .github/scripts/configure-oci-cli.sh
+
+      - name: Remove superseded cc-service images
+        run: bash .github/scripts/cleanup-ocir-images.sh --retained .deploy/retained-images.json --apply

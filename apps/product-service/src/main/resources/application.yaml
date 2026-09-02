@@ -4,3 +4,9 @@ spring:
 
   config:
     import: ${CONFIG_SERVER_IMPORT:optional:configserver:http://localhost:8888}
+
+kafka:
+  bootstrap-servers: localhost:9092
+  auto-offset-reset: latest
+  product-group-id: product-group
+  category-group-id: category-group
