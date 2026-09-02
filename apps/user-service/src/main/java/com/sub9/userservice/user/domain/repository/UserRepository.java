@@ -9,6 +9,8 @@ public interface UserRepository {
 
     User save(User user);
 
+    void flush();
+
     Optional<User> findActiveById(UUID userId);
 
     Optional<User> findActiveByEmail(String email);

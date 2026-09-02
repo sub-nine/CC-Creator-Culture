@@ -19,6 +19,11 @@ public class CreatorRepositoryImpl implements CreatorRepository {
     }
 
     @Override
+    public void flush() {
+        creatorJpaRepository.flush();
+    }
+
+    @Override
     public Optional<Creator> findActiveById(UUID creatorId) {
         return creatorJpaRepository.findByCreatorIdAndDeletedAtIsNull(creatorId);
     }

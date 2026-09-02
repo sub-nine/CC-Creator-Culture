@@ -8,6 +8,8 @@ public interface CreatorRepository {
 
     Creator save(Creator creator);
 
+    void flush();
+
     Optional<Creator> findActiveById(UUID creatorId);
 
     Optional<Creator> findActiveByUserId(UUID userId);
