@@ -12,7 +12,6 @@ import com.sub9.productservice.product.domain.model.Stock;
 import com.sub9.productservice.product.domain.repository.ProductCommandRepository;
 import com.sub9.productservice.product.domain.repository.SkuCommandRepository;
 import com.sub9.productservice.product.domain.repository.StockCommandRepository;
-
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -66,7 +65,10 @@ public class ProductCommandService {
   }
 
   public void deleteProduct(UUID creatorId, UUID productId) {
-    Product product = findByProductId(productId);
+    Product product =
+        productCommandRepository
+            .findByIdForUpdate(productId)
+            .orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
 
     product.validateOwner(creatorId);
     product.delete(creatorId);
