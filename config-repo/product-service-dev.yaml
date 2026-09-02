@@ -3,7 +3,9 @@ server:
 
 spring:
   datasource:
-    url: ${PRODUCT_DATASOURCE_URL:jdbc:postgresql://localhost:5432/product_db}
+    url: ${PRODUCT_DATASOURCE_URL}
     username: ${PRODUCT_DB_USERNAME}
     password: ${PRODUCT_DB_PASSWORD}
-
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
