@@ -57,4 +57,12 @@ public class Product extends BaseEntity {
       throw new BusinessException(ProductErrorCode.PRODUCT_ACCESS_DENIED);
     }
   }
+
+  public void updateStatus(ProductStatus productStatus) {
+    this.status = productStatus;
+  }
+
+  public void update(String name, String content) {
+
+  }
 }

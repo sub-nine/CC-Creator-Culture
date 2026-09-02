@@ -45,4 +45,14 @@ public class Sku extends BaseEntity {
     sku.isDefault = isDefault;
     return sku;
   }
+
+  public void update(String name, Long price, boolean isDefault) {
+    this.name = name;
+    this.price = price;
+    this.isDefault = isDefault;
+  }
+
+  public void unsetDefault() {
+    this.isDefault = false;
+  }
 }
