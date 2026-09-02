@@ -19,10 +19,6 @@ import lombok.NoArgsConstructor;
     name = "p_products",
     indexes = {@Index(name = "idx_products_creator_id", columnList = "creator_id")})
 public class Product extends BaseEntity {
-  @Id
-  @Column(name = "product_id")
-  private UUID id;
-
   @Column(nullable = false)
   private UUID creatorId;
 
@@ -45,7 +41,6 @@ public class Product extends BaseEntity {
 
   public static Product create(UUID creatorId, String name, String content) {
     Product product = new Product();
-    product.id = UuidCreator.getTimeOrderedEpoch();
     product.creatorId = creatorId;
     product.name = name;
     product.content = content;

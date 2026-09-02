@@ -24,7 +24,7 @@ import java.util.UUID;
     check = {@CheckConstraint(name = "ck_stocks_quantity", constraint = "quantity >= 0")})
 public class Stock {
   @Id
-  @Column(name = "stock_id")
+  @Column(name = "id")
   private UUID id;
 
   @Column(nullable = false)
