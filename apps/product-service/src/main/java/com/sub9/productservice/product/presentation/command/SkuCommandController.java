@@ -1,9 +1,11 @@
 package com.sub9.productservice.product.presentation.command;
 
+import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.product.application.command.dto.DeleteSkuCommand;
 import com.sub9.productservice.product.application.command.service.SkuCommandService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,10 +21,11 @@ public class SkuCommandController {
   private final SkuCommandService skuCommandService;
 
   @DeleteMapping("/{productId}/skus/{skuId}")
-  public void deleteSku(
+  public ResponseEntity<ApiResponse<Void>> deleteSku(
       @AuthenticationPrincipal AuthUser creatorUser,
       @PathVariable UUID productId,
       @PathVariable UUID skuId) {
     skuCommandService.deleteSku(new DeleteSkuCommand(creatorUser.id(), productId, skuId));
+    return ResponseEntity.ok(ApiResponse.success(null));
   }
 }
