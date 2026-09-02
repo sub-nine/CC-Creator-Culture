@@ -74,24 +74,24 @@ class PersistenceIntegrationTest {
     void when_user_and_creator_are_saved_relationship_and_initial_state_are_preserved() {
         User user = createUser("creator@example.com", "creator", "010-1111-2222", UserRole.CREATOR);
         userRepository.save(user);
-        Creator creator = Creator.createPending(uuidGenerator.generate(), user.getUserId(), "창작상점",
+        Creator creator = Creator.createPending(uuidGenerator.generate(), user.getId(), "창작상점",
                 "123-45-67890", Instant.parse("2026-09-01T02:00:00Z"));
 
         creatorRepository.save(creator);
         entityManager.flush();
         entityManager.clear();
 
-        Creator savedCreator = creatorRepository.findActiveByUserId(user.getUserId()).orElseThrow();
+        Creator savedCreator = creatorRepository.findActiveByUserId(user.getId()).orElseThrow();
         assertThat(savedCreator.getApprovalStatus().name()).isEqualTo("PENDING");
         assertThat(savedCreator.getCreatedBy()).isNull();
-        assertThat(savedCreator.getUpdatedBy()).isEqualTo(user.getUserId());
+        assertThat(savedCreator.getUpdatedBy()).isEqualTo(user.getId());
     }
 
     @Test
     @DisplayName("삭제된 사용자의 이메일도 UNIQUE 제약으로 재사용할 수 없다")
     void when_duplicate_email_is_saved_database_unique_constraint_rejects_it() {
         User first = createUser("same@example.com", "first", "010-1111-2222", UserRole.CUSTOMER);
-        first.softDelete(first.getUserId(), Instant.parse("2026-09-01T03:00:00Z"));
+        first.softDelete(first.getId(), Instant.parse("2026-09-01T03:00:00Z"));
         userRepository.save(first);
         entityManager.flush();
 

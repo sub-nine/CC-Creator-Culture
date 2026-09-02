@@ -17,11 +17,11 @@ public record CreatorSignupResponse(
 
     public static CreatorSignupResponse from(User user, Creator creator) {
         return new CreatorSignupResponse(
-                user.getUserId(),
+                user.getId(),
                 user.getEmail(),
                 user.getNickname(),
                 user.getRole(),
-                creator.getCreatorId(),
+                creator.getId(),
                 creator.getApprovalStatus());
     }
 }

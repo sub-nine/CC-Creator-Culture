@@ -79,7 +79,7 @@ class SignupServiceTest {
         assertThat(user.getPhone()).isEqualTo("01012345678");
         assertThat(user.getSlackId()).isNull();
         assertThat(user.getRole()).isEqualTo(UserRole.CUSTOMER);
-        assertThat(response.userId()).isEqualTo(user.getUserId());
+        assertThat(response.userId()).isEqualTo(user.getId());
     }
 
     @Test
@@ -97,10 +97,10 @@ class SignupServiceTest {
         User user = userCaptor.getValue();
         Creator creator = creatorCaptor.getValue();
         assertThat(user.getRole()).isEqualTo(UserRole.CREATOR);
-        assertThat(creator.getUserId()).isEqualTo(user.getUserId());
+        assertThat(creator.getUserId()).isEqualTo(user.getId());
         assertThat(creator.getBusinessRegistrationNumber()).isEqualTo("1234567890");
         assertThat(creator.getApprovalStatus()).isEqualTo(ApprovalStatus.PENDING);
-        assertThat(response.creatorId()).isEqualTo(creator.getCreatorId());
+        assertThat(response.creatorId()).isEqualTo(creator.getId());
     }
 
     @ParameterizedTest(name = "{0} 중복")

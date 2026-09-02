@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CreatorJpaRepository extends JpaRepository<Creator, UUID> {
 
-    Optional<Creator> findByCreatorIdAndDeletedAtIsNull(UUID creatorId);
+    Optional<Creator> findByIdAndDeletedAtIsNull(UUID id);
 
     Optional<Creator> findByUserIdAndDeletedAtIsNull(UUID userId);
 
