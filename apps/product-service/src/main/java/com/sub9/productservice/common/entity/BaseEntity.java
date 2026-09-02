@@ -1,15 +1,16 @@
-package com.sub9.productservice.common.domain;
+package com.sub9.productservice.common.entity;
 
+import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
-import lombok.AccessLevel;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
@@ -18,8 +19,10 @@ import java.util.UUID;
 @Getter
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-public abstract class BaseEntity {
+public abstract class BaseEntity implements Persistable<UUID> {
+    @Id
+    @Column(name = "id", nullable = false, updatable = false)
+    private UUID id;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -32,11 +35,16 @@ public abstract class BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    @CreatedBy @Column private UUID createdBy;
+    @CreatedBy
+    @Column(name = "created_by", updatable = false)
+    private UUID createdBy;
 
-    @LastModifiedBy @Column private UUID updatedBy;
+    @LastModifiedBy
+    @Column(name = "updated_by")
+    private UUID updatedBy;
 
-    @Column private UUID deletedBy;
+    @Column(name = "deleted_by")
+    private UUID deletedBy;
 
     public void delete(UUID deletedBy) {
         this.deletedAt = LocalDateTime.now();
@@ -46,5 +54,14 @@ public abstract class BaseEntity {
     public void restore() {
         this.deletedAt = null;
         this.deletedBy = null;
+    }
+
+    protected BaseEntity() {
+        this.id = UuidCreator.getTimeOrderedEpoch();
+    }
+
+    @Override
+    public boolean isNew() {
+        return this.createdAt == null;
     }
 }

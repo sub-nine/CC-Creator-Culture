@@ -10,7 +10,7 @@ import java.util.UUID;
 
 public record CreateProductRequest(
     @NotNull(message = "해시태그는 필수입니다.")
-        @Size(min = 2, max = 5, message = "해시태그는 최소 2개 이상 최대 5개 이하로 등록해야 합니다.")
+        @Size(min = 1, max = 5, message = "해시태그는 최소 1개 이상 최대 5개 이하로 등록해야 합니다.")
         List<
                 @NotBlank(message = "해시태그는 빈 값일 수  없습니다.")
                 @Size(max = 10, message = "해시태그는 10자를 초과할 수 없습니다.")

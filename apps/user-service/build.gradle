@@ -24,6 +24,11 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
 
+    // JUnit에서 Testcontainer의 시작과 종료 수명주기를 관리하기 위한 확장 모듈
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    // 실제 PostgreSQL에서 JPA 매핑과 DB 제약을 검증하기 위한 테스트 컨테이너
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     testCompileOnly 'org.projectlombok:lombok'

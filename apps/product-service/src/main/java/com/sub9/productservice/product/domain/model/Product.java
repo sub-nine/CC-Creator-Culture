@@ -1,12 +1,9 @@
 package com.sub9.productservice.product.domain.model;
 
 import com.github.f4b6a3.uuid.UuidCreator;
-import com.sub9.common.exception.BusinessException;
-import com.sub9.productservice.common.domain.BaseEntity;
-import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
-import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;

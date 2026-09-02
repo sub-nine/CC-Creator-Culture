@@ -108,7 +108,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
               "해시태그가 5개를 초과한 경우",
               changeRequestValue("hashTags", List.of("태그1", "태그2", "태그3", "태그4", "태그5", "태그6")),
               "hashTags",
-              "해시태그는 최소 2개 이상 최대 5개 이하로 등록해야 합니다."),
+              "해시태그는 최소 1개 이상 최대 5개 이하로 등록해야 합니다."),
           Arguments.of(
               "해시태그가 Null인 경우", changeRequestValue("hashTags", null), "hashTags", "해시태그는 필수입니다."),
           Arguments.of(
