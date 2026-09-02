@@ -16,9 +16,12 @@ psql \
   --set=ON_ERROR_STOP=1 \
   --username "$POSTGRES_USER" \
   --dbname "$SERVICE_DB_NAME" \
+  --set=postgres_user="$POSTGRES_USER" \
   --set=service_db_name="$SERVICE_DB_NAME" \
   --set=service_db_username="$SERVICE_DB_USERNAME" \
   --set=service_db_password="$SERVICE_DB_PASSWORD" <<'SQL'
+SET log_min_error_statement = PANIC;
+
 SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'service_db_username', :'service_db_password')
 WHERE NOT EXISTS (
   SELECT 1
@@ -27,6 +30,7 @@ WHERE NOT EXISTS (
 )
 \gexec
 
+SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', :'service_db_username', :'service_db_password') \gexec
 SELECT format('ALTER DATABASE %I OWNER TO %I', :'service_db_name', :'service_db_username') \gexec
 SELECT format('REVOKE CONNECT ON DATABASE %I FROM PUBLIC', :'service_db_name') \gexec
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I', :'service_db_name', :'service_db_username') \gexec

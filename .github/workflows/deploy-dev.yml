@@ -2,6 +2,12 @@ name: Deploy Development
 
 on:
   workflow_dispatch:
+    inputs:
+      first_cutover:
+        description: Allow the first guarded handoff of ports 80 and 443 to cc-service
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -265,6 +271,7 @@ jobs:
       GRAFANA_ADMIN_PASSWORD_SECRET_OCID: ${{ secrets.GRAFANA_ADMIN_PASSWORD_SECRET_OCID }}
       ENABLE_MESSAGING_PROFILE: "true"
       ENABLE_OBSERVABILITY_PROFILE: "true"
+      ALLOW_FIRST_CUTOVER: ${{ inputs.first_cutover }}
       PULL_TIMEOUT_SECONDS: "600"
       DEPLOY_TIMEOUT_SECONDS: "1200"
       ROLLBACK_TIMEOUT_SECONDS: "600"

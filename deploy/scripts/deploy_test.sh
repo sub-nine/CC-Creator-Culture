@@ -14,6 +14,8 @@ OLD_SHA="1111111111111111111111111111111111111111"
 NEW_SHA="2222222222222222222222222222222222222222"
 OLD_DIGEST="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 NEW_DIGEST="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+PUBLIC_CADDY_ID="eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+CC_CADDY_ID="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 
 cleanup() {
   if [[ "${KEEP_TEST_ROOT:-false}" == "true" ]]; then
@@ -75,14 +77,58 @@ set -Eeuo pipefail
 
 printf '%s\n' "$*" >> "$DOCKER_LOG"
 if [[ "$1" == "ps" ]]; then
-  if [[ "${LEGACY_POSTGRES_RUNNING:-false}" == "true" ]]; then
+  args="$*"
+  if [[ "$args" == *"label=com.docker.compose.service=postgres"* ]] \
+    && [[ "${LEGACY_POSTGRES_RUNNING:-false}" == "true" ]]; then
     printf 'legacy-postgres-container\n'
+  elif [[ "$args" == *"label=com.docker.compose.service=caddy"* ]] \
+    && [[ "$args" == *"publish=80"* ]] \
+    && [[ "$args" == *"publish=443"* ]] \
+    && [[ -f "${EXTERNAL_CADDY_STATE_FILE:-/nonexistent}" ]]; then
+    printf '%s\n' "${PUBLIC_CADDY_ID:-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee}"
+  elif [[ "$args" == *"label=com.docker.compose.project=cc-dev"* ]] \
+    && [[ "$args" == *"label=com.docker.compose.service=caddy"* ]] \
+    && [[ -f "${CC_CADDY_STATE_FILE:-/nonexistent}" ]]; then
+    printf '%s\n' "${CC_CADDY_ID:-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc}"
+  elif [[ "$args" == *"label=com.docker.compose.project=cc-dev"* ]] \
+    && [[ "$args" != *"label=com.docker.compose.service="* ]] \
+    && [[ -f "${CC_PROJECT_STATE_FILE:-/nonexistent}" ]]; then
+    printf '%s\n' "${CC_PROJECT_ID:-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd}"
   fi
   exit 0
 fi
 
 if [[ "$1" == "stop" ]]; then
+  container="${!#}"
+  if [[ "$container" == "${PUBLIC_CADDY_ID:-unset}" ]]; then
+    if [[ -n "${CUTOVER_STATE_PATH:-}" ]]; then
+      if stat -c '%a' "$CUTOVER_STATE_PATH" >/dev/null 2>&1; then
+        mode="$(stat -c '%a' "$CUTOVER_STATE_PATH")"
+      else
+        mode="$(stat -f '%Lp' "$CUTOVER_STATE_PATH")"
+      fi
+      [[ "$mode" == "600" ]] || exit 1
+    fi
+    rm -f "${EXTERNAL_CADDY_STATE_FILE:-/nonexistent}"
+    if [[ "${TERM_AFTER_EXTERNAL_STOP:-false}" == "true" ]]; then
+      kill -TERM "$PPID"
+      sleep 0.1
+    fi
+    exit 0
+  fi
   [[ "${FAIL_LEGACY_STOP:-false}" == "true" ]] && exit 1
+  exit 0
+fi
+
+if [[ "$1" == "start" ]]; then
+  container="${!#}"
+  [[ "$container" == "${PUBLIC_CADDY_ID:-unset}" ]] || exit 1
+  : > "$EXTERNAL_CADDY_STATE_FILE"
+  exit 0
+fi
+
+if [[ "$1" == "rm" ]]; then
+  rm -f "${CC_CADDY_STATE_FILE:-/nonexistent}"
   exit 0
 fi
 
@@ -101,7 +147,7 @@ if [[ "$1" == "compose" ]]; then
       --profile)
         shift 2
         ;;
-      pull|up|ps|exec|stop|rm)
+      pull|up|ps|exec|stop|rm|run|down)
         command="$1"
         shift
         break
@@ -118,6 +164,16 @@ if [[ "$1" == "compose" ]]; then
     printf 'candidate=%s topology=isolated command=%s\n' "$candidate" "$command" >> "$DOCKER_LOG"
   fi
   case "$command" in
+    up)
+      : > "$CC_PROJECT_STATE_FILE"
+      [[ " $* " == *" caddy "* ]] && : > "$CC_CADDY_STATE_FILE"
+      ;;
+    run)
+      [[ "${FAIL_CADDY_CONFIG:-false}" == "true" ]] && exit 1
+      ;;
+    down)
+      rm -f "$CC_PROJECT_STATE_FILE" "$CC_CADDY_STATE_FILE"
+      ;;
     ps)
       if [[ "$*" == "-q" ]]; then
         for service in config-server eureka-server gateway order-service order-postgres product-service product-postgres user-service user-postgres zipkin redis kafka kafka-ui prometheus grafana caddy; do
@@ -178,7 +234,19 @@ fi
 
 if [[ "$1" == "inspect" ]]; then
   container="${!#}"
-  if [[ "$*" == *"RestartCount"* ]]; then
+  if [[ "$container" == "${PUBLIC_CADDY_ID:-unset}" ]]; then
+    if [[ "$*" == *"com.docker.compose.service"* ]]; then
+      printf 'caddy\n'
+    elif [[ "$*" == *"com.docker.compose.project"* ]]; then
+      printf '%s\n' "${PUBLIC_CADDY_PROJECT:-external-project}"
+    elif [[ "$*" == *"{{.Name}}"* ]]; then
+      printf '/external-public-caddy\n'
+    elif [[ "$*" == *"State.Running"* ]]; then
+      [[ -f "${EXTERNAL_CADDY_STATE_FILE:-/nonexistent}" ]] && printf 'true\n' || printf 'false\n'
+    else
+      exit 1
+    fi
+  elif [[ "$*" == *"RestartCount"* ]]; then
     printf '/%s|0|false|running\n' "$container"
   elif [[ "$container" == "${FAIL_CANDIDATE_SHA:-unset}-${FAIL_HEALTH_SERVICE:-unset}-container" ]]; then
     printf 'unhealthy\n'
@@ -265,6 +333,18 @@ EOF
 run_deploy() {
   local manifest="$1"
   local state_dir="$2"
+  local cc_project_state_file="$state_dir/fake-cc-project"
+  local cc_caddy_state_file="$state_dir/fake-cc-caddy"
+  local external_caddy_state_file="$state_dir/fake-external-caddy"
+
+  mkdir -p "$state_dir"
+  if [[ "${STALE_CC_CONTAINERS:-false}" == "true" ]]; then
+    : > "$cc_project_state_file"
+  fi
+  if [[ "${PUBLIC_CADDY_RUNNING:-false}" == "true" ]]; then
+    : > "$external_caddy_state_file"
+  fi
+
   DEV_DOMAIN=dev.example.com \
   USER_DB_ADMIN_PASSWORD_SECRET_OCID=user-admin \
   PRODUCT_DB_ADMIN_PASSWORD_SECRET_OCID=product-admin \
@@ -277,6 +357,7 @@ run_deploy() {
   ENABLE_MESSAGING_PROFILE="${TEST_ENABLE_MESSAGING_PROFILE:-true}" \
   ENABLE_OBSERVABILITY_PROFILE="${TEST_ENABLE_OBSERVABILITY_PROFILE:-true}" \
   FORCE_DEPLOY="${TEST_FORCE_DEPLOY:-false}" \
+  ALLOW_FIRST_CUTOVER="${TEST_ALLOW_FIRST_CUTOVER:-false}" \
   DEPLOY_TIMEOUT_SECONDS="${TEST_DEPLOY_TIMEOUT_SECONDS:-5}" \
   PULL_TIMEOUT_SECONDS=5 \
   ROLLBACK_TIMEOUT_SECONDS=5 \
@@ -284,6 +365,13 @@ run_deploy() {
   PROM_READY_AFTER="${PROM_READY_AFTER:-1}" \
   DOCKER_LOG="$DOCKER_LOG" \
   CURL_LOG="$CURL_LOG" \
+  CC_PROJECT_STATE_FILE="$cc_project_state_file" \
+  CC_CADDY_STATE_FILE="$cc_caddy_state_file" \
+  EXTERNAL_CADDY_STATE_FILE="$external_caddy_state_file" \
+  CUTOVER_STATE_PATH="$state_dir/runtime/public-cutover.json" \
+  PUBLIC_CADDY_ID="$PUBLIC_CADDY_ID" \
+  PUBLIC_CADDY_PROJECT="${PUBLIC_CADDY_PROJECT:-external-project}" \
+  CC_CADDY_ID="$CC_CADDY_ID" \
   PATH="$FAKE_BIN:$PATH" \
     bash "$DEPLOY_SCRIPT" \
       --manifest "$manifest" \
@@ -298,6 +386,26 @@ assert_file_line() {
   local file="$2"
   grep -Fqx "$expected" "$file" || {
     echo "Expected line not found in $file: $expected" >&2
+    exit 1
+  }
+}
+
+file_mode() {
+  local file="$1"
+  if stat -c '%a' "$file" >/dev/null 2>&1; then
+    stat -c '%a' "$file"
+  else
+    stat -f '%Lp' "$file"
+  fi
+}
+
+assert_file_mode() {
+  local expected="$1"
+  local file="$2"
+  local actual
+  actual="$(file_mode "$file")"
+  [[ "$actual" == "$expected" ]] || {
+    echo "Expected mode $expected for $file, got $actual." >&2
     exit 1
   }
 }
@@ -345,6 +453,13 @@ unset PROM_ATTEMPT_FILE PROM_READY_AFTER LEGACY_POSTGRES_RUNNING
 
 assert_file_line "CANDIDATE_SHA=$NEW_SHA" "$success_state/runtime/current.env"
 assert_file_line "CANDIDATE_SHA=$OLD_SHA" "$success_state/runtime/previous.env"
+assert_file_mode 600 "$success_state/runtime/current.env"
+assert_file_mode 600 "$success_state/releases/$NEW_SHA/source/deploy/compose.dev.yml"
+assert_file_mode 644 "$success_state/releases/$NEW_SHA/source/deploy/Caddyfile"
+assert_file_mode 644 "$success_state/releases/$NEW_SHA/source/deploy/prometheus/prometheus.yml"
+assert_file_mode 644 "$success_state/releases/$NEW_SHA/source/deploy/grafana/provisioning/datasources/prometheus.yml"
+assert_file_mode 755 "$success_state/releases/$NEW_SHA/source/deploy/postgres/init-service-database.sh"
+assert_file_mode 600 "$success_state/releases/$NEW_SHA/source/deploy/postgres/reconcile-credentials.sql"
 [[ ! -d "$success_state/releases/3333333333333333333333333333333333333333" ]]
 jq -e '.services | length == 6 and all(.[]; length == 2)' "$success_state/retained-images.json" >/dev/null
 grep -Fq -- '--resolve dev.example.com:443:127.0.0.1' "$CURL_LOG"
@@ -426,6 +541,117 @@ assert_semantic_failure() {
 assert_semantic_failure eureka FAIL_EUREKA
 assert_semantic_failure grafana FAIL_GRAFANA
 assert_semantic_failure zipkin FAIL_ZIPKIN
+
+first_cutover_block_state="$TEST_ROOT/first-cutover-block-state"
+: > "$DOCKER_LOG"
+export STALE_CC_CONTAINERS=true
+export PUBLIC_CADDY_RUNNING=true
+if run_deploy "$manifest" "$first_cutover_block_state" > "$TEST_ROOT/first-cutover-block.out" 2>&1; then
+  echo "Expected an unapproved first public cutover to fail." >&2
+  exit 1
+fi
+unset STALE_CC_CONTAINERS PUBLIC_CADDY_RUNNING
+grep -Fq "command=down args=--remove-orphans" "$DOCKER_LOG"
+if grep -Fq -- '--volumes' "$DOCKER_LOG"; then
+  echo "Incomplete deployment cleanup attempted to remove named volumes." >&2
+  exit 1
+fi
+if grep -Fq "stop --time 30 $PUBLIC_CADDY_ID" "$DOCKER_LOG"; then
+  echo "The external Caddy was stopped without first-cutover approval." >&2
+  exit 1
+fi
+[[ ! -f "$first_cutover_block_state/runtime/current.env" ]]
+[[ -f "$first_cutover_block_state/fake-external-caddy" ]]
+
+first_cutover_success_state="$TEST_ROOT/first-cutover-success-state"
+: > "$DOCKER_LOG"
+export PUBLIC_CADDY_RUNNING=true
+export TEST_ALLOW_FIRST_CUTOVER=true
+run_deploy "$manifest" "$first_cutover_success_state" > "$TEST_ROOT/first-cutover-success.out" 2>&1
+unset PUBLIC_CADDY_RUNNING TEST_ALLOW_FIRST_CUTOVER
+grep -Fq "stop --time 30 $PUBLIC_CADDY_ID" "$DOCKER_LOG"
+if grep -Fq "start $PUBLIC_CADDY_ID" "$DOCKER_LOG"; then
+  echo "A successful first cutover unexpectedly restarted the previous Caddy." >&2
+  exit 1
+fi
+[[ ! -f "$first_cutover_success_state/runtime/public-cutover.json" ]]
+[[ ! -f "$first_cutover_success_state/fake-external-caddy" ]]
+assert_file_line "CANDIDATE_SHA=$NEW_SHA" "$first_cutover_success_state/runtime/current.env"
+
+config_line="$(grep -nF "candidate=$NEW_SHA command=run" "$DOCKER_LOG" | head -n 1 | cut -d: -f1)"
+cutover_line="$(grep -nF "stop --time 30 $PUBLIC_CADDY_ID" "$DOCKER_LOG" | head -n 1 | cut -d: -f1)"
+caddy_line="$(grep -nF "candidate=$NEW_SHA command=up args=-d caddy" "$DOCKER_LOG" | head -n 1 | cut -d: -f1)"
+[[ -n "$config_line" && -n "$cutover_line" && -n "$caddy_line" ]]
+(( config_line < cutover_line && cutover_line < caddy_line )) || {
+  echo "The public cutover did not occur after Caddy validation and before candidate Caddy startup." >&2
+  exit 1
+}
+
+first_cutover_failure_state="$TEST_ROOT/first-cutover-failure-state"
+: > "$DOCKER_LOG"
+export PUBLIC_CADDY_RUNNING=true
+export TEST_ALLOW_FIRST_CUTOVER=true
+export FAIL_CANDIDATE_SHA="$NEW_SHA"
+export FAIL_HEALTH_SERVICE=caddy
+if run_deploy "$manifest" "$first_cutover_failure_state" > "$TEST_ROOT/first-cutover-failure.out" 2>&1; then
+  echo "Expected a candidate Caddy failure after first cutover." >&2
+  exit 1
+fi
+unset PUBLIC_CADDY_RUNNING TEST_ALLOW_FIRST_CUTOVER FAIL_CANDIDATE_SHA FAIL_HEALTH_SERVICE
+grep -Fq "stop --time 30 $PUBLIC_CADDY_ID" "$DOCKER_LOG"
+grep -Fq "start $PUBLIC_CADDY_ID" "$DOCKER_LOG"
+[[ -f "$first_cutover_failure_state/fake-external-caddy" ]]
+[[ ! -f "$first_cutover_failure_state/runtime/public-cutover.json" ]]
+[[ ! -f "$first_cutover_failure_state/runtime/current.env" ]]
+
+same_project_caddy_state="$TEST_ROOT/same-project-caddy-state"
+: > "$DOCKER_LOG"
+export PUBLIC_CADDY_RUNNING=true
+export PUBLIC_CADDY_PROJECT=cc-dev
+run_deploy "$manifest" "$same_project_caddy_state" > "$TEST_ROOT/same-project-caddy.out" 2>&1
+unset PUBLIC_CADDY_RUNNING PUBLIC_CADDY_PROJECT
+if grep -Fq "stop --time 30 $PUBLIC_CADDY_ID" "$DOCKER_LOG"; then
+  echo "The current cc-service Caddy was mistaken for an external first-cutover target." >&2
+  exit 1
+fi
+
+signal_cutover_state="$TEST_ROOT/signal-cutover-state"
+: > "$DOCKER_LOG"
+export PUBLIC_CADDY_RUNNING=true
+export TEST_ALLOW_FIRST_CUTOVER=true
+export TERM_AFTER_EXTERNAL_STOP=true
+if run_deploy "$manifest" "$signal_cutover_state" > "$TEST_ROOT/signal-cutover.out" 2>&1; then
+  echo "Expected the deployment to stop after the simulated TERM signal." >&2
+  exit 1
+fi
+unset PUBLIC_CADDY_RUNNING TEST_ALLOW_FIRST_CUTOVER TERM_AFTER_EXTERNAL_STOP
+grep -Fq "stop --time 30 $PUBLIC_CADDY_ID" "$DOCKER_LOG"
+grep -Fq "start $PUBLIC_CADDY_ID" "$DOCKER_LOG"
+grep -Fq "command=down args=--remove-orphans" "$DOCKER_LOG"
+[[ -f "$signal_cutover_state/fake-external-caddy" ]]
+[[ ! -f "$signal_cutover_state/runtime/public-cutover.json" ]]
+
+interrupted_cutover_state="$TEST_ROOT/interrupted-cutover-state"
+mkdir -p "$interrupted_cutover_state/runtime"
+jq -n \
+  --arg container_id "$PUBLIC_CADDY_ID" \
+  --arg candidate_sha "$NEW_SHA" \
+  '{container_id: $container_id, container_name: "external-public-caddy", candidate_sha: $candidate_sha}' \
+  > "$interrupted_cutover_state/runtime/public-cutover.json"
+chmod 0600 "$interrupted_cutover_state/runtime/public-cutover.json"
+: > "$interrupted_cutover_state/fake-cc-project"
+: > "$interrupted_cutover_state/fake-cc-caddy"
+: > "$DOCKER_LOG"
+export FAIL_SECRET=true
+if run_deploy "$manifest" "$interrupted_cutover_state" > "$TEST_ROOT/interrupted-cutover.out" 2>&1; then
+  echo "Expected the interrupted-cutover recovery fixture to stop on Secret retrieval." >&2
+  exit 1
+fi
+unset FAIL_SECRET
+grep -Fq "rm -f $CC_CADDY_ID" "$DOCKER_LOG"
+grep -Fq "start $PUBLIC_CADDY_ID" "$DOCKER_LOG"
+[[ -f "$interrupted_cutover_state/fake-external-caddy" ]]
+[[ ! -f "$interrupted_cutover_state/runtime/public-cutover.json" ]]
 
 legacy_stop_failure_state="$TEST_ROOT/legacy-stop-failure-state"
 mkdir -p "$legacy_stop_failure_state/runtime"

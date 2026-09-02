@@ -37,7 +37,9 @@ trap cleanup EXIT
 start_postgres() {
   local service="$1"
   local suffix="$2"
+  local with_init="${3:-true}"
   local container network volume database username alias
+  local -a init_mount=()
   container="$(container_name "$service")"
   network="$(network_name "$service")"
   volume="$(volume_name "$service")"
@@ -46,6 +48,11 @@ start_postgres() {
   alias="${service}-postgres"
 
   docker network inspect "$network" >/dev/null 2>&1 || docker network create "$network" >/dev/null
+  if [[ "$with_init" == "true" ]]; then
+    init_mount=(
+      -v "$REPOSITORY_ROOT/deploy/postgres/init-service-database.sh:/docker-entrypoint-initdb.d/10-init-service-database.sh:ro"
+    )
+  fi
   docker run -d \
     --name "$container" \
     --network "$network" \
@@ -57,12 +64,12 @@ start_postgres() {
     -e "SERVICE_DB_USERNAME=$username" \
     -e "SERVICE_DB_PASSWORD=${service}-app-${suffix}" \
     -v "$volume:/var/lib/postgresql/data" \
-    -v "$REPOSITORY_ROOT/deploy/postgres/init-service-database.sh:/docker-entrypoint-initdb.d/10-init-service-database.sh:ro" \
+    "${init_mount[@]+"${init_mount[@]}"}" \
     "$POSTGRES_IMAGE" \
     -c max_connections=30 >/dev/null
 
   for _ in $(seq 1 30); do
-    if docker exec "$container" pg_isready --username postgres --dbname "$database" >/dev/null 2>&1; then
+    if docker exec "$container" pg_isready --host 127.0.0.1 --username postgres --dbname "$database" >/dev/null 2>&1; then
       return 0
     fi
     sleep 1
@@ -112,6 +119,16 @@ for service in "${SERVICES[@]}"; do
   assert_login "$service" "${service}-app-old" "${service}_app"
 done
 
+docker rm -f "$(container_name user)" >/dev/null
+docker volume rm "$(volume_name user)" >/dev/null
+start_postgres user old false
+if docker exec "$(container_name user)" psql --username postgres --dbname user_db \
+  --tuples-only --no-align --command "SELECT 1 FROM pg_roles WHERE rolname = 'user_app'" \
+  | grep -Fqx 1; then
+  echo "The missing-role recovery fixture unexpectedly created user_app." >&2
+  exit 1
+fi
+
 for service in "${SERVICES[@]}"; do
   docker rm -f "$(container_name "$service")" >/dev/null
   start_postgres "$service" new
@@ -128,6 +145,18 @@ for service in "${SERVICES[@]}"; do
     echo "Previous $service database password remained valid after reconciliation." >&2
     exit 1
   fi
+
+  logs="$(docker logs "$(container_name "$service")" 2>&1)"
+  for password in \
+    "${service}-admin-old" \
+    "${service}-app-old" \
+    "${service}-admin-new" \
+    "${service}-app-new"; do
+    if grep -Fq "$password" <<<"$logs"; then
+      echo "$service PostgreSQL logs exposed a database password." >&2
+      exit 1
+    fi
+  done
 done
 
 if docker exec -e PGPASSWORD=user-app-new "$(container_name user)" \

@@ -54,6 +54,7 @@ jq -e '
       and (($root.services[$item.container].networks | keys) == [$item.network])
       and (($root.services[$item.container].ports // []) | length == 0)
       and ($root.services[$item.container].mem_limit == "536870912")
+      and ($root.services[$item.container].healthcheck.test[1] | contains("pg_isready -h 127.0.0.1"))
       and ($root.services[$item.container].volumes | any(.source == $item.volume))
       and ($root.services[$item.container].volumes | any(.source | endswith("/deploy/postgres/init-service-database.sh")))
       and (($root.services[$item.app].networks | keys | sort) == (["internal", $item.network] | sort))

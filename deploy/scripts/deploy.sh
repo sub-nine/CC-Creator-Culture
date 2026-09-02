@@ -38,11 +38,12 @@ done
 ENABLE_MESSAGING_PROFILE="${ENABLE_MESSAGING_PROFILE:-true}"
 ENABLE_OBSERVABILITY_PROFILE="${ENABLE_OBSERVABILITY_PROFILE:-true}"
 FORCE_DEPLOY="${FORCE_DEPLOY:-false}"
+ALLOW_FIRST_CUTOVER="${ALLOW_FIRST_CUTOVER:-false}"
 DEPLOY_TIMEOUT_SECONDS="${DEPLOY_TIMEOUT_SECONDS:-900}"
 PULL_TIMEOUT_SECONDS="${PULL_TIMEOUT_SECONDS:-600}"
 ROLLBACK_TIMEOUT_SECONDS="${ROLLBACK_TIMEOUT_SECONDS:-600}"
 
-for value in "$ENABLE_MESSAGING_PROFILE" "$ENABLE_OBSERVABILITY_PROFILE" "$FORCE_DEPLOY"; do
+for value in "$ENABLE_MESSAGING_PROFILE" "$ENABLE_OBSERVABILITY_PROFILE" "$FORCE_DEPLOY" "$ALLOW_FIRST_CUTOVER"; do
   [[ "$value" == "true" || "$value" == "false" ]] || {
     echo "Boolean deployment flags must be true or false." >&2
     exit 65
@@ -133,19 +134,92 @@ locked_image_value() {
 current_env="$STATE_DIR/runtime/current.env"
 previous_env="$STATE_DIR/runtime/previous.env"
 candidate_env="$STATE_DIR/runtime/candidate.env"
+public_cutover_state="$STATE_DIR/runtime/public-cutover.json"
 candidate_env_tmp=""
+cutover_committed="false"
 
 cleanup_temp_files() {
   if [[ -n "$candidate_env_tmp" && -f "$candidate_env_tmp" ]]; then
     rm -f "$candidate_env_tmp"
   fi
 }
-trap cleanup_temp_files EXIT
+
+on_exit() {
+  local status=$?
+  trap - EXIT INT TERM
+  cleanup_temp_files || true
+  if (( status != 0 )) && [[ ! -f "$current_env" ]] \
+    && [[ -n "${ACTIVE_ENV_FILE:-}" && -n "${ACTIVE_SOURCE_DIR:-}" ]] \
+    && declare -F cleanup_candidate_containers >/dev/null; then
+    cleanup_candidate_containers || status=1
+  fi
+  if [[ "$cutover_committed" != "true" && -f "$public_cutover_state" ]] \
+    && declare -F restore_public_endpoint >/dev/null; then
+    restore_public_endpoint || status=1
+  fi
+  exit "$status"
+}
+trap on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 env_value() {
   local key="$1"
   local file="$2"
   awk -F= -v key="$key" '$1 == key {sub(/^[^=]*=/, ""); print; exit}' "$file"
+}
+
+cc_caddy_container_ids() {
+  docker ps -aq \
+    --filter label=com.docker.compose.project=cc-dev \
+    --filter label=com.docker.compose.service=caddy
+}
+
+remove_cc_caddy() {
+  local containers container
+  containers="$(cc_caddy_container_ids)"
+  [[ -n "$containers" ]] || return 0
+  while IFS= read -r container; do
+    [[ -n "$container" ]] || continue
+    docker rm -f "$container" >/dev/null || return 1
+  done <<<"$containers"
+}
+
+restore_public_endpoint() {
+  [[ -f "$public_cutover_state" ]] || return 0
+
+  local container_id marker_sha current_sha service project running
+  container_id="$(jq -er '.container_id' "$public_cutover_state")" || return 1
+  marker_sha="$(jq -er '.candidate_sha' "$public_cutover_state")" || return 1
+  [[ "$container_id" =~ ^[0-9a-f]{12,64}$ && "$marker_sha" =~ ^[0-9a-f]{40}$ ]] || {
+    echo "Public cutover recovery state is invalid." >&2
+    return 1
+  }
+
+  current_sha=""
+  if [[ -f "$current_env" ]]; then
+    current_sha="$(env_value CANDIDATE_SHA "$current_env")"
+  fi
+  if [[ "$current_sha" == "$marker_sha" ]]; then
+    rm -f "$public_cutover_state"
+    cutover_committed="true"
+    return 0
+  fi
+
+  service="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$container_id" 2>/dev/null)" || return 1
+  project="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$container_id" 2>/dev/null)" || return 1
+  if [[ "$service" != "caddy" || -z "$project" || "$project" == "cc-dev" ]]; then
+    echo "Refusing to restore a container that is not the recorded external Caddy." >&2
+    return 1
+  fi
+
+  remove_cc_caddy || return 1
+  running="$(docker inspect --format '{{.State.Running}}' "$container_id")" || return 1
+  if [[ "$running" != "true" ]]; then
+    docker start "$container_id" >/dev/null || return 1
+  fi
+  rm -f "$public_cutover_state"
+  echo "Restored the previous public Caddy after an incomplete cutover." >&2
 }
 
 service_env_key() {
@@ -218,13 +292,25 @@ fi
 repository_root="$(cd "$(dirname "$COMPOSE_FILE")/.." && pwd)"
 release_root="$STATE_DIR/releases/$candidate_sha"
 release_source="$release_root/source"
-mkdir -p "$release_source/deploy"
-cp "$COMPOSE_FILE" "$release_source/deploy/compose.dev.yml"
-cp "$repository_root/deploy/Caddyfile" "$release_source/deploy/Caddyfile"
-cp -R "$repository_root/deploy/prometheus" "$release_source/deploy/"
-cp -R "$repository_root/deploy/grafana" "$release_source/deploy/"
-cp -R "$repository_root/deploy/postgres" "$release_source/deploy/"
-cp "$MANIFEST" "$release_root/manifest.json"
+install -d -m 0700 \
+  "$release_root" \
+  "$release_source/deploy" \
+  "$release_source/deploy/prometheus" \
+  "$release_source/deploy/grafana/provisioning/datasources" \
+  "$release_source/deploy/postgres"
+install -m 0600 "$COMPOSE_FILE" "$release_source/deploy/compose.dev.yml"
+install -m 0644 "$repository_root/deploy/Caddyfile" "$release_source/deploy/Caddyfile"
+install -m 0644 "$repository_root/deploy/prometheus/prometheus.yml" "$release_source/deploy/prometheus/prometheus.yml"
+install -m 0644 \
+  "$repository_root/deploy/grafana/provisioning/datasources/prometheus.yml" \
+  "$release_source/deploy/grafana/provisioning/datasources/prometheus.yml"
+install -m 0755 \
+  "$repository_root/deploy/postgres/init-service-database.sh" \
+  "$release_source/deploy/postgres/init-service-database.sh"
+install -m 0600 \
+  "$repository_root/deploy/postgres/reconcile-credentials.sql" \
+  "$release_source/deploy/postgres/reconcile-credentials.sql"
+install -m 0600 "$MANIFEST" "$release_root/manifest.json"
 
 secret_value() {
   local secret_ocid="$1"
@@ -314,6 +400,79 @@ compose_timed() {
       --env-file "$ACTIVE_ENV_FILE" \
       -f "$ACTIVE_SOURCE_DIR/deploy/compose.dev.yml" \
       "$@"
+}
+
+cc_project_container_ids() {
+  docker ps -aq --filter label=com.docker.compose.project=cc-dev
+}
+
+cleanup_candidate_containers() {
+  local containers
+  containers="$(cc_project_container_ids)"
+  [[ -n "$containers" ]] || return 0
+
+  echo "Removing incomplete cc-service containers while preserving named volumes." >&2
+  compose_timed "$ROLLBACK_TIMEOUT_SECONDS" \
+    --profile messaging \
+    --profile observability \
+    down --remove-orphans
+}
+
+discover_external_public_caddy() {
+  local containers container_count container_id project
+  containers="$(
+    docker ps -q --no-trunc \
+      --filter label=com.docker.compose.service=caddy \
+      --filter publish=80 \
+      --filter publish=443
+  )"
+  container_count="$(grep -c . <<<"$containers" || true)"
+
+  if (( container_count > 1 )); then
+    echo "Expected at most one running Caddy container to own ports 80 and 443." >&2
+    return 1
+  fi
+  (( container_count == 1 )) || return 0
+
+  container_id="$(head -n 1 <<<"$containers")"
+  project="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$container_id")" || return 1
+  [[ "$project" != "cc-dev" ]] || return 0
+  printf '%s' "$container_id"
+}
+
+validate_caddy_config() {
+  compose run --rm --no-deps caddy \
+    caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
+}
+
+begin_public_cutover() {
+  local container_id container_name state_tmp
+  container_id="$(discover_external_public_caddy)" || return 1
+  [[ -n "$container_id" ]] || return 0
+
+  if [[ "$ALLOW_FIRST_CUTOVER" != "true" ]]; then
+    echo "An external Caddy owns ports 80 and 443. Run the approved first cutover explicitly." >&2
+    return 1
+  fi
+
+  container_name="$(docker inspect --format '{{.Name}}' "$container_id")" || return 1
+  state_tmp="$(mktemp "${public_cutover_state}.XXXXXX")"
+  jq -n \
+    --arg container_id "$container_id" \
+    --arg container_name "${container_name#/}" \
+    --arg candidate_sha "$candidate_sha" \
+    '{container_id: $container_id, container_name: $container_name, candidate_sha: $candidate_sha}' \
+    > "$state_tmp"
+  chmod 0600 "$state_tmp"
+  mv "$state_tmp" "$public_cutover_state"
+
+  docker stop --time 30 "$container_id" >/dev/null || return 1
+  echo "Stopped the previous public Caddy for the approved first cutover."
+}
+
+complete_public_cutover() {
+  rm -f "$public_cutover_state"
+  cutover_committed="true"
 }
 
 DEPLOY_DEADLINE=0
@@ -600,11 +759,6 @@ deploy_release() {
   wait_healthy gateway || return 1
   verify_eureka || return 1
 
-  compose up -d caddy || return 1
-  wait_healthy caddy || return 1
-  wait_https || return 1
-  verify_zipkin || return 1
-
   if [[ "$ENABLE_MESSAGING_PROFILE" == "true" ]]; then
     compose --profile messaging up -d redis kafka kafka-ui || return 1
     wait_healthy redis || return 1
@@ -625,9 +779,21 @@ deploy_release() {
     disable_profile_services observability prometheus grafana
   fi
 
+  validate_caddy_config || return 1
+  begin_public_cutover || return 1
+  compose up -d caddy || return 1
+  wait_healthy caddy || return 1
+  wait_https || return 1
+  verify_zipkin || return 1
+
   verify_container_runtime || return 1
   stop_legacy_postgres || return 1
 }
+
+restore_public_endpoint || exit 1
+if [[ ! -f "$current_env" ]]; then
+  cleanup_candidate_containers || exit 1
+fi
 
 ROLLBACK_ENV=""
 ROLLBACK_SOURCE=""
@@ -676,7 +842,12 @@ rollback() {
 }
 
 if ! deploy_release; then
-  rollback || true
+  if [[ -n "$ROLLBACK_ENV" ]]; then
+    rollback || true
+  else
+    echo "Deployment failed and no previous cc-service release is available." >&2
+    cleanup_candidate_containers || true
+  fi
   rm -f "$candidate_env"
   exit 1
 fi
@@ -688,4 +859,5 @@ if [[ -n "$RETAINED_IMAGES_OUTPUT" ]]; then
   mkdir -p "$(dirname "$RETAINED_IMAGES_OUTPUT")"
   write_retained_images "$RETAINED_IMAGES_OUTPUT"
 fi
+complete_public_cutover
 echo "Deployment completed: $candidate_sha"
