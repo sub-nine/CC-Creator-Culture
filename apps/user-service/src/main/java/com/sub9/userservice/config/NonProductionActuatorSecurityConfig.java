@@ -7,11 +7,11 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration(proxyBeanMethods = false)
-@Profile("local")
-public class LocalActuatorSecurityConfig {
+@Profile({"local", "dev"})
+public class NonProductionActuatorSecurityConfig {
 
     @Bean
-    SecurityFilterChain localSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain nonProductionSecurityFilterChain(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(
                         "/actuator/health",

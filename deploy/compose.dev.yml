@@ -1,0 +1,378 @@
+name: cc-dev
+
+x-logging: &rotating-logs
+  driver: local
+  options:
+    max-size: 10m
+    max-file: "3"
+
+x-java-service: &java-service
+  restart: unless-stopped
+  networks:
+    - internal
+  logging: *rotating-logs
+
+x-postgres-service: &postgres-service
+  image: ${POSTGRES_IMAGE:?POSTGRES_IMAGE is required}
+  restart: unless-stopped
+  command: ["postgres", "-c", "max_connections=30"]
+  mem_limit: 512m
+  logging: *rotating-logs
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+    interval: 5s
+    timeout: 5s
+    retries: 12
+    start_period: 20s
+
+x-app-environment: &app-environment
+  SPRING_PROFILES_ACTIVE: dev
+  CONFIG_SERVER_IMPORT: configserver:http://config-server:8888
+  EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+  MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+
+x-platform-depends-on: &platform-depends-on
+  config-server:
+    condition: service_healthy
+  eureka-server:
+    condition: service_healthy
+  zipkin:
+    condition: service_started
+
+services:
+  user-postgres:
+    <<: *postgres-service
+    environment:
+      POSTGRES_DB: user_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${USER_DB_ADMIN_PASSWORD:?USER_DB_ADMIN_PASSWORD is required}
+      SERVICE_DB_NAME: user_db
+      SERVICE_DB_USERNAME: user_app
+      SERVICE_DB_PASSWORD: ${USER_DB_PASSWORD:?USER_DB_PASSWORD is required}
+    volumes:
+      - user-postgres-data:/var/lib/postgresql/data
+      - ./deploy/postgres/init-service-database.sh:/docker-entrypoint-initdb.d/10-init-service-database.sh:ro
+    networks:
+      - user-data
+
+  product-postgres:
+    <<: *postgres-service
+    environment:
+      POSTGRES_DB: product_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${PRODUCT_DB_ADMIN_PASSWORD:?PRODUCT_DB_ADMIN_PASSWORD is required}
+      SERVICE_DB_NAME: product_db
+      SERVICE_DB_USERNAME: product_app
+      SERVICE_DB_PASSWORD: ${PRODUCT_DB_PASSWORD:?PRODUCT_DB_PASSWORD is required}
+    volumes:
+      - product-postgres-data:/var/lib/postgresql/data
+      - ./deploy/postgres/init-service-database.sh:/docker-entrypoint-initdb.d/10-init-service-database.sh:ro
+    networks:
+      - product-data
+
+  order-postgres:
+    <<: *postgres-service
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${ORDER_DB_ADMIN_PASSWORD:?ORDER_DB_ADMIN_PASSWORD is required}
+      SERVICE_DB_NAME: order_db
+      SERVICE_DB_USERNAME: order_app
+      SERVICE_DB_PASSWORD: ${ORDER_DB_PASSWORD:?ORDER_DB_PASSWORD is required}
+    volumes:
+      - order-postgres-data:/var/lib/postgresql/data
+      - ./deploy/postgres/init-service-database.sh:/docker-entrypoint-initdb.d/10-init-service-database.sh:ro
+    networks:
+      - order-data
+
+  zipkin:
+    image: ${ZIPKIN_IMAGE:?ZIPKIN_IMAGE is required}
+    restart: unless-stopped
+    environment:
+      JAVA_OPTS: -Xms128m -Xmx256m -XX:+ExitOnOutOfMemoryError
+      STORAGE_TYPE: mem
+    networks:
+      - internal
+    mem_limit: 384m
+    logging: *rotating-logs
+
+  config-server:
+    <<: *java-service
+    image: ${CONFIG_SERVER_IMAGE:?CONFIG_SERVER_IMAGE is required}
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_REPO_PATH: /config-repo
+      SERVER_PORT: "8888"
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m -XX:+ExitOnOutOfMemoryError
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+
+  eureka-server:
+    <<: *java-service
+    image: ${EUREKA_SERVER_IMAGE:?EUREKA_SERVER_IMAGE is required}
+    environment:
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m -XX:+ExitOnOutOfMemoryError
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+
+  user-service:
+    <<: *java-service
+    image: ${USER_SERVICE_IMAGE:?USER_SERVICE_IMAGE is required}
+    environment:
+      <<: *app-environment
+      USER_DATASOURCE_URL: jdbc:postgresql://user-postgres:5432/user_db
+      USER_DB_USERNAME: user_app
+      USER_DB_PASSWORD: ${USER_DB_PASSWORD:?USER_DB_PASSWORD is required}
+      JAVA_TOOL_OPTIONS: -Xms192m -Xmx384m -XX:+ExitOnOutOfMemoryError
+    mem_limit: 640m
+    networks:
+      - internal
+      - user-data
+    depends_on:
+      <<: *platform-depends-on
+      user-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 75s
+
+  product-service:
+    <<: *java-service
+    image: ${PRODUCT_SERVICE_IMAGE:?PRODUCT_SERVICE_IMAGE is required}
+    environment:
+      <<: *app-environment
+      PRODUCT_DATASOURCE_URL: jdbc:postgresql://product-postgres:5432/product_db
+      PRODUCT_DB_USERNAME: product_app
+      PRODUCT_DB_PASSWORD: ${PRODUCT_DB_PASSWORD:?PRODUCT_DB_PASSWORD is required}
+      JAVA_TOOL_OPTIONS: -Xms192m -Xmx384m -XX:+ExitOnOutOfMemoryError
+    mem_limit: 640m
+    networks:
+      - internal
+      - product-data
+    depends_on:
+      <<: *platform-depends-on
+      product-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 75s
+
+  order-service:
+    <<: *java-service
+    image: ${ORDER_SERVICE_IMAGE:?ORDER_SERVICE_IMAGE is required}
+    environment:
+      <<: *app-environment
+      ORDER_DATASOURCE_URL: jdbc:postgresql://order-postgres:5432/order_db
+      ORDER_DB_USERNAME: order_app
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:?ORDER_DB_PASSWORD is required}
+      JAVA_TOOL_OPTIONS: -Xms192m -Xmx384m -XX:+ExitOnOutOfMemoryError
+    mem_limit: 640m
+    networks:
+      - internal
+      - order-data
+    depends_on:
+      <<: *platform-depends-on
+      order-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 75s
+
+  gateway:
+    <<: *java-service
+    image: ${GATEWAY_IMAGE:?GATEWAY_IMAGE is required}
+    environment:
+      <<: *app-environment
+      GATEWAY_PORT: "8080"
+      JAVA_TOOL_OPTIONS: -Xms192m -Xmx384m -XX:+ExitOnOutOfMemoryError
+    mem_limit: 640m
+    depends_on:
+      user-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  caddy:
+    image: ${CADDY_IMAGE:?CADDY_IMAGE is required}
+    restart: unless-stopped
+    environment:
+      DEV_DOMAIN: ${DEV_DOMAIN:?DEV_DOMAIN is required}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - internal
+    mem_limit: 128m
+    logging: *rotating-logs
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+  redis:
+    profiles: ["messaging"]
+    image: ${REDIS_IMAGE:?REDIS_IMAGE is required}
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    networks:
+      - internal
+    mem_limit: 256m
+    logging: *rotating-logs
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  kafka-volume-init:
+    profiles: ["messaging"]
+    image: ${KAFKA_IMAGE:?KAFKA_IMAGE is required}
+    user: "0:0"
+    network_mode: none
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["chown -R 1000:1000 /tmp/kraft-combined-logs"]
+    volumes:
+      - kafka-data:/tmp/kraft-combined-logs
+
+  kafka:
+    profiles: ["messaging"]
+    image: ${KAFKA_IMAGE:?KAFKA_IMAGE is required}
+    hostname: kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: CONTROLLER://:29093,INTERNAL://:19092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:19092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+    volumes:
+      - kafka-data:/tmp/kraft-combined-logs
+    networks:
+      - internal
+    mem_limit: 1024m
+    logging: *rotating-logs
+    depends_on:
+      kafka-volume-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:19092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  kafka-ui:
+    profiles: ["messaging"]
+    image: ${KAFKA_UI_IMAGE:?KAFKA_UI_IMAGE is required}
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: development
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:19092
+    networks:
+      - internal
+    mem_limit: 384m
+    logging: *rotating-logs
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  prometheus:
+    profiles: ["observability"]
+    image: ${PROMETHEUS_IMAGE:?PROMETHEUS_IMAGE is required}
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=3d
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - internal
+    mem_limit: 512m
+    logging: *rotating-logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/ready >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  grafana:
+    profiles: ["observability"]
+    image: ${GRAFANA_IMAGE:?GRAFANA_IMAGE is required}
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deploy/grafana/provisioning/datasources/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml:ro
+    networks:
+      - internal
+    mem_limit: 768m
+    logging: *rotating-logs
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+volumes:
+  user-postgres-data:
+  product-postgres-data:
+  order-postgres-data:
+  kafka-data:
+  prometheus-data:
+  grafana-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  internal:
+    driver: bridge
+  user-data:
+    driver: bridge
+  product-data:
+    driver: bridge
+  order-data:
+    driver: bridge
