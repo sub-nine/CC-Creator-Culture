@@ -9,6 +9,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,13 +21,21 @@ import java.util.UUID;
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "p_categories")
+@Table(
+        name = "p_categories",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_categories_name",
+                        columnNames = {"name", "unique_version"}
+                )
+        }
+)
 public class Category extends BaseEntity {
 
     @Column(name = "merged_category_id")
     private UUID mergedCategoryId;
 
-    @Column(name = "name", nullable = false)
+    @Column(name = "name", unique = true, nullable = false)
     private String name;
 
     @Column(name = "description")

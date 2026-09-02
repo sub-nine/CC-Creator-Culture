@@ -29,7 +29,7 @@ import java.util.UUID;
         uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uk_categories_hashtags_category_hashtag",
-                        columnNames = {"category_id", "hashtag_id"}
+                        columnNames = {"category_id", "hashtag_id", "unique_version"}
                 )
         }
 )
