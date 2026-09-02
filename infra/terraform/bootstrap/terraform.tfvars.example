@@ -1,0 +1,4 @@
+tenancy_ocid            = "replace-with-tenancy-ocid"
+parent_compartment_ocid = "replace-with-parent-compartment-ocid"
+compartment_name       = "cc-dev"
+terraform_state_bucket = "replace-with-namespace-unique-state-bucket"
