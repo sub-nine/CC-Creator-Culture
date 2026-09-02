@@ -1,0 +1,11 @@
+server:
+  port: ${ORDER_SERVICE_PORT:8083}
+
+spring:
+  datasource:
+    url: ${ORDER_DATASOURCE_URL}
+    username: ${ORDER_DB_USERNAME}
+    password: ${ORDER_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1

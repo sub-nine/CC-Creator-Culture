@@ -1,0 +1,7 @@
+network_compartment_ocid = "replace-with-network-compartment-ocid"
+instance_ocid            = "replace-with-existing-instance-ocid"
+vcn_ocid                 = "replace-with-existing-vcn-ocid"
+vnic_ocid                = "replace-with-existing-vnic-ocid"
+reserved_public_ip_name  = "cc-dev-reserved-ip"
+cloudflare_zone_id       = "replace-with-cloudflare-zone-id"
+cloudflare_record_name   = "dev.nodyy.com"

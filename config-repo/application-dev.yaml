@@ -1,0 +1,12 @@
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+
+server:
+  forward-headers-strategy: framework
