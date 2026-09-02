@@ -30,7 +30,7 @@ public class SkuValidator {
       throw new BusinessException(ProductErrorCode.DEFAULT_SKU_CANNOT_DELETED);
     }
 
-    if (activeSkuCount == 1) {
+    if (activeSkuCount <= 1) {
       throw new BusinessException(ProductErrorCode.SKU_REQUIRED);
     }
   }
