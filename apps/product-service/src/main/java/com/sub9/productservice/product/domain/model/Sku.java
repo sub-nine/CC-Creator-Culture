@@ -21,10 +21,6 @@ import java.util.UUID;
 // TODO : defalut 1개만 적용되도록 유니크 걸려면
 //        Partial Index 필요,  DB 마이그레이션 툴 사용 여부 확인 필요
 public class Sku extends BaseEntity {
-  @Id
-  @Column(name = "sku_id")
-  private UUID id;
-
   @Column(nullable = false)
   private UUID productId;
 
@@ -43,7 +39,6 @@ public class Sku extends BaseEntity {
     }
 
     Sku sku = new Sku();
-    sku.id = UuidCreator.getTimeOrderedEpoch();
     sku.productId = productId;
     sku.name = name;
     sku.price = price;

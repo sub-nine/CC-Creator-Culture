@@ -1,10 +1,25 @@
 package com.sub9.productservice.product.presentation.command;
 
-import com.sub9.common.exception.GlobalExceptionHandler;
-import com.sub9.productservice.config.SecurityConfig;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.sub9.productservice.common.security.AuthUser;
+import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.product.application.command.dto.CreateProductCommand;
 import com.sub9.productservice.product.application.command.service.ProductCommandService;
-import com.sub9.productservice.product.support.AbstractControllerTest;
+import com.sub9.productservice.support.AbstractControllerTest;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -12,38 +27,24 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Stream;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @WebMvcTest(ProductCommandController.class)
 @DisplayName("ProductCommandController - 단위 테스트")
 class ProductCommandControllerUnitTest extends AbstractControllerTest {
-
-  private static final UUID USER_ID = UUID.randomUUID();
-  private static final String CREATE_ENDPOINT = "/api/v1/products";
-
-  @Autowired MockMvc mockMvc;
-
   @MockitoBean ProductCommandService productCommandService;
+
+  private final UUID userId = UUID.randomUUID();
+  private final String endPoint = "/api/v1/products";
+
+  private final AuthUser authUser = new AuthUser(userId, "CREATOR");
+
+  private RequestPostProcessor authUser(AuthUser authUser) {
+    return authentication(CustomAuthenticationToken.of(authUser.id(), authUser.role()));
+  }
 
   @Nested
   @DisplayName("상품 등록 테스트")
@@ -53,9 +54,8 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
     void when_request_is_valid_create_product_returns_created() throws Exception {
       mockMvc
           .perform(
-              post(CREATE_ENDPOINT)
-                  .header("X-User-Id", USER_ID)
-                  .header("X-Role", "CREATOR")
+              post(endPoint)
+                  .with(authUser(authUser))
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(jsonMapper.writeValueAsString(validRequest())))
           .andExpect(status().isCreated())
@@ -68,7 +68,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
       verify(productCommandService).createProduct(commandCaptor.capture());
 
       CreateProductCommand command = commandCaptor.getValue();
-      assertThat(command.creatorId()).isEqualTo(USER_ID);
+      assertThat(command.creatorId()).isEqualTo(userId);
       assertThat(command.name()).isEqualTo("왁뿌볼");
       assertThat(command.content()).isEqualTo("상품 설명");
       assertThat(command.hashTags()).containsExactly("왁뿌볼", "말랑이");
@@ -83,9 +83,8 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
         throws Exception {
       mockMvc
           .perform(
-              post(CREATE_ENDPOINT)
-                  .header("X-User-Id", USER_ID)
-                  .header("X-Role", "CREATOR")
+              post(endPoint)
+                  .with(authUser(authUser))
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(jsonMapper.writeValueAsString(request)))
           .andExpect(status().isBadRequest())
@@ -140,6 +139,26 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
       Map<String, Object> request = new HashMap<>(validRequest());
       request.put(field, value);
       return request;
+    }
+  }
+
+  @Nested
+  @DisplayName("상품 삭제 테스트")
+  class DeleteProduct {
+    @Test
+    @DisplayName("유효한 요청이면 상품을 삭제하고 200를 반환한다")
+    void deleteProduct_success() throws Exception {
+      // given
+      UUID productId = UUID.randomUUID();
+
+      // when & then
+      mockMvc
+          .perform(delete(endPoint + "/{productId}", productId).with(authUser(authUser)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.message").value("요청 성공"))
+          .andExpect(jsonPath("$.data").doesNotExist());
+
+      verify(productCommandService).deleteProduct(authUser.id(), productId);
     }
   }
 }

@@ -17,8 +17,10 @@ public record CreateProductRequest(
                 @Pattern(regexp = "^[\\p{L}\\p{N}]+$", message = "해시태그는 문자와 숫자만 사용할 수 있습니다.")
                 String>
             hashTags,
-    @NotBlank(message = "상품명은 필수입니다.") String name,
-    @NotBlank(message = "상품 설명은 필수입니다.") String content,
+    @NotBlank(message = "상품명은 필수입니다.") @Size(max = 100, message = "상품명은 100자를 초과할 수 없습니다.")
+        String name,
+    @NotBlank(message = "상품 설명은 필수입니다.") @Size(max = 5000, message = "상품 설명은 5000자를 초과할 수 없습니다.")
+        String content,
     @Valid @NotEmpty(message = "상품 옵션은 최소 1개 이상 등록해야합니다.") List<CreateSkuRequest> skus) {
   public CreateProductCommand toCommand(UUID creatorId) {
     List<CreateSkuCommand> skuCommands = skus.stream().map(CreateSkuRequest::toCommand).toList();
