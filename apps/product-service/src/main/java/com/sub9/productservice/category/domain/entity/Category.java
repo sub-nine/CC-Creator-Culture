@@ -35,7 +35,7 @@ public class Category extends BaseEntity {
     @Column(name = "merged_category_id")
     private UUID mergedCategoryId;
 
-    @Column(name = "name", unique = true, nullable = false)
+    @Column(name = "name", nullable = false)
     private String name;
 
     @Column(name = "description")

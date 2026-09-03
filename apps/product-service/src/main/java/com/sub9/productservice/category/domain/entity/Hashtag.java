@@ -60,7 +60,7 @@ public class Hashtag extends BaseEntity {
     }
 
     @Builder
-    public Hashtag(String name, UUID uniqueVersion) {
+    private Hashtag(String name, UUID uniqueVersion) {
         this.name = name;
         this.usageCount = 0L;
         this.uniqueVersion = uniqueVersion;
