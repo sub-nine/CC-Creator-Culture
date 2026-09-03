@@ -33,4 +33,9 @@ public class SkuCommandRepositoryAdapter implements SkuCommandRepository {
   public long countByProductIdAndDeletedAtIsNull(UUID productId) {
     return skuCommandJpaRepository.countByProductIdAndDeletedAtIsNull(productId);
   }
+
+  @Override
+  public Optional<Sku> findByProductIdAndIsDefaultTrue(UUID productId) {
+    return skuCommandJpaRepository.findByProductIdAndIsDefaultTrue(productId);
+  }
 }
