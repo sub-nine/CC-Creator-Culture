@@ -3,7 +3,7 @@ package com.sub9.userservice.notification.infrastructure.persistence.adapter;
 import com.sub9.userservice.notification.domain.model.Notification;
 import com.sub9.userservice.notification.domain.model.NotificationPage;
 import com.sub9.userservice.notification.domain.repository.NotificationRepository;
-import com.sub9.userservice.notification.infrastructure.persistence.entity.NotificationJpaEntity;
+import com.sub9.userservice.notification.domain.entity.NotificationJpaEntity;
 import com.sub9.userservice.notification.infrastructure.persistence.springdata.NotificationJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;

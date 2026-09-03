@@ -1,5 +1,5 @@
 package com.sub9.userservice.notification.infrastructure.persistence.springdata;
-import com.sub9.userservice.notification.infrastructure.persistence.entity.NotificationJpaEntity;
+import com.sub9.userservice.notification.domain.entity.NotificationJpaEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

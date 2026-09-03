@@ -2,7 +2,7 @@ package com.sub9.userservice.notification.infrastructure.persistence.adapter;
 
 import com.sub9.userservice.notification.domain.model.NotificationEvent;
 import com.sub9.userservice.notification.domain.repository.NotificationEventRepository;
-import com.sub9.userservice.notification.infrastructure.persistence.entity.NotificationEventJpaEntity;
+import com.sub9.userservice.notification.domain.entity.NotificationEventJpaEntity;
 import com.sub9.userservice.notification.infrastructure.persistence.springdata.NotificationEventJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;

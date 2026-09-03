@@ -1,4 +1,4 @@
-package com.sub9.userservice.notification.infrastructure.persistence.entity;
+package com.sub9.userservice.notification.domain.entity;
 
 import com.sub9.userservice.notification.domain.model.SlackDelivery;
 import com.sub9.userservice.notification.domain.model.SlackDeliveryStatus;
