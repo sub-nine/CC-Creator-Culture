@@ -13,6 +13,11 @@ import org.springframework.security.web.SecurityFilterChain;
 @Profile({"local", "dev"})
 public class NonProductionActuatorSecurityConfig {
 
+    private static final String[] PUBLIC_SIGNUP_PATHS = {
+            "/api/v1/auth/signup/customer",
+            "/api/v1/auth/signup/creator"
+    };
+
     @Bean
     @Order(1)
     SecurityFilterChain nonProductionSecurityFilterChain(HttpSecurity http) throws Exception {
@@ -28,6 +33,8 @@ public class NonProductionActuatorSecurityConfig {
                         "/actuator/health/**",
                         "/actuator/prometheus"
                 )
+                .permitAll()
+                .requestMatchers(PUBLIC_SIGNUP_PATHS)
                 .permitAll()
                 .anyRequest()
                 .authenticated());
