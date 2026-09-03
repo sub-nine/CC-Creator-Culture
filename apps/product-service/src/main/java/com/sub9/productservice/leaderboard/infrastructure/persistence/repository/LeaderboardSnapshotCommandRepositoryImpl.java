@@ -1,4 +1,4 @@
-package com.sub9.productservice.leaderboard.infrastructure.persistence.command.repository;
+package com.sub9.productservice.leaderboard.infrastructure.persistence.repository;
 
 import org.springframework.stereotype.Repository;
 

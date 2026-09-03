@@ -1,5 +1,5 @@
-# Multi-architecture image manifests verified for linux/arm64 on 2026-08-31.
-POSTGRES_IMAGE=docker.io/library/postgres:17.11-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+# Multi-architecture image manifests verified for linux/arm64; POSTGRES_IMAGE reverified on 2026-09-03.
+POSTGRES_IMAGE=docker.io/pgvector/pgvector:pg17@sha256:cf134a767f474095eeba57e0117be8e568e011a63f33fbf252f14c9b760f8e6f
 REDIS_IMAGE=docker.io/library/redis:7.4.11-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
 KAFKA_IMAGE=docker.io/apache/kafka:3.7.2@sha256:8bd63e1bd445e5e19427a4bdbcc3d23bf6efd774b058a41b36ba87fda7623e34
 KAFKA_UI_IMAGE=docker.io/provectuslabs/kafka-ui:v0.7.2@sha256:8f2ff02d64b0a7a2b71b6b3b3148b85f66d00ec20ad40c30bdcd415d46d31818

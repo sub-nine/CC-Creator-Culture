@@ -5,6 +5,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import com.sub9.productservice.product.application.command.dto.CreateProductCommand;
 import com.sub9.productservice.product.application.command.dto.CreateSkuCommand;
 import com.sub9.productservice.product.application.command.dto.DeleteSkuCommand;
+import com.sub9.productservice.product.application.command.dto.UpdateSkuCommand;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.Sku;
 import com.sub9.productservice.product.infrastructure.command.product.ProductCommandJpaRepository;
@@ -31,7 +32,7 @@ class SkuCommandServiceIntegrationTest extends AbstractIntegrationTest {
   @Autowired SkuCommandJpaRepository skuRepository;
   @Autowired EntityManager entityManager;
 
-  private static final UUID CREATOR_ID = UUID.randomUUID();
+  private final UUID creatorId = UUID.randomUUID();
   private Product dummyProduct;
   private List<Sku> dummySku;
 
@@ -40,7 +41,7 @@ class SkuCommandServiceIntegrationTest extends AbstractIntegrationTest {
     CreateProductCommand command =
         new CreateProductCommand(
             List.of("왁뿌볼", "말랑이"),
-            CREATOR_ID,
+            creatorId,
             "말랑이",
             "말랑이 설명",
             List.of(
@@ -57,12 +58,68 @@ class SkuCommandServiceIntegrationTest extends AbstractIntegrationTest {
                 skuCommand ->
                     Sku.create(
                         dummyProduct.getId(),
-                        dummyProduct.getName(),
+                        skuCommand.name(),
                         skuCommand.price(),
                         skuCommand.isDefault()))
             .collect(Collectors.toList());
 
     skuRepository.saveAll(dummySku);
+  }
+
+  @Nested
+  @DisplayName("SKU 수정 테스트")
+  class UpdateSku {
+    @Test
+    @DisplayName("일반 SKU 정보 수정에 성공한다.")
+    void updateSku_success() {
+      // given
+      Sku targetSku = dummySku.get(1);
+      UpdateSkuCommand command =
+          new UpdateSkuCommand(
+              creatorId, dummyProduct.getId(), targetSku.getId(), "수정된 옵션", 15000L, false);
+
+      // when
+      skuCommandService.updateSku(command);
+
+      entityManager.flush();
+      entityManager.clear();
+
+      // then
+      Sku updatedSku = skuRepository.findById(targetSku.getId()).orElseThrow();
+
+      assertThat(updatedSku.getName()).isEqualTo(command.name());
+      assertThat(updatedSku.getPrice()).isEqualTo(command.price());
+      assertThat(updatedSku.isDefault()).isFalse();
+    }
+
+    @Test
+    @DisplayName("일반 SKU를 대표 SKU로 수정하면 기존 대표 SKU가 해제된다.")
+    void updateSku_success_when_changing_default_sku() {
+      // given
+      Sku currentDefaultSku = dummySku.get(0);
+      Sku targetSku = dummySku.get(1);
+      UpdateSkuCommand command =
+          new UpdateSkuCommand(
+              creatorId,
+              dummyProduct.getId(),
+              targetSku.getId(),
+              targetSku.getName(),
+              targetSku.getPrice(),
+              true);
+
+      // when
+      skuCommandService.updateSku(command);
+
+      entityManager.flush();
+      entityManager.clear();
+
+      // then
+      Sku previousDefaultSku = skuRepository.findById(currentDefaultSku.getId()).orElseThrow();
+      Sku updatedDefaultSku = skuRepository.findById(targetSku.getId()).orElseThrow();
+
+      assertThat(previousDefaultSku.isDefault()).isFalse();
+      assertThat(updatedDefaultSku.isDefault()).isTrue();
+    }
   }
 
   @Nested
@@ -73,7 +130,7 @@ class SkuCommandServiceIntegrationTest extends AbstractIntegrationTest {
     void deleteSku_Success() {
       // given
       DeleteSkuCommand command =
-          new DeleteSkuCommand(CREATOR_ID, dummyProduct.getId(), dummySku.get(1).getId());
+          new DeleteSkuCommand(creatorId, dummyProduct.getId(), dummySku.get(1).getId());
 
       // when
       skuCommandService.deleteSku(command);

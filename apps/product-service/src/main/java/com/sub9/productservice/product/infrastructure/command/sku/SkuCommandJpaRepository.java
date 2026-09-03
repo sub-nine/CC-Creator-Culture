@@ -13,4 +13,6 @@ public interface SkuCommandJpaRepository extends JpaRepository<Sku, UUID> {
     Optional<Sku> findByIdAndProductIdAndDeletedAtIsNull(UUID skuId, UUID productId);
 
     long countByProductIdAndDeletedAtIsNull(UUID productId);
+
+    Optional<Sku> findByProductIdAndIsDefaultTrue(UUID productId);
 }

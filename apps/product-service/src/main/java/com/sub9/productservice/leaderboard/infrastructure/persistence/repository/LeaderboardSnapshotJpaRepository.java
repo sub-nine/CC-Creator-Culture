@@ -1,4 +1,4 @@
-package com.sub9.productservice.leaderboard.infrastructure.persistence.command.repository;
+package com.sub9.productservice.leaderboard.infrastructure.persistence.repository;
 
 import com.sub9.productservice.leaderboard.domain.entity.LeaderboardSnapshot;
 import org.springframework.data.jpa.repository.JpaRepository;
