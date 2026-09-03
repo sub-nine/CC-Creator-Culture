@@ -5,4 +5,5 @@ public enum CategoryHashtagStatus {
     ANALYZING,
     PENDING_APPROVAL,
     MERGED,
+    REJECTED
 }
