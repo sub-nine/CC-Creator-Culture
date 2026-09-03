@@ -13,6 +13,7 @@ dependencies {
 
     // RFC 9562 표준 UUID v7 식별자를 생성하기 위한 라이브러리
     implementation 'com.github.f4b6a3:uuid-creator:6.1.0'
+
     implementation 'org.springframework.security:spring-security-core'
 
     implementation 'org.slf4j:slf4j-api'

@@ -57,7 +57,17 @@ public class Product extends BaseEntity {
     }
   }
 
-  public void updateStatus(ProductStatus productStatus) {
+  public void updateStatusByCreator(ProductStatus productStatus) {
+    if (this.status == ProductStatus.SUSPENDED || productStatus == ProductStatus.SUSPENDED) {
+      throw new BusinessException(ProductErrorCode.INVALID_PRODUCT_STATUS_TRANSITION);
+    }
+    this.status = productStatus;
+  }
+
+  public void updateStatusByAdmin(ProductStatus productStatus) {
+    if (this.status == ProductStatus.INACTIVE || productStatus == ProductStatus.INACTIVE) {
+      throw new BusinessException(ProductErrorCode.INVALID_PRODUCT_STATUS_TRANSITION);
+    }
     this.status = productStatus;
   }
 
