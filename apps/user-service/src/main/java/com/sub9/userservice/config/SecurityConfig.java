@@ -13,7 +13,8 @@ public class SecurityConfig {
     private static final String[] PUBLIC_AUTH_PATHS = {
             "/api/v1/auth/signup/customer",
             "/api/v1/auth/signup/creator",
-            "/api/v1/auth/login"
+            "/api/v1/auth/login",
+            "/api/v1/auth/reissue"
     };
 
     @Bean

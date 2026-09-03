@@ -6,6 +6,8 @@ import org.springframework.http.HttpStatus;
 public enum AuthErrorCode implements ErrorCode {
     INVALID_CREDENTIALS(
             "AUTH_0001", HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 일치하지 않습니다."),
+    INVALID_REFRESH_TOKEN(
+            "AUTH_0002", HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."),
     CREATOR_APPROVAL_PENDING(
             "AUTH_0003", HttpStatus.FORBIDDEN, "창작자 승인이 완료되지 않았습니다."),
     CREATOR_APPROVAL_REJECTED(
