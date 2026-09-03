@@ -2,7 +2,7 @@ package com.sub9.productservice.product.infrastructure.kafka.publisher;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.sub9.common.kafka.KafkaTopics;
+import com.sub9.common.kafka.topic.KafkaTopics;
 import com.sub9.productservice.common.config.kafka.KafkaProducerConfig;
 import com.sub9.productservice.common.config.kafka.KafkaProperties;
 import com.sub9.productservice.product.application.event.ProductCreatedEvent;
