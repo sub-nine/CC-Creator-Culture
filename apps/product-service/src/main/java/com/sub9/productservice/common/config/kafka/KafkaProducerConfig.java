@@ -1,4 +1,4 @@
-package com.sub9.productservice.config.kafka;
+package com.sub9.productservice.common.config.kafka;
 
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.producer.ProducerConfig;
