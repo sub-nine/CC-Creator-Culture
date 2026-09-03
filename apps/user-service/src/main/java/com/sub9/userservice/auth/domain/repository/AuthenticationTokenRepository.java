@@ -12,4 +12,7 @@ public interface AuthenticationTokenRepository {
     Optional<String> findRefreshToken(UUID userId);
 
     void deleteRefreshToken(UUID userId);
+
+    // Refresh Token과 Access Token 블랙리스트 저장을 추상화
+    void logout(UUID userId, UUID accessTokenId, Duration blacklistTtl);
 }

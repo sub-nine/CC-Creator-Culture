@@ -80,6 +80,11 @@ public class JwtTokenProvider implements TokenProvider {
     }
 
     @Override
+    public Duration clockSkew() {
+        return properties.clockSkew();
+    }
+
+    @Override
     public TokenClaims validateAccessToken(String token) {
         return validateToken(token, TokenType.ACCESS);
     }

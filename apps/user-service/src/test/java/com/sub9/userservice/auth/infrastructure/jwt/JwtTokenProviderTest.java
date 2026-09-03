@@ -40,6 +40,7 @@ class JwtTokenProviderTest {
     void exposes_configured_token_expirations() {
         assertThat(tokenProvider.accessTokenExpiration()).isEqualTo(Duration.ofMinutes(30));
         assertThat(tokenProvider.refreshTokenExpiration()).isEqualTo(Duration.ofDays(7));
+        assertThat(tokenProvider.clockSkew()).isEqualTo(Duration.ofSeconds(60));
     }
 
     @Test

@@ -23,6 +23,8 @@ class RedisAuthenticationTokenRepositoryIntegrationTest {
     private static final UUID USER_ID =
             UUID.fromString("0198f2a0-76c0-7000-8000-000000000001");
     private static final String KEY = AuthenticationTokenRedisKey.refreshToken(USER_ID);
+    private static final UUID ACCESS_TOKEN_ID =
+            UUID.fromString("0198f2a0-76c0-7000-8000-000000000002");
 
     @Container
     static final GenericContainer<?> REDIS = new GenericContainer<>(
@@ -40,7 +42,8 @@ class RedisAuthenticationTokenRepositoryIntegrationTest {
         connectionFactory.start();
         redisTemplate = new StringRedisTemplate(connectionFactory);
         redisTemplate.afterPropertiesSet();
-        repository = new RedisAuthenticationTokenRepository(redisTemplate);
+        repository = new RedisAuthenticationTokenRepository(
+                redisTemplate, new AuthenticationTokenLogoutScript());
     }
 
     @AfterAll
@@ -88,5 +91,49 @@ class RedisAuthenticationTokenRepositoryIntegrationTest {
         Thread.sleep(150);
 
         assertThat(repository.findRefreshToken(USER_ID)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Lua 로그아웃은 Refresh Token을 삭제하고 Access Token을 블랙리스트에 등록한다")
+    void logs_out_atomically_with_blacklist_ttl() {
+        String blacklistKey = AuthenticationTokenRedisKey.accessTokenBlacklist(ACCESS_TOKEN_ID);
+        redisTemplate.delete(blacklistKey);
+        repository.saveRefreshToken(USER_ID, "refresh-token", Duration.ofDays(7));
+
+        repository.logout(USER_ID, ACCESS_TOKEN_ID, Duration.ofSeconds(660));
+
+        assertThat(repository.findRefreshToken(USER_ID)).isEmpty();
+        assertThat(redisTemplate.opsForValue().get(blacklistKey)).isEqualTo("logout");
+        assertThat(redisTemplate.getExpire(blacklistKey)).isBetween(655L, 660L);
+    }
+
+    @Test
+    @DisplayName("블랙리스트 TTL이 0 이하이면 Refresh Token만 삭제한다")
+    void skips_blacklist_when_ttl_is_not_positive() {
+        UUID expiredTokenId = UUID.fromString("0198f2a0-76c0-7000-8000-000000000003");
+        String blacklistKey = AuthenticationTokenRedisKey.accessTokenBlacklist(expiredTokenId);
+        redisTemplate.delete(blacklistKey);
+        repository.saveRefreshToken(USER_ID, "refresh-token", Duration.ofDays(7));
+
+        repository.logout(USER_ID, expiredTokenId, Duration.ZERO);
+
+        assertThat(repository.findRefreshToken(USER_ID)).isEmpty();
+        assertThat(redisTemplate.hasKey(blacklistKey)).isFalse();
+    }
+
+    @Test
+    @DisplayName("같은 Lua 로그아웃을 반복해도 결과가 유지된다")
+    void repeats_logout_idempotently() {
+        UUID repeatedTokenId = UUID.fromString("0198f2a0-76c0-7000-8000-000000000004");
+        String blacklistKey = AuthenticationTokenRedisKey.accessTokenBlacklist(repeatedTokenId);
+        redisTemplate.delete(blacklistKey);
+        repository.saveRefreshToken(USER_ID, "refresh-token", Duration.ofDays(7));
+
+        repository.logout(USER_ID, repeatedTokenId, Duration.ofMinutes(10));
+        repository.logout(USER_ID, repeatedTokenId, Duration.ofMinutes(9));
+
+        assertThat(repository.findRefreshToken(USER_ID)).isEmpty();
+        assertThat(redisTemplate.opsForValue().get(blacklistKey)).isEqualTo("logout");
+        assertThat(redisTemplate.getExpire(blacklistKey)).isBetween(535L, 540L);
     }
 }

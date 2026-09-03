@@ -15,6 +15,8 @@ public interface TokenProvider {
 
     Duration refreshTokenExpiration();
 
+    Duration clockSkew();
+
     TokenClaims validateAccessToken(String token);
 
     TokenClaims validateRefreshToken(String token);

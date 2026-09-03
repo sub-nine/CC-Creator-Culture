@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.userservice.auth.domain.exception.AuthenticationTokenStorageException;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 
 @DisplayName("Redis 인증 토큰 저장소")
 // Redis 인증 토큰 저장소의 호출 및 장애 변환을 검증하는 단위 테스트
@@ -30,6 +32,8 @@ class RedisAuthenticationTokenRepositoryTest {
 
     private StringRedisTemplate redisTemplate;
     private ValueOperations<String, String> valueOperations;
+    private AuthenticationTokenLogoutScript logoutScript;
+    private RedisScript<Long> redisScript;
     private RedisAuthenticationTokenRepository repository;
 
     @BeforeEach
@@ -37,8 +41,11 @@ class RedisAuthenticationTokenRepositoryTest {
     void setUp() {
         redisTemplate = mock(StringRedisTemplate.class);
         valueOperations = mock(ValueOperations.class);
+        logoutScript = mock(AuthenticationTokenLogoutScript.class);
+        redisScript = mock(RedisScript.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        repository = new RedisAuthenticationTokenRepository(redisTemplate);
+        when(logoutScript.value()).thenReturn(redisScript);
+        repository = new RedisAuthenticationTokenRepository(redisTemplate, logoutScript);
     }
 
     @Test
@@ -97,6 +104,51 @@ class RedisAuthenticationTokenRepositoryTest {
         when(redisTemplate.delete(KEY)).thenThrow(new QueryTimeoutException("Redis timeout"));
 
         assertStorageFailure(() -> repository.deleteRefreshToken(USER_ID));
+    }
+
+    @Test
+    @DisplayName("Lua Script에 Refresh Token과 블랙리스트 키 및 TTL을 전달한다")
+    void executes_logout_lua_script_with_contract_values() {
+        UUID accessTokenId = UUID.fromString("0198f2a0-76c0-7000-8000-000000000002");
+        String blacklistKey = "auth:blacklist:access:" + accessTokenId;
+        when(redisTemplate.execute(
+                redisScript,
+                List.of(KEY, blacklistKey),
+                "logout",
+                "660"))
+                .thenReturn(1L);
+
+        repository.logout(USER_ID, accessTokenId, Duration.ofSeconds(660));
+
+        verify(redisTemplate).execute(
+                redisScript,
+                List.of(KEY, blacklistKey),
+                "logout",
+                "660");
+    }
+
+    @Test
+    @DisplayName("Lua Script 결과가 없으면 공통 503 오류로 처리한다")
+    void converts_missing_lua_result_to_service_unavailable() {
+        UUID accessTokenId = UUID.fromString("0198f2a0-76c0-7000-8000-000000000002");
+
+        assertStorageFailure(
+                () -> repository.logout(USER_ID, accessTokenId, Duration.ofSeconds(660)));
+    }
+
+    @Test
+    @DisplayName("Lua Script 실행 장애를 공통 503 오류로 변환한다")
+    void converts_lua_failure_to_service_unavailable() {
+        UUID accessTokenId = UUID.fromString("0198f2a0-76c0-7000-8000-000000000002");
+        when(redisTemplate.execute(
+                redisScript,
+                List.of(KEY, "auth:blacklist:access:" + accessTokenId),
+                "logout",
+                "660"))
+                .thenThrow(new QueryTimeoutException("Redis timeout"));
+
+        assertStorageFailure(
+                () -> repository.logout(USER_ID, accessTokenId, Duration.ofSeconds(660)));
     }
 
     private void assertStorageFailure(Runnable operation) {
