@@ -1,7 +1,7 @@
 package com.sub9.userservice.notification.infrastructure.persistence.springdata;
 
 import com.sub9.userservice.notification.domain.model.SlackDeliveryStatus;
-import com.sub9.userservice.notification.infrastructure.persistence.entity.SlackDeliveryJpaEntity;
+import com.sub9.userservice.notification.domain.entity.SlackDeliveryJpaEntity;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

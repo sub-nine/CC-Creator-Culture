@@ -1,6 +1,6 @@
 package com.sub9.userservice.notification.infrastructure.persistence.springdata;
 
-import com.sub9.userservice.notification.infrastructure.persistence.entity.NotificationEventJpaEntity;
+import com.sub9.userservice.notification.domain.entity.NotificationEventJpaEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
