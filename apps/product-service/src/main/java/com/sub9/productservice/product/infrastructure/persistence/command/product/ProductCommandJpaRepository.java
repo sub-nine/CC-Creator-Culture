@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.infrastructure.command.product;
+package com.sub9.productservice.product.infrastructure.persistence.command.product;
 
 import com.sub9.productservice.product.domain.model.Product;
 import jakarta.persistence.LockModeType;

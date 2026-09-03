@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.infrastructure.command.stock;
+package com.sub9.productservice.product.infrastructure.persistence.command.stock;
 
 import com.sub9.productservice.product.domain.model.Stock;
 import org.springframework.data.jpa.repository.JpaRepository;
