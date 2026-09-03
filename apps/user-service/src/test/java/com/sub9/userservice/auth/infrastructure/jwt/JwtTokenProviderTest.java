@@ -36,6 +36,13 @@ class JwtTokenProviderTest {
     private final JwtTokenProvider tokenProvider = provider(properties, clock);
 
     @Test
+    @DisplayName("설정된 Access와 Refresh Token 만료시간을 제공한다")
+    void exposes_configured_token_expirations() {
+        assertThat(tokenProvider.accessTokenExpiration()).isEqualTo(Duration.ofMinutes(30));
+        assertThat(tokenProvider.refreshTokenExpiration()).isEqualTo(Duration.ofDays(7));
+    }
+
+    @Test
     @DisplayName("Access Token에 필수 Claim과 30분 만료시간을 담아 발급한다")
     void when_access_token_is_issued_then_contains_required_claims() {
         String token = tokenProvider.issueAccessToken(USER_ID, UserRole.CUSTOMER);

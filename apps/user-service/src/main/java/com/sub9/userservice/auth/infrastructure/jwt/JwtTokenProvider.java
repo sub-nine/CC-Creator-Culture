@@ -26,6 +26,7 @@ import org.springframework.util.StringUtils;
 
 @Component
 @ConditionalOnProperty(prefix = "auth.jwt", name = "secret")
+// JWT 비밀키가 설정된 환경에서만 JWT 발급·검증 구현체를 Spring Bean으로 등록한다.
 public class JwtTokenProvider implements TokenProvider {
 
     private static final String ROLE_CLAIM = "role";
@@ -66,6 +67,16 @@ public class JwtTokenProvider implements TokenProvider {
     @Override
     public String issueRefreshToken(UUID userId, UserRole role) {
         return issueToken(userId, role, TokenType.REFRESH, properties.refreshTokenExpiration());
+    }
+
+    @Override
+    public Duration accessTokenExpiration() {
+        return properties.accessTokenExpiration();
+    }
+
+    @Override
+    public Duration refreshTokenExpiration() {
+        return properties.refreshTokenExpiration();
     }
 
     @Override

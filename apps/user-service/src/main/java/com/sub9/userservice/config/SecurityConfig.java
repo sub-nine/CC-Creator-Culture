@@ -10,16 +10,17 @@ import org.springframework.security.web.SecurityFilterChain;
 @Profile("!local")
 public class SecurityConfig {
 
-    private static final String[] PUBLIC_SIGNUP_PATHS = {
+    private static final String[] PUBLIC_AUTH_PATHS = {
             "/api/v1/auth/signup/customer",
-            "/api/v1/auth/signup/creator"
+            "/api/v1/auth/signup/creator",
+            "/api/v1/auth/login"
     };
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http.csrf(csrf -> csrf.ignoringRequestMatchers(PUBLIC_SIGNUP_PATHS));
+        http.csrf(csrf -> csrf.ignoringRequestMatchers(PUBLIC_AUTH_PATHS));
         http.authorizeHttpRequests(authorize -> authorize
-                .requestMatchers(PUBLIC_SIGNUP_PATHS)
+                .requestMatchers(PUBLIC_AUTH_PATHS)
                 .permitAll()
                 .anyRequest()
                 .authenticated()
