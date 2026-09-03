@@ -1,4 +1,4 @@
-package com.sub9.productservice.config;
+package com.sub9.productservice.common.config;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
