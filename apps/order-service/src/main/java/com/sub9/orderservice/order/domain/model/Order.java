@@ -127,7 +127,7 @@ public class Order extends BaseEntity {
 
         Set<UUID> skuIds = new HashSet<>();
         for (OrderItem item : candidates) {
-            if (item == null || item.isAttached() || !skuIds.add(item.getSkuId())) {
+            if (item == null || item.hasOrder() || !skuIds.add(item.getSkuId())) {
                 throw new BusinessException(OrderErrorCode.INVALID_ORDER_ITEMS);
             }
         }

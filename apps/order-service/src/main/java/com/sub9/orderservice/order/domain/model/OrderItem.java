@@ -107,7 +107,7 @@ public class OrderItem extends BaseEntity {
         return order == null ? null : order.getId();
     }
 
-    boolean isAttached() {
+    boolean hasOrder() {
         return order != null;
     }
 
