@@ -2,7 +2,7 @@ package com.sub9.productservice.product.presentation.command.controller;
 
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.common.security.AuthUser;
-import com.sub9.productservice.common.security.annotation.Creator;
+import com.sub9.common.annotation.Creator;
 import com.sub9.productservice.product.application.command.service.ProductCommandService;
 import com.sub9.productservice.product.presentation.command.dto.reqeust.CreateProductRequest;
 import com.sub9.productservice.product.presentation.command.dto.reqeust.UpdateProductRequest;

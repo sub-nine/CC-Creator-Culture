@@ -1,4 +1,4 @@
-package com.sub9.productservice.common.security.annotation;
+package com.sub9.common.annotation;
 
 import org.springframework.security.access.prepost.PreAuthorize;
 

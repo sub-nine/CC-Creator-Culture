@@ -199,7 +199,7 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("관리자가 SUSPENDED 상품을 ACTIVE로 수정하는 데 성공한다.")
     void updateStatusProduct_success_when_admin_activates_product() {
       // given
-      dummyProduct.updateStatus(ProductStatus.SUSPENDED);
+      dummyProduct.updateStatusByAdmin(ProductStatus.SUSPENDED);
       entityManager.flush();
 
       UpdateProductStatusCommand command =

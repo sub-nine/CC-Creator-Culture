@@ -93,8 +93,10 @@ public class ProductCommandService {
     Product product = findByProductId(command.productId());
     if (command.isCreator()) {
       product.validateOwner(command.userId());
+      product.updateStatusByCreator(command.productStatus());
+      return;
     }
-    product.updateStatus(command.productStatus());
+    product.updateStatusByAdmin(command.productStatus());
   }
 
   // ============================== Helper Method ====================================

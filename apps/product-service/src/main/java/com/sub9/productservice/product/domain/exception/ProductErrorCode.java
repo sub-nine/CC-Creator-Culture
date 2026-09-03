@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 public enum ProductErrorCode implements ErrorCode {
   PRODUCT_NOT_FOUND("PRODUCT_0001", HttpStatus.NOT_FOUND, "존재하지 않는 상품입니다."),
   PRODUCT_ACCESS_DENIED("PRODUCT_0002", HttpStatus.FORBIDDEN, "상품에 대한 접근 권한이 없습니다."),
+  INVALID_PRODUCT_STATUS_TRANSITION("PRODUCT_0003", HttpStatus.BAD_REQUEST, "유효하지 않은 상품 상태 변경 요청입니다."),
 
   SKU_REQUIRED("SKU_0001", HttpStatus.BAD_REQUEST, "상품에는 최소 하나의 옵션이 필요합니다."),
   INVALID_DEFAULT_SKU_COUNT("SKU_0002", HttpStatus.BAD_REQUEST, "대표 옵션은 하나여야 합니다."),

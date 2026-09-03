@@ -2,7 +2,7 @@ package com.sub9.productservice.product.presentation.command.controller;
 
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.common.security.AuthUser;
-import com.sub9.productservice.common.security.annotation.Creator;
+import com.sub9.common.annotation.Creator;
 import com.sub9.productservice.product.application.command.dto.DeleteSkuCommand;
 import com.sub9.productservice.product.application.command.service.SkuCommandService;
 import com.sub9.productservice.product.presentation.command.dto.reqeust.UpdateSkuRequest;

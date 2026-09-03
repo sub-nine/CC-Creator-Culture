@@ -100,7 +100,7 @@ class ProductCommandServiceUnitTest {
 
       // then
       verify(product, never()).validateOwner(command.userId());
-      verify(product).updateStatus(ProductStatus.ACTIVE);
+      verify(product).updateStatusByAdmin(ProductStatus.ACTIVE);
     }
 
     @Test
@@ -139,7 +139,7 @@ class ProductCommandServiceUnitTest {
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.PRODUCT_ACCESS_DENIED.message());
 
-      verify(product, never()).updateStatus(ProductStatus.INACTIVE);
+      verify(product, never()).updateStatusByCreator(ProductStatus.INACTIVE);
     }
   }
 
