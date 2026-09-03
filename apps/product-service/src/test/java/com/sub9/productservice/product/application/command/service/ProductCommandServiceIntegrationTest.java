@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sub9.productservice.product.application.command.dto.CreateProductCommand;
 import com.sub9.productservice.product.application.command.dto.CreateSkuCommand;
+import com.sub9.productservice.product.application.command.dto.UpdateProductCommand;
+import com.sub9.productservice.product.application.command.dto.UpdateProductStatusCommand;
 import com.sub9.productservice.product.application.event.ProductCreatedEvent;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
@@ -70,7 +72,7 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
 
   @Nested
   @DisplayName("상품 등록 테스트")
-  class CreateProduct {
+  class CreateProductTest {
     @Test
     @DisplayName("유효한 상품 등록 명령을 실행하면 상품, SKU, 재고를 저장하고 생성 이벤트를 발행한다")
     void when_command_is_valid_create_product_saves_product_skus_stocks_and_publishes_event() {
@@ -123,6 +125,97 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
 
     private Sku findSku(List<Sku> skus, String name) {
       return skus.stream().filter(sku -> sku.getName().equals(name)).findFirst().orElseThrow();
+    }
+  }
+
+  @Nested
+  @DisplayName("상품 정보 수정 테스트")
+  class UpdateProductTest {
+    @Test
+    @DisplayName("상품 정보 수정에 성공한다.")
+    void updateProduct_success() {
+      // given
+      UpdateProductCommand command =
+          new UpdateProductCommand(creatorId, dummyProduct.getId(), "수정된 상품명", "수정된 상품 설명");
+
+      // when
+      productCommandService.updateProduct(command);
+
+      entityManager.flush();
+      entityManager.clear();
+
+      // then
+      Product updatedProduct = productRepository.findById(dummyProduct.getId()).orElseThrow();
+
+      assertThat(updatedProduct.getName()).isEqualTo(command.name());
+      assertThat(updatedProduct.getContent()).isEqualTo(command.content());
+    }
+  }
+
+  @Nested
+  @DisplayName("상품 상태 수정 테스트")
+  class UpdateStatusProductTest {
+    @Test
+    @DisplayName("창작자가 상품 상태를 INACTIVE로 수정하는 데 성공한다.")
+    void updateStatusProduct_success_for_creator() {
+      // given
+      UpdateProductStatusCommand command =
+          new UpdateProductStatusCommand(
+              creatorId, dummyProduct.getId(), "CREATOR", ProductStatus.INACTIVE.name());
+
+      // when
+      productCommandService.updateStatusProduct(command);
+
+      entityManager.flush();
+      entityManager.clear();
+
+      // then
+      Product updatedProduct = productRepository.findById(dummyProduct.getId()).orElseThrow();
+
+      assertThat(updatedProduct.getStatus()).isEqualTo(ProductStatus.INACTIVE);
+    }
+
+    @Test
+    @DisplayName("관리자가 상품 상태를 SUSPENDED로 수정하는 데 성공한다.")
+    void updateStatusProduct_success_for_admin() {
+      // given
+      UpdateProductStatusCommand command =
+          new UpdateProductStatusCommand(
+              UUID.randomUUID(), dummyProduct.getId(), "MASTER", ProductStatus.SUSPENDED.name());
+
+      // when
+      productCommandService.updateStatusProduct(command);
+
+      entityManager.flush();
+      entityManager.clear();
+
+      // then
+      Product updatedProduct = productRepository.findById(dummyProduct.getId()).orElseThrow();
+
+      assertThat(updatedProduct.getStatus()).isEqualTo(ProductStatus.SUSPENDED);
+    }
+
+    @Test
+    @DisplayName("관리자가 SUSPENDED 상품을 ACTIVE로 수정하는 데 성공한다.")
+    void updateStatusProduct_success_when_admin_activates_product() {
+      // given
+      dummyProduct.updateStatus(ProductStatus.SUSPENDED);
+      entityManager.flush();
+
+      UpdateProductStatusCommand command =
+          new UpdateProductStatusCommand(
+              UUID.randomUUID(), dummyProduct.getId(), "MASTER", ProductStatus.ACTIVE.name());
+
+      // when
+      productCommandService.updateStatusProduct(command);
+
+      entityManager.flush();
+      entityManager.clear();
+
+      // then
+      Product updatedProduct = productRepository.findById(dummyProduct.getId()).orElseThrow();
+
+      assertThat(updatedProduct.getStatus()).isEqualTo(ProductStatus.ACTIVE);
     }
   }
 
