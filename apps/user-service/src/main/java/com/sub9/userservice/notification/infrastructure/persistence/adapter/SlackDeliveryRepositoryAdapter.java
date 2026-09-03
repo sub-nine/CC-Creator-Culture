@@ -3,7 +3,7 @@ package com.sub9.userservice.notification.infrastructure.persistence.adapter;
 import com.sub9.userservice.notification.domain.model.SlackDelivery;
 import com.sub9.userservice.notification.domain.model.SlackDeliveryStatus;
 import com.sub9.userservice.notification.domain.repository.SlackDeliveryRepository;
-import com.sub9.userservice.notification.infrastructure.persistence.entity.SlackDeliveryJpaEntity;
+import com.sub9.userservice.notification.domain.entity.SlackDeliveryJpaEntity;
 import com.sub9.userservice.notification.infrastructure.persistence.springdata.SlackDeliveryJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
