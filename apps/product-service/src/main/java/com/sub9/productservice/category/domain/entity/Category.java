@@ -64,7 +64,7 @@ public class Category extends BaseEntity {
                 .build();
     }
 
-    public CategoryHashtag linkManually(Hashtag hashtag, BigDecimal similarityScore) {
+    public CategoryHashtag linkManually(Hashtag hashtag, double similarityScore) {
         return CategoryHashtag.create(
                 this,
                 hashtag,
