@@ -2,12 +2,11 @@ package com.sub9.userservice.auth.presentation.controller;
 
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.userservice.auth.application.service.LogoutService;
-import com.sub9.userservice.user.domain.model.UserRole;
-import java.util.UUID;
+import com.sub9.userservice.auth.infrastructure.security.GatewayAuthenticationPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,12 +20,11 @@ public class LogoutController {
     private final LogoutService logoutService;
 
     @PostMapping("/logout")
-    public ApiResponse<Void> logout(
-            @RequestHeader("X-User-Id") UUID userId,
-            @RequestHeader("X-User-Role") UserRole userRole,
-            @RequestHeader("X-Token-Id") UUID accessTokenId,
-            @RequestHeader("X-Token-Expires-At") long expiresAtEpochSecond) {
-        logoutService.logout(userId, accessTokenId, expiresAtEpochSecond);
+    public ApiResponse<Void> logout(@AuthenticationPrincipal GatewayAuthenticationPrincipal principal) {
+        logoutService.logout(
+                principal.userId(),
+                principal.accessTokenId(),
+                principal.expiresAtEpochSecond());
         return ApiResponse.success("로그아웃이 완료되었습니다.", null);
     }
 }

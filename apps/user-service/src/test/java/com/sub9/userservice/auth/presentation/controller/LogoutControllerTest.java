@@ -2,8 +2,6 @@ package com.sub9.userservice.auth.presentation.controller;
 
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -45,7 +43,7 @@ class LogoutControllerTest {
     @Test
     @DisplayName("인증된 내부 헤더로 로그아웃하면 200을 반환한다")
     void logs_out_with_authenticated_internal_headers() throws Exception {
-        mockMvc.perform(logoutRequest().with(user("gateway")).with(csrf()))
+        mockMvc.perform(logoutRequest())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("로그아웃이 완료되었습니다."))
                 .andExpect(jsonPath("$.data").isEmpty());
@@ -54,22 +52,22 @@ class LogoutControllerTest {
     }
 
     @Test
-    @DisplayName("현재 Security 기본 정책은 비인증 로그아웃을 403으로 거부한다")
+    @DisplayName("내부 인증 헤더가 없는 로그아웃은 COMMON_0007과 401을 반환한다")
     void rejects_unauthenticated_logout() throws Exception {
-        mockMvc.perform(logoutRequest().with(csrf()))
-                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/auth/logout"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.UNAUTHORIZED.code()));
     }
 
     @Test
-    @DisplayName("필수 내부 헤더가 없으면 400을 반환한다")
+    @DisplayName("필수 내부 헤더가 없으면 COMMON_0007과 401을 반환한다")
     void rejects_logout_without_required_internal_header() throws Exception {
         mockMvc.perform(post("/api/v1/auth/logout")
                         .header("X-User-Id", USER_ID)
                         .header("X-User-Role", "CUSTOMER")
-                        .header("X-Token-Id", ACCESS_TOKEN_ID)
-                        .with(user("gateway"))
-                        .with(csrf()))
-                .andExpect(status().isBadRequest());
+                        .header("X-Token-Id", ACCESS_TOKEN_ID))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.UNAUTHORIZED.code()));
     }
 
     @Test
@@ -79,7 +77,7 @@ class LogoutControllerTest {
                 .when(logoutService)
                 .logout(USER_ID, ACCESS_TOKEN_ID, EXPIRES_AT);
 
-        mockMvc.perform(logoutRequest().with(user("gateway")).with(csrf()))
+        mockMvc.perform(logoutRequest())
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.SERVICE_UNAVAILABLE.code()));
     }
