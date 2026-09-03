@@ -27,16 +27,16 @@ public class LeaderboardSnapshot extends BaseEntity {
     @Column(name = "type", nullable = false)
     private LeaderboardType type;
 
-    @Column(name = "type", nullable = false)
+    @Column(name = "target_id", nullable = false)
     private UUID targetId;
 
-    @Column(name = "type", nullable = false)
+    @Column(name = "score", nullable = false)
     private double score;
 
-    @Column(name = "type", nullable = false)
+    @Column(name = "ranking", nullable = false)
     private long ranking;
 
-    @Column(name = "type", nullable = false)
+    @Column(name = "date", nullable = false)
     private LocalDate date;
 }
 /*
