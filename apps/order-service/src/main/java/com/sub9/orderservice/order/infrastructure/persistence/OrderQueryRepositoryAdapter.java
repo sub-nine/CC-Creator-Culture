@@ -6,7 +6,6 @@ import com.sub9.orderservice.order.domain.model.OrderNumber;
 import com.sub9.orderservice.order.domain.model.OrderStatus;
 import com.sub9.orderservice.order.domain.repository.OrderQueryRepository;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -19,11 +18,6 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class OrderQueryRepositoryAdapter implements OrderQueryRepository {
 
-    private static final Set<OrderStatus> CREATOR_VISIBLE_ORDER_STATUSES = Set.of(
-            OrderStatus.PAID,
-            OrderStatus.PROCESSING,
-            OrderStatus.COMPLETED,
-            OrderStatus.CANCELED);
     private static final Sort NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "createdAt", "id");
 
     private final OrderJpaRepository orderJpaRepository;
@@ -48,7 +42,7 @@ public class OrderQueryRepositoryAdapter implements OrderQueryRepository {
     public Page<OrderItem> findAllItemsByCreatorId(UUID creatorId, Pageable pageable) {
         return orderItemJpaRepository.findAllVisibleByCreatorId(
                 creatorId,
-                CREATOR_VISIBLE_ORDER_STATUSES,
+                OrderStatus.creatorVisibleStatuses(),
                 newestFirst(pageable));
     }
 
