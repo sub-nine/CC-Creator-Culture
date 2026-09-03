@@ -1,9 +1,13 @@
 package com.sub9.orderservice.order.infrastructure.persistence;
 
 import com.sub9.orderservice.order.domain.model.Order;
+import com.sub9.orderservice.order.domain.model.OrderItem;
 import com.sub9.orderservice.order.domain.model.OrderNumber;
+import com.sub9.orderservice.order.domain.model.OrderStatus;
 import com.sub9.orderservice.order.domain.repository.OrderQueryRepository;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -15,9 +19,15 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class OrderQueryRepositoryAdapter implements OrderQueryRepository {
 
-    private static final Sort NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "createdAt");
+    private static final Set<OrderStatus> CREATOR_VISIBLE_ORDER_STATUSES = Set.of(
+            OrderStatus.PAID,
+            OrderStatus.PROCESSING,
+            OrderStatus.COMPLETED,
+            OrderStatus.CANCELED);
+    private static final Sort NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "createdAt", "id");
 
     private final OrderJpaRepository orderJpaRepository;
+    private final OrderItemJpaRepository orderItemJpaRepository;
 
     @Override
     public Optional<Order> findDetailByOrderNumber(OrderNumber orderNumber) {
@@ -25,8 +35,26 @@ public class OrderQueryRepositoryAdapter implements OrderQueryRepository {
     }
 
     @Override
+    public Page<Order> findAllByCustomerId(UUID customerId, Pageable pageable) {
+        return orderJpaRepository.findAllByCustomerId(customerId, newestFirst(pageable));
+    }
+
+    @Override
     public Page<Order> findAllOrders(Pageable pageable) {
         return orderJpaRepository.findAll(newestFirst(pageable));
+    }
+
+    @Override
+    public Page<OrderItem> findAllItemsByCreatorId(UUID creatorId, Pageable pageable) {
+        return orderItemJpaRepository.findAllVisibleByCreatorId(
+                creatorId,
+                CREATOR_VISIBLE_ORDER_STATUSES,
+                newestFirst(pageable));
+    }
+
+    @Override
+    public Optional<OrderItem> findItemDetailById(UUID orderItemId) {
+        return orderItemJpaRepository.findDetailById(orderItemId);
     }
 
     private static Pageable newestFirst(Pageable pageable) {
