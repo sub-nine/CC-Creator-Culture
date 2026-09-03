@@ -1,4 +1,4 @@
-package com.sub9.productservice.config.kafka;
+package com.sub9.productservice.common.config.kafka;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

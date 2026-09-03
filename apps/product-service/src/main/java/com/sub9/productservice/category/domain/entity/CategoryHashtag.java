@@ -50,8 +50,8 @@ public class CategoryHashtag extends BaseEntity {
     @Column(name = "status", nullable = false)
     private CategoryHashtagStatus status;
 
-    @Column(name = "similarity_score", precision = 5, scale = 4, nullable = false)
-    private BigDecimal similarityScore;
+    @Column(name = "similarity_score", nullable = false)
+    private double similarityScore;
 
     @Column(name = "unique_version", nullable = false)
     private UUID uniqueVersion;
@@ -68,7 +68,7 @@ public class CategoryHashtag extends BaseEntity {
             Hashtag hashtag,
             CategoryHashtagMatchType matchType,
             CategoryHashtagStatus status,
-            BigDecimal similarityScore
+            double similarityScore
     ) {
         return CategoryHashtag.builder()
                 .category(category)
@@ -100,7 +100,7 @@ public class CategoryHashtag extends BaseEntity {
             Hashtag hashtag,
             CategoryHashtagMatchType matchType,
             CategoryHashtagStatus status,
-            BigDecimal similarityScore,
+            double similarityScore,
             UUID uniqueVersion
     ) {
         this.category = category;

@@ -1,4 +1,4 @@
-package com.sub9.productservice.config;
+package com.sub9.productservice.common.config;
 
 import com.sub9.productservice.common.security.UserContextFilter;
 import org.springframework.context.annotation.Bean;
