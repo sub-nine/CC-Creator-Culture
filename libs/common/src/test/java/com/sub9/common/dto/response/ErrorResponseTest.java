@@ -27,6 +27,16 @@ class ErrorResponseTest {
     }
 
     @Test
+    @DisplayName("서비스 이용 불가 오류를 공통 응답으로 변환한다")
+    void when_service_is_unavailable_then_returns_common_error_response() {
+        ErrorResponse response = ErrorResponse.from(CommonErrorCode.SERVICE_UNAVAILABLE);
+
+        assertThat(response.getErrorCode()).isEqualTo("COMMON_0009");
+        assertThat(response.getMessage()).isEqualTo("서비스를 일시적으로 사용할 수 없습니다.");
+        assertThat(response.getErrors()).isEmpty();
+    }
+
+    @Test
     @DisplayName("응답 오류 목록은 외부 변경의 영향을 받지 않는다")
     void when_source_errors_change_then_response_remains_unchanged() {
         Map<String, String> fieldError = new HashMap<>();

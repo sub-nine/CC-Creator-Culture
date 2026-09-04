@@ -26,7 +26,8 @@ class CommonErrorCodeTest {
                         tuple("COMMON_0005", HttpStatus.METHOD_NOT_ALLOWED),
                         tuple("COMMON_0006", HttpStatus.UNSUPPORTED_MEDIA_TYPE),
                         tuple("COMMON_0007", HttpStatus.UNAUTHORIZED),
-                        tuple("COMMON_0008", HttpStatus.FORBIDDEN));
+                        tuple("COMMON_0008", HttpStatus.FORBIDDEN),
+                        tuple("COMMON_0009", HttpStatus.SERVICE_UNAVAILABLE));
     }
 
     private static Tuple tuple(String code, HttpStatus status) {

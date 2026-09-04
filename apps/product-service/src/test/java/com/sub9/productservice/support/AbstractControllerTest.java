@@ -1,7 +1,7 @@
 package com.sub9.productservice.support;
 
 import com.sub9.common.exception.GlobalExceptionHandler;
-import com.sub9.productservice.config.SecurityConfig;
+import com.sub9.productservice.common.config.SecurityConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;

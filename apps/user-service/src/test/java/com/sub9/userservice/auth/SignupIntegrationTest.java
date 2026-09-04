@@ -117,8 +117,8 @@ class SignupIntegrationTest {
         User user = userRepository.findActiveById(original.userId()).orElseThrow();
         Creator creator = creatorRepository.findActiveById(original.creatorId()).orElseThrow();
         Instant deletedAt = Instant.parse("2026-09-01T07:00:00Z");
-        creator.softDelete(user.getUserId(), deletedAt);
-        user.softDelete(user.getUserId(), deletedAt);
+        creator.softDelete(user.getId(), deletedAt);
+        user.softDelete(user.getId(), deletedAt);
         creatorRepository.save(creator);
         userRepository.save(user);
         creatorRepository.flush();

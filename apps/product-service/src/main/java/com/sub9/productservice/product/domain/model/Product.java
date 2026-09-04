@@ -1,6 +1,5 @@
 package com.sub9.productservice.product.domain.model;
 
-import com.github.f4b6a3.uuid.UuidCreator;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.common.entity.BaseEntity;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
@@ -56,5 +55,24 @@ public class Product extends BaseEntity {
     if (!Objects.equals(creatorId, this.creatorId)) {
       throw new BusinessException(ProductErrorCode.PRODUCT_ACCESS_DENIED);
     }
+  }
+
+  public void updateStatusByCreator(ProductStatus productStatus) {
+    if (this.status == ProductStatus.SUSPENDED || productStatus == ProductStatus.SUSPENDED) {
+      throw new BusinessException(ProductErrorCode.INVALID_PRODUCT_STATUS_TRANSITION);
+    }
+    this.status = productStatus;
+  }
+
+  public void updateStatusByAdmin(ProductStatus productStatus) {
+    if (this.status == ProductStatus.INACTIVE || productStatus == ProductStatus.INACTIVE) {
+      throw new BusinessException(ProductErrorCode.INVALID_PRODUCT_STATUS_TRANSITION);
+    }
+    this.status = productStatus;
+  }
+
+  public void update(String name, String content) {
+    this.name = name;
+    this.content = content;
   }
 }

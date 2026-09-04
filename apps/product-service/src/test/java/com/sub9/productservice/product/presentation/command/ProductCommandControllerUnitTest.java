@@ -6,6 +6,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -13,7 +14,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.product.application.command.dto.CreateProductCommand;
+import com.sub9.productservice.product.application.command.dto.UpdateProductCommand;
+import com.sub9.productservice.product.application.command.dto.UpdateProductStatusCommand;
 import com.sub9.productservice.product.application.command.service.ProductCommandService;
+import com.sub9.productservice.product.presentation.command.controller.ProductCommandController;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.HashMap;
 import java.util.List;
@@ -139,6 +143,102 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
       Map<String, Object> request = new HashMap<>(validRequest());
       request.put(field, value);
       return request;
+    }
+  }
+
+  @Nested
+  @DisplayName("상품 정보 수정 테스트")
+  class UpdateProduct {
+    @Test
+    @DisplayName("유효한 요청이면 상품 정보를 수정하고 200을 반환한다")
+    void updateProduct_success() throws Exception {
+      // given
+      UUID productId = UUID.randomUUID();
+      Map<String, Object> request = Map.of("name", "수정된 상품명", "content", "수정된 상품 설명");
+      UpdateProductCommand command =
+          new UpdateProductCommand(authUser.id(), productId, "수정된 상품명", "수정된 상품 설명");
+
+      // when & then
+      mockMvc
+          .perform(
+              patch(endPoint + "/{productId}", productId)
+                  .with(authUser(authUser))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(jsonMapper.writeValueAsString(request)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.message").value("요청 성공"))
+          .andExpect(jsonPath("$.data").doesNotExist());
+
+      verify(productCommandService).updateProduct(command);
+    }
+
+    @Test
+    @DisplayName("상품명이 공백이면 400을 반환한다")
+    void updateProduct_fails_when_name_is_blank() throws Exception {
+      // given
+      UUID productId = UUID.randomUUID();
+      Map<String, Object> request = Map.of("name", " ", "content", "수정된 상품 설명");
+
+      // when & then
+      mockMvc
+          .perform(
+              patch(endPoint + "/{productId}", productId)
+                  .with(authUser(authUser))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(jsonMapper.writeValueAsString(request)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.errorCode").value("COMMON_0003"))
+          .andExpect(jsonPath("$.errors[0].name").value("상품명은 필수입니다."));
+
+      verify(productCommandService, never()).updateProduct(any());
+    }
+  }
+
+  @Nested
+  @DisplayName("상품 상태 수정 테스트")
+  class UpdateStatusProduct {
+    @Test
+    @DisplayName("유효한 요청이면 상품 상태를 수정하고 200을 반환한다")
+    void updateStatusProduct_success() throws Exception {
+      // given
+      UUID productId = UUID.randomUUID();
+      Map<String, Object> request = Map.of("status", "INACTIVE");
+      UpdateProductStatusCommand command =
+          new UpdateProductStatusCommand(authUser.id(), productId, authUser.role(), "INACTIVE");
+
+      // when & then
+      mockMvc
+          .perform(
+              patch(endPoint + "/{productId}/status", productId)
+                  .with(authUser(authUser))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(jsonMapper.writeValueAsString(request)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.message").value("요청 성공"))
+          .andExpect(jsonPath("$.data").doesNotExist());
+
+      verify(productCommandService).updateStatusProduct(command);
+    }
+
+    @Test
+    @DisplayName("상품 상태가 null이면 400을 반환한다")
+    void updateStatusProduct_fails_when_status_is_null() throws Exception {
+      // given
+      UUID productId = UUID.randomUUID();
+      String request = "{\"status\":null}";
+
+      // when & then
+      mockMvc
+          .perform(
+              patch(endPoint + "/{productId}/status", productId)
+                  .with(authUser(authUser))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(request))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.errorCode").value("COMMON_0003"))
+          .andExpect(jsonPath("$.errors[0].status").value("상품 상태는 필수 입력 값입니다."));
+
+      verify(productCommandService, never()).updateStatusProduct(any());
     }
   }
 

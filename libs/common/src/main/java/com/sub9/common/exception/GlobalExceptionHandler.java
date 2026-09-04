@@ -2,6 +2,7 @@ package com.sub9.common.exception;
 
 import com.sub9.common.dto.response.ErrorResponse;
 import jakarta.validation.ConstraintViolationException;
+
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -10,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
@@ -108,6 +110,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleUnsupportedMediaType(
             HttpMediaTypeNotSupportedException exception) {
         return failure(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDeniedException(AccessDeniedException exception) {
+        return failure(CommonErrorCode.FORBIDDEN);
     }
 
     @ExceptionHandler(Exception.class)

@@ -56,7 +56,7 @@ class UserTest {
         assertThatThrownBy(() -> createUser(uuidV4, "user@example.com", "nickname",
                 "010-1111-2222", Instant.parse("2026-09-01T01:30:00Z")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("userId must be a UUID v7");
+                .hasMessage("id must be a UUID v7");
     }
 
     private User createUser(UUID userId, String email, String nickname, String phone, Instant now) {
