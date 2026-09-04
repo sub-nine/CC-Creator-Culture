@@ -4,12 +4,11 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Getter
 @Entity
@@ -23,9 +22,7 @@ import java.util.UUID;
     },
     check = {@CheckConstraint(name = "ck_stocks_quantity", constraint = "quantity >= 0")})
 public class Stock {
-  @Id
-  @Column(name = "id")
-  private UUID id;
+  @Id private UUID id;
 
   @Column(nullable = false)
   private UUID skuId;
