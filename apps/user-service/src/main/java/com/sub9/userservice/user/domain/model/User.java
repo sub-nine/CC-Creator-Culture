@@ -35,8 +35,8 @@ import lombok.NoArgsConstructor;
 public class User extends BaseAuditEntity {
 
     @Id
-    @Column(name = "user_id", nullable = false, updatable = false)
-    private UUID userId;
+    @Column(name = "id", nullable = false, updatable = false)
+    private UUID id;
 
     @Column(name = "email", nullable = false, length = 255)
     private String email;
@@ -80,10 +80,10 @@ public class User extends BaseAuditEntity {
             foreignKey = @ForeignKey(name = "fk_users_deleted_by"))
     private User deletedByUser;
 
-    private User(UUID userId, String email, String encodedPassword, String nickname,
+    private User(UUID id, String email, String encodedPassword, String nickname,
             String phone, String address, String slackId, UserRole role, Instant now) {
         // 필수값 누락을 객체 생성 시점에 차단해 불완전한 User가 만들어지지 않도록 한다.
-        this.userId = requireUuidV7(userId, "userId");
+        this.id = requireUuidV7(id, "id");
         this.email = Objects.requireNonNull(email, "email must not be null");
         this.password = Objects.requireNonNull(encodedPassword, "encodedPassword must not be null");
         this.nickname = Objects.requireNonNull(nickname, "nickname must not be null");
@@ -92,13 +92,13 @@ public class User extends BaseAuditEntity {
         this.slackId = slackId;
         this.role = Objects.requireNonNull(role, "role must not be null");
         // 가입 시에는 인증 정보가 없으므로 미리 생성한 사용자 ID를 수정자로 기록한다.
-        initializeAudit(null, userId, now);
+        initializeAudit(null, id, now);
     }
 
     // 비밀번호 해시와 역할은 가입 유스케이스에서 준비하며, 요청 DTO를 그대로 전달하지 않는다.
-    public static User create(UUID userId, String email, String encodedPassword, String nickname,
+    public static User create(UUID id, String email, String encodedPassword, String nickname,
             String phone, String address, String slackId, UserRole role, Instant now) {
-        return new User(userId, email, encodedPassword, nickname, phone, address, slackId, role, now);
+        return new User(id, email, encodedPassword, nickname, phone, address, slackId, role, now);
     }
 
     public void softDelete(UUID actorId, Instant now) {

@@ -24,7 +24,7 @@ class CreatorTest {
         Creator creator = Creator.createPending(creatorId, userId, "창작상점", "123-45-67890",
                 createdAt);
 
-        assertThat(creator.getCreatorId()).isEqualTo(creatorId);
+        assertThat(creator.getId()).isEqualTo(creatorId);
         assertThat(creator.getUserId()).isEqualTo(userId);
         assertThat(creator.getApprovalStatus()).isEqualTo(ApprovalStatus.PENDING);
         assertThat(creator.getApprovedAt()).isNull();

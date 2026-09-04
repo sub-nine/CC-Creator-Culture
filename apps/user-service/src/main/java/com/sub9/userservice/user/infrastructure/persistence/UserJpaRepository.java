@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface UserJpaRepository extends JpaRepository<User, UUID> {
     // JPA를 통한 실제 DB 접근
 
-    Optional<User> findByUserIdAndDeletedAtIsNull(UUID userId);
+    Optional<User> findByIdAndDeletedAtIsNull(UUID id);
 
     Optional<User> findByEmailAndDeletedAtIsNull(String email);
 

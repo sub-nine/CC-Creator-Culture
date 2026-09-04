@@ -73,6 +73,16 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("서비스 이용 불가 예외를 공통 503 응답으로 변환한다")
+    void when_service_is_unavailable_then_returns_service_unavailable_response() throws Exception {
+        mockMvc.perform(get("/service-unavailable").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.errorCode").value("COMMON_0009"))
+                .andExpect(jsonPath("$.message").value("서비스를 일시적으로 사용할 수 없습니다."))
+                .andExpect(jsonPath("$.errors").isEmpty());
+    }
+
+    @Test
     @DisplayName("요청 본문 검증 실패를 필드 오류 응답으로 변환한다")
     void when_request_body_validation_fails_then_returns_field_error_response() throws Exception {
         mockMvc.perform(post("/body-validation")
@@ -247,6 +257,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/business")
         void business() {
             throw new BusinessException(TestErrorCode.PRODUCT_ALREADY_EXISTS);
+        }
+
+        @GetMapping("/service-unavailable")
+        void serviceUnavailable() {
+            throw new BusinessException(CommonErrorCode.SERVICE_UNAVAILABLE);
         }
 
         @PostMapping("/body-validation")
