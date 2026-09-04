@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -38,6 +39,37 @@ public class LeaderboardSnapshot extends BaseEntity {
 
     @Column(name = "date", nullable = false)
     private LocalDate date;
+
+    public LeaderboardSnapshot create(
+            LeaderboardType type,
+            UUID targetId,
+            double score,
+            long ranking,
+            LocalDate date
+    ) {
+        return LeaderboardSnapshot.builder()
+                .type(type)
+                .targetId(targetId)
+                .score(0)
+                .ranking(0)
+                .date(date)
+                .build();
+    }
+
+    @Builder
+    private LeaderboardSnapshot(
+            LeaderboardType type,
+            UUID targetId,
+            double score,
+            long ranking,
+            LocalDate date
+    ) {
+        this.type = type;
+        this.targetId = targetId;
+        this.score = score;
+        this.ranking = ranking;
+        this.date = date;
+    }
 }
 /*
 id	식별자	uuid	-	PK	NOT NULL	앱 생성(UUID)	리더보드 식별자	-	주요 엔티티 ID
