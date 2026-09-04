@@ -23,4 +23,9 @@ public class OrderRepositoryAdapter implements OrderRepository {
         return orderJpaRepository.findByIdForUpdate(orderId);
     }
 
+    @Override
+    public Optional<Order> findByOrderItemIdForUpdate(UUID orderItemId) {
+        return orderJpaRepository.findByOrderItemIdForUpdate(orderItemId);
+    }
+
 }
