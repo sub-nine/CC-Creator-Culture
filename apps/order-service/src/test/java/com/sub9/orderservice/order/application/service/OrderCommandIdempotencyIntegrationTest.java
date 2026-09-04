@@ -5,6 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
+import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
+import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
+import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import com.sub9.orderservice.order.domain.model.Money;
 import com.sub9.orderservice.order.domain.model.Order;
@@ -34,6 +38,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
@@ -51,6 +56,12 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         "management.tracing.export.enabled=false"
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@MockitoBean(types = {
+        CartSnapshotPort.class,
+        CouponApplicationPort.class,
+        CouponUsagePort.class,
+        StockPort.class
+})
 @DisplayName("주문 명령 멱등 처리 PostgreSQL 연동")
 class OrderCommandIdempotencyIntegrationTest {
 
