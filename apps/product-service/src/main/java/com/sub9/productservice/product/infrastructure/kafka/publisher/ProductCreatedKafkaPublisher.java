@@ -2,8 +2,8 @@ package com.sub9.productservice.product.infrastructure.kafka.publisher;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
+import com.sub9.common.kafka.event.ProductCreatedEvent;
 import com.sub9.common.kafka.topic.KafkaTopics;
-import com.sub9.productservice.product.application.event.ProductCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;

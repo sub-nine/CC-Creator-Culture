@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.presentation.command;
+package com.sub9.productservice.product.presentation.command.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -17,7 +17,6 @@ import com.sub9.productservice.product.application.command.dto.CreateProductComm
 import com.sub9.productservice.product.application.command.dto.UpdateProductCommand;
 import com.sub9.productservice.product.application.command.dto.UpdateProductStatusCommand;
 import com.sub9.productservice.product.application.command.service.ProductCommandService;
-import com.sub9.productservice.product.presentation.command.controller.ProductCommandController;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.HashMap;
 import java.util.List;
@@ -54,7 +53,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
   @DisplayName("상품 등록 테스트")
   class CreateProduct {
     @Test
-    @DisplayName("유효한 요청이면 창작자의 ID로 상품을 등록하고 201을 반환한다")
+    @DisplayName("창작자의 ID로 상품을 등록하고 201을 반환한다")
     void when_request_is_valid_create_product_returns_created() throws Exception {
       mockMvc
           .perform(
@@ -150,7 +149,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
   @DisplayName("상품 정보 수정 테스트")
   class UpdateProduct {
     @Test
-    @DisplayName("유효한 요청이면 상품 정보를 수정하고 200을 반환한다")
+    @DisplayName("상품 정보를 수정하고 200을 반환한다")
     void updateProduct_success() throws Exception {
       // given
       UUID productId = UUID.randomUUID();
@@ -198,7 +197,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
   @DisplayName("상품 상태 수정 테스트")
   class UpdateStatusProduct {
     @Test
-    @DisplayName("유효한 요청이면 상품 상태를 수정하고 200을 반환한다")
+    @DisplayName("상품 상태를 수정하고 200을 반환한다")
     void updateStatusProduct_success() throws Exception {
       // given
       UUID productId = UUID.randomUUID();
@@ -246,7 +245,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
   @DisplayName("상품 삭제 테스트")
   class DeleteProduct {
     @Test
-    @DisplayName("유효한 요청이면 상품을 삭제하고 200를 반환한다")
+    @DisplayName("상품을 삭제하고 200를 반환한다")
     void deleteProduct_success() throws Exception {
       // given
       UUID productId = UUID.randomUUID();
