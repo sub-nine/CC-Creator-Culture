@@ -119,4 +119,11 @@ public class OrderItem extends BaseEntity {
         this.order = order;
     }
 
+    void changeStatusTo(OrderItemStatus targetStatus) {
+        if (!status.canTransitionTo(targetStatus)) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_ITEM_STATUS_TRANSITION);
+        }
+        status = targetStatus;
+    }
+
 }
