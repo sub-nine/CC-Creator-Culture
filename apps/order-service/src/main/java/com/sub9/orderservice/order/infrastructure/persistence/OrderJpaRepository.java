@@ -4,6 +4,9 @@ import static jakarta.persistence.LockModeType.PESSIMISTIC_WRITE;
 
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.model.OrderNumber;
+import com.sub9.orderservice.order.domain.model.OrderStatus;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -32,6 +35,18 @@ public interface OrderJpaRepository extends JpaRepository<Order, UUID> {
              )
             """)
     Optional<Order> findByOrderItemIdForUpdate(@Param("orderItemId") UUID orderItemId);
+
+    @Query("""
+            select o.id
+              from Order o
+             where o.status = :status
+               and o.expiresAt <= :now
+             order by o.expiresAt, o.id
+            """)
+    List<UUID> findExpiredOrderIds(
+            @Param("status") OrderStatus status,
+            @Param("now") Instant now,
+            Pageable pageable);
 
     @EntityGraph(attributePaths = "items")
     Optional<Order> findByOrderNumber(OrderNumber orderNumber);
