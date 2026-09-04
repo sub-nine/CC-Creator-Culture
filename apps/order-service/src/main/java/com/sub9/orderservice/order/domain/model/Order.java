@@ -120,6 +120,32 @@ public class Order extends BaseEntity {
         return Collections.unmodifiableList(items);
     }
 
+    public OrderItem changeItemStatus(
+            UUID creatorId, UUID orderItemId, OrderItemStatus targetStatus) {
+        OrderItem item = items.stream()
+                .filter(candidate -> candidate.getId().equals(orderItemId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        if (!item.getCreatorId().equals(creatorId)) {
+            throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
+        }
+        if (targetStatus == null || !targetStatus.isCreatorTarget()) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_ITEM_STATUS_TRANSITION);
+        }
+        if (item.getStatus() == targetStatus) {
+            return item;
+        }
+        if (status != OrderStatus.PAID && status != OrderStatus.PROCESSING) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS);
+        }
+
+        item.changeStatusTo(targetStatus);
+        status = items.stream().allMatch(candidate -> candidate.getStatus() == OrderItemStatus.COMPLETED)
+                ? OrderStatus.COMPLETED
+                : OrderStatus.PROCESSING;
+        return item;
+    }
+
     private void addItems(List<OrderItem> candidates) {
         if (candidates == null || candidates.isEmpty()) {
             throw new BusinessException(OrderErrorCode.INVALID_ORDER_ITEMS);
