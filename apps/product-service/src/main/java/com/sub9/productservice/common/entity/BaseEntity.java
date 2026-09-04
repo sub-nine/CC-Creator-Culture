@@ -13,7 +13,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.domain.Persistable;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Getter
@@ -26,14 +26,14 @@ public abstract class BaseEntity implements Persistable<UUID> {
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @LastModifiedDate
     @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
+    private Instant deletedAt;
 
     @CreatedBy
     @Column(name = "created_by", updatable = false)
@@ -47,7 +47,7 @@ public abstract class BaseEntity implements Persistable<UUID> {
     private UUID deletedBy;
 
     public void delete(UUID deletedBy) {
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = Instant.now();
         this.deletedBy = deletedBy;
     }
 
