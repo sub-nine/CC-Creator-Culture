@@ -63,6 +63,10 @@ public class SecurityConfig {
                         "/api/v1/creator/order-items/{orderItemId}")
                 .hasRole(GatewayAuthenticationPrincipal.Role.CREATOR.name())
                 .requestMatchers(
+                        HttpMethod.PATCH,
+                        "/api/v1/creator/order-items/{orderItemId}/status")
+                .hasRole(GatewayAuthenticationPrincipal.Role.CREATOR.name())
+                .requestMatchers(
                         HttpMethod.GET,
                         "/api/v1/admin/orders",
                         "/api/v1/admin/orders/{orderNumber}")
