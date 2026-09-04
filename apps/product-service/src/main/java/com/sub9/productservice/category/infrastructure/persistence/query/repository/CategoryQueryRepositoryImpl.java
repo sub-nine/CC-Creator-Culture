@@ -69,4 +69,22 @@ public class CategoryQueryRepositoryImpl implements CategoryQueryRepository {
 
         return Optional.ofNullable(result);
     }
+
+    @Override
+    public List<CategoryResponse> searchCategoriesByIds(List<UUID> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+
+        return queryFactory
+                .select(Projections.constructor(CategoryResponse.class,
+                        category.id, category.name, category.description))
+                .from(category)
+                .where(
+                        category.id.in(ids),
+                        category.deletedAt.isNull(),
+                        category.status.eq(CategoryStatus.ACTIVE)
+                )
+                .fetch();
+    }
 }
