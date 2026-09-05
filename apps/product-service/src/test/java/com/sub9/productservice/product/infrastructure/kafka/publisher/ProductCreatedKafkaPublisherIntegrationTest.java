@@ -90,11 +90,7 @@ class ProductCreatedKafkaPublisherIntegrationTest {
 
     @Bean
     KafkaProperties kafkaProperties(EmbeddedKafkaBroker embeddedKafkaBroker) {
-      return new KafkaProperties(
-          embeddedKafkaBroker.getBrokersAsString(),
-          "earliest",
-          "product-test-group",
-          "category-test-group");
+      return new KafkaProperties(embeddedKafkaBroker.getBrokersAsString(), "earliest");
     }
 
     @Bean
