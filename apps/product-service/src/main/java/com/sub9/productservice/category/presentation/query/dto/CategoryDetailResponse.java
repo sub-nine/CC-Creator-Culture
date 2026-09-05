@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record CategoryDetailResponse(
-        UUID categoryId,
+        UUID id,
         String name,
         String description,
         List<HashtagResponse> hashtags

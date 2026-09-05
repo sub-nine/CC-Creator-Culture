@@ -38,7 +38,7 @@ public class CategoryQueryService implements CategoryQueryPort {
 
         List<HashtagResponse> hashtags = categoryHashtagQueryRepository.findHashtagsByCategoryId(categoryId);
 
-        return new CategoryDetailResponse(category.categoryId(), category.name(), category.description(), hashtags);
+        return new CategoryDetailResponse(category.id(), category.name(), category.description(), hashtags);
     }
 
     public Page<HashtagResponse> getCategoryHashtags(UUID categoryId, Pageable pageable) {
