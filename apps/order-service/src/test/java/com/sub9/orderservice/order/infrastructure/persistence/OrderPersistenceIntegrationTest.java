@@ -145,7 +145,7 @@ class OrderPersistenceIntegrationTest {
                  where table_schema = 'public'
                    and table_name in ('p_orders', 'p_order_items')
                    and column_name in ('created_at', 'updated_at', 'expires_at', 'paid_at', 'canceled_at')
-                   and data_type = 'timestamp without time zone'
+                   and data_type = 'timestamp with time zone'
                 """, Integer.class)).isEqualTo(7);
         assertThat(jdbcTemplate.queryForObject("""
                 select count(*)
