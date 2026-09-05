@@ -8,7 +8,7 @@ import com.sub9.productservice.product.application.query.dto.ProductViewCount;
 import com.sub9.productservice.product.domain.model.ProductDailyView;
 import com.sub9.productservice.product.domain.repository.ProductCommandRepository;
 import com.sub9.productservice.product.domain.repository.ProductDailyViewCommandRepository;
-import com.sub9.productservice.product.domain.repository.ProductViewRepository;
+import com.sub9.productservice.product.application.port.ProductViewRepository;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;

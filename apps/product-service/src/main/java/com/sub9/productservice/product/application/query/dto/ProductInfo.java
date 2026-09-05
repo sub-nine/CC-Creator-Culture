@@ -1,10 +1,10 @@
-package com.sub9.productservice.product.presentation.query.dto;
+package com.sub9.productservice.product.application.query.dto;
 
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-public record ProductResponse(
+public record ProductInfo(
     UUID productId,
     String name,
     ProductStatus status,

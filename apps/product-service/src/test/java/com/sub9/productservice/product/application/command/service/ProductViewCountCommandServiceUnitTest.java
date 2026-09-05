@@ -8,7 +8,7 @@ import com.sub9.productservice.product.application.port.ProductViewCountPublishe
 import com.sub9.productservice.product.application.query.dto.ProductViewCount;
 import com.sub9.productservice.product.domain.repository.ProductCommandRepository;
 import com.sub9.productservice.product.domain.repository.ProductDailyViewCommandRepository;
-import com.sub9.productservice.product.domain.repository.ProductViewRepository;
+import com.sub9.productservice.product.application.port.ProductViewRepository;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;

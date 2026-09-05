@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.domain.repository;
+package com.sub9.productservice.product.application.port;
 
 import com.sub9.productservice.product.application.query.dto.ProductViewCount;
 

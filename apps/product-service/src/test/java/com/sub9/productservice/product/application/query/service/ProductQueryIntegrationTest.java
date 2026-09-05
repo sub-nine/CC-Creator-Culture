@@ -9,9 +9,9 @@ import com.sub9.productservice.product.domain.model.Stock;
 import com.sub9.productservice.product.infrastructure.persistence.command.product.ProductCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.sku.SkuCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.stock.StockCommandJpaRepository;
-import com.sub9.productservice.product.presentation.query.dto.ProductDetailResponse;
-import com.sub9.productservice.product.presentation.query.dto.ProductResponse;
-import com.sub9.productservice.product.presentation.query.dto.SkuResponse;
+import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
+import com.sub9.productservice.product.application.query.dto.ProductInfo;
+import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import com.sub9.productservice.support.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
 import java.util.List;
@@ -58,7 +58,7 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
   @DisplayName("상품 상세 조회에 성공하면 상품, SKU, 재고 정보를 반환한다.")
   void getProductDetail_success() {
     // when
-    ProductDetailResponse response = productQueryService.getProductDetail(dummyProduct.getId(), null);
+    ProductDetailInfo response = productQueryService.getProductDetail(dummyProduct.getId(), null);
 
     // then
     assertThat(response.productId()).isEqualTo(dummyProduct.getId());
@@ -73,8 +73,8 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
     assertThat(response.hashtags()).isEmpty();
     assertThat(response.skus()).hasSize(2);
 
-    ProductDetailResponse.SkuInfo firstSku = response.skus().get(0);
-    ProductDetailResponse.SkuInfo secondSku = response.skus().get(1);
+    ProductDetailInfo.SkuInfo firstSku = response.skus().get(0);
+    ProductDetailInfo.SkuInfo secondSku = response.skus().get(1);
 
     assertThat(firstSku.skuId()).isEqualTo(defaultSku.getId());
     assertThat(firstSku.name()).isEqualTo("핑크");
@@ -96,29 +96,29 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
     List<UUID> skuIds = List.of(defaultSku.getId(), normalSku.getId());
 
     // when
-    List<SkuResponse> responses = productQueryService.getSkus(skuIds);
+    List<SkuInfo> responses = productQueryService.getSkus(skuIds);
 
     // then
     assertThat(responses).hasSize(2);
 
-    SkuResponse defaultSkuResponse = findSkuResponse(responses, defaultSku.getId());
-    SkuResponse normalSkuResponse = findSkuResponse(responses, normalSku.getId());
+    SkuInfo defaultSkuInfo = findSkuResponse(responses, defaultSku.getId());
+    SkuInfo normalSkuInfo = findSkuResponse(responses, normalSku.getId());
 
-    assertThat(defaultSkuResponse.productId()).isEqualTo(dummyProduct.getId());
-    assertThat(defaultSkuResponse.creatorId()).isEqualTo(creatorId);
-    assertThat(defaultSkuResponse.productName()).isEqualTo("말랑이");
-    assertThat(defaultSkuResponse.skuName()).isEqualTo("핑크");
-    assertThat(defaultSkuResponse.productStatus()).isEqualTo(ProductStatus.ACTIVE);
-    assertThat(defaultSkuResponse.price()).isEqualTo(10000L);
-    assertThat(defaultSkuResponse.quantity()).isEqualTo(10);
+    assertThat(defaultSkuInfo.productId()).isEqualTo(dummyProduct.getId());
+    assertThat(defaultSkuInfo.creatorId()).isEqualTo(creatorId);
+    assertThat(defaultSkuInfo.productName()).isEqualTo("말랑이");
+    assertThat(defaultSkuInfo.skuName()).isEqualTo("핑크");
+    assertThat(defaultSkuInfo.productStatus()).isEqualTo(ProductStatus.ACTIVE);
+    assertThat(defaultSkuInfo.price()).isEqualTo(10000L);
+    assertThat(defaultSkuInfo.quantity()).isEqualTo(10);
 
-    assertThat(normalSkuResponse.productId()).isEqualTo(dummyProduct.getId());
-    assertThat(normalSkuResponse.creatorId()).isEqualTo(creatorId);
-    assertThat(normalSkuResponse.productName()).isEqualTo("말랑이");
-    assertThat(normalSkuResponse.skuName()).isEqualTo("블루");
-    assertThat(normalSkuResponse.productStatus()).isEqualTo(ProductStatus.ACTIVE);
-    assertThat(normalSkuResponse.price()).isEqualTo(12000L);
-    assertThat(normalSkuResponse.quantity()).isEqualTo(5);
+    assertThat(normalSkuInfo.productId()).isEqualTo(dummyProduct.getId());
+    assertThat(normalSkuInfo.creatorId()).isEqualTo(creatorId);
+    assertThat(normalSkuInfo.productName()).isEqualTo("말랑이");
+    assertThat(normalSkuInfo.skuName()).isEqualTo("블루");
+    assertThat(normalSkuInfo.productStatus()).isEqualTo(ProductStatus.ACTIVE);
+    assertThat(normalSkuInfo.price()).isEqualTo(12000L);
+    assertThat(normalSkuInfo.quantity()).isEqualTo(5);
   }
 
   @Test
@@ -129,13 +129,13 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
     PageRequest pageable = PageRequest.of(0, 10);
 
     // when
-    Page<ProductResponse> responses = productQueryService.searchProducts(keyword, pageable);
+    Page<ProductInfo> responses = productQueryService.searchProducts(keyword, pageable);
 
     // then
     assertThat(responses.getTotalElements()).isEqualTo(1);
     assertThat(responses.getContent()).hasSize(1);
 
-    ProductResponse response = responses.getContent().getFirst();
+    ProductInfo response = responses.getContent().getFirst();
 
     assertThat(response.productId()).isEqualTo(dummyProduct.getId());
     assertThat(response.name()).isEqualTo("말랑이");
@@ -146,7 +146,7 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
     assertThat(response.quantity()).isEqualTo(10);
   }
 
-  private SkuResponse findSkuResponse(List<SkuResponse> responses, UUID skuId) {
+  private SkuInfo findSkuResponse(List<SkuInfo> responses, UUID skuId) {
     return responses.stream()
         .filter(response -> response.skuId().equals(skuId))
         .findFirst()

@@ -3,8 +3,8 @@ package com.sub9.productservice.product.presentation.query.controller;
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.product.application.query.service.ProductQueryService;
-import com.sub9.productservice.product.presentation.query.dto.ProductDetailResponse;
-import com.sub9.productservice.product.presentation.query.dto.ProductResponse;
+import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
+import com.sub9.productservice.product.application.query.dto.ProductInfo;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -21,7 +21,7 @@ public class ProductQueryController {
   private final ProductQueryService productQueryService;
 
   @GetMapping
-  public ApiResponse<Page<ProductResponse>> searchProducts(
+  public ApiResponse<Page<ProductInfo>> searchProducts(
       @RequestParam(required = false) String keyword,
       // TODO : 추후 검증 조건 및 페이징 조건 추가(현재 sort 값 사용 안함)
       @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
@@ -30,7 +30,7 @@ public class ProductQueryController {
   }
 
   @GetMapping("/{productId}")
-  public ApiResponse<ProductDetailResponse> getProductDetail(
+  public ApiResponse<ProductDetailInfo> getProductDetail(
           @AuthenticationPrincipal AuthUser authUser,
           @PathVariable UUID productId) {
     UUID visitorId = authUser != null ? authUser.id() : null;

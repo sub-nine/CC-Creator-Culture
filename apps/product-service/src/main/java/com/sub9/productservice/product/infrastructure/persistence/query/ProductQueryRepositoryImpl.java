@@ -12,9 +12,9 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.sub9.productservice.product.application.query.repository.ProductQueryRepository;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
-import com.sub9.productservice.product.presentation.query.dto.ProductDetailResponse;
-import com.sub9.productservice.product.presentation.query.dto.ProductResponse;
-import com.sub9.productservice.product.presentation.query.dto.SkuResponse;
+import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
+import com.sub9.productservice.product.application.query.dto.ProductInfo;
+import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,17 +31,17 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
   private final JPAQueryFactory queryFactory;
 
   @Override
-  public Optional<ProductDetailResponse> findProductDetailById(UUID productId) {
+  public Optional<ProductDetailInfo> findProductDetailById(UUID productId) {
     Product product = findProductById(productId);
 
     if (product == null) {
       return Optional.empty();
     }
 
-    List<ProductDetailResponse.SkuInfo> skus = findSkusByProductId(productId);
+    List<ProductDetailInfo.SkuInfo> skus = findSkusByProductId(productId);
 
     return Optional.of(
-        new ProductDetailResponse(
+        new ProductDetailInfo(
             product.getId(),
             product.getCreatorId(),
             product.getName(),
@@ -56,11 +56,11 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
   }
 
   @Override
-  public List<SkuResponse> findAllSkuInfoByIds(List<UUID> skuIds) {
+  public List<SkuInfo> findAllSkuInfoByIds(List<UUID> skuIds) {
     return queryFactory
         .select(
             Projections.constructor(
-                SkuResponse.class,
+                SkuInfo.class,
                 sku.id,
                 product.id,
                 product.creatorId,
@@ -79,7 +79,7 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
   }
 
   @Override
-  public Page<ProductResponse> searchProducts(String keyword, Pageable pageable) {
+  public Page<ProductInfo> searchProducts(String keyword, Pageable pageable) {
     List<UUID> productIds =
         queryFactory
             .select(product.id)
@@ -91,7 +91,7 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
             .limit(pageable.getPageSize())
             .fetch();
 
-    List<ProductResponse> content =
+    List<ProductInfo> content =
         productIds.isEmpty() ? List.of() : findProductsByIds(productIds);
 
     JPAQuery<Long> countQuery =
@@ -118,11 +118,11 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
         .fetchOne();
   }
 
-  private List<ProductResponse> findProductsByIds(List<UUID> productIds) {
+  private List<ProductInfo> findProductsByIds(List<UUID> productIds) {
     return queryFactory
         .select(
             Projections.constructor(
-                ProductResponse.class,
+                ProductInfo.class,
                 product.id,
                 product.name,
                 product.status,
@@ -140,11 +140,11 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
         .fetch();
   }
 
-  private List<ProductDetailResponse.SkuInfo> findSkusByProductId(UUID productId) {
+  private List<ProductDetailInfo.SkuInfo> findSkusByProductId(UUID productId) {
     return queryFactory
         .select(
             Projections.constructor(
-                ProductDetailResponse.SkuInfo.class,
+                ProductDetailInfo.SkuInfo.class,
                 sku.id,
                 sku.name,
                 sku.price,

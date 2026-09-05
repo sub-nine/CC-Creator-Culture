@@ -10,7 +10,7 @@ import com.sub9.productservice.product.application.port.ProductViewCountPublishe
 import com.sub9.productservice.product.application.query.dto.ProductViewCount;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductDailyView;
-import com.sub9.productservice.product.domain.repository.ProductViewRepository;
+import com.sub9.productservice.product.application.port.ProductViewRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.product.ProductCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.product.ProductDailyViewCommandJPARepository;
 import com.sub9.productservice.product.infrastructure.scheduler.ProductTotalViewCountScheduler;

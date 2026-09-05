@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.sub9.productservice.product.application.query.service.ProductQueryService;
 import com.sub9.productservice.product.domain.model.ProductStatus;
-import com.sub9.productservice.product.presentation.query.dto.SkuResponse;
+import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.List;
 import java.util.UUID;
@@ -35,8 +35,8 @@ class InternalSkuQueryControllerTest extends AbstractControllerTest {
     UUID productId = UUID.randomUUID();
     UUID creatorId = UUID.randomUUID();
 
-    SkuResponse response =
-        new SkuResponse(
+    SkuInfo response =
+        new SkuInfo(
             skuIds.getFirst(),
             productId,
             creatorId,

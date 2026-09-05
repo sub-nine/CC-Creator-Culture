@@ -1,7 +1,7 @@
 package com.sub9.productservice.product.infrastructure.redis;
 
 import com.sub9.productservice.product.application.query.dto.ProductViewCount;
-import com.sub9.productservice.product.domain.repository.ProductViewRepository;
+import com.sub9.productservice.product.application.port.ProductViewRepository;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;

@@ -1,6 +1,6 @@
 package com.sub9.productservice.product.application.event;
 
-import com.sub9.productservice.product.domain.repository.ProductViewRepository;
+import com.sub9.productservice.product.application.port.ProductViewRepository;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -10,8 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.product.application.query.service.ProductQueryService;
 import com.sub9.productservice.product.domain.model.ProductStatus;
-import com.sub9.productservice.product.presentation.query.dto.ProductDetailResponse;
-import com.sub9.productservice.product.presentation.query.dto.ProductResponse;
+import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
+import com.sub9.productservice.product.application.query.dto.ProductInfo;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.math.BigDecimal;
 import java.util.List;
@@ -39,8 +39,8 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
     // given
     String keyword = "왁뿌볼";
     Pageable pageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt"));
-    ProductResponse response =
-        new ProductResponse(
+    ProductInfo response =
+        new ProductInfo(
             productId, "왁뿌볼", ProductStatus.ACTIVE, BigDecimal.valueOf(4.5), 3L, 10000L, 10);
 
     given(productQueryService.searchProducts(eq(keyword), any(Pageable.class)))
@@ -68,8 +68,8 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
   @DisplayName("상품 상세 정보 조회에 성공하면 상품 정보와 200을 반환한다.")
   void getProductDetail_success() throws Exception {
     // given
-    ProductDetailResponse response =
-        new ProductDetailResponse(
+    ProductDetailInfo response =
+        new ProductDetailInfo(
             productId,
             UUID.randomUUID(),
             "왁뿌볼",
