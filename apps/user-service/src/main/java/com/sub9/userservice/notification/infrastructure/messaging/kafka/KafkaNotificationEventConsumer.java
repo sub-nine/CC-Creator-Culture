@@ -67,7 +67,10 @@ public class KafkaNotificationEventConsumer {
                     payload,
                     KafkaDomainEventPayload.class
             );
-
+            Set<ConstraintViolation<KafkaDomainEventPayload>> violations = validator.validate(event);
+            if (!violations.isEmpty()) {
+                throw new IllegalArgumentException("Invalid event: " + violations);
+            }
             validateTopicContract(
                     event,
                     expectedSource,
