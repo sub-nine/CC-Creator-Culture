@@ -17,7 +17,7 @@ public enum OrderItemStatus {
 
     boolean canTransitionTo(OrderItemStatus target) {
         return switch (this) {
-            case ORDERED -> target == PREPARING;
+            case ORDERED -> target == PREPARING || target == CANCELED;
             case PREPARING -> target == SHIPPED;
             case SHIPPED -> target == DELIVERED;
             case DELIVERED -> target == COMPLETED;

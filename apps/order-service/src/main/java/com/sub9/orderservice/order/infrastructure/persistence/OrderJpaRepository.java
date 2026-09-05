@@ -24,6 +24,10 @@ public interface OrderJpaRepository extends JpaRepository<Order, UUID> {
     Optional<Order> findByIdForUpdate(@Param("orderId") UUID orderId);
 
     @Lock(PESSIMISTIC_WRITE)
+    @Query("select o from Order o join fetch o.items where o.orderNumber = :orderNumber")
+    Optional<Order> findByOrderNumberForUpdate(@Param("orderNumber") OrderNumber orderNumber);
+
+    @Lock(PESSIMISTIC_WRITE)
     @Query("""
             select parent
               from Order parent

@@ -140,6 +140,24 @@ public class Order extends BaseEntity {
         return true;
     }
 
+    public void cancel(UUID customerId, Instant canceledAt) {
+        if (!this.customerId.equals(customerId)) {
+            throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
+        }
+        Objects.requireNonNull(canceledAt, "주문 취소 시각은 필수입니다.");
+        if (items.stream().anyMatch(item -> item.getStatus().isCreatorTarget())) {
+            throw new BusinessException(OrderErrorCode.CANNOT_CANCEL_ORDER_IN_PROGRESS);
+        }
+        if (status != OrderStatus.PAID
+                || items.stream().anyMatch(item -> item.getStatus() != OrderItemStatus.ORDERED)) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS);
+        }
+
+        items.forEach(item -> item.changeStatusTo(OrderItemStatus.CANCELED));
+        status = OrderStatus.CANCELED;
+        this.canceledAt = canceledAt;
+    }
+
     public OrderItem changeItemStatus(
             UUID creatorId, UUID orderItemId, OrderItemStatus targetStatus) {
         OrderItem item = items.stream()
