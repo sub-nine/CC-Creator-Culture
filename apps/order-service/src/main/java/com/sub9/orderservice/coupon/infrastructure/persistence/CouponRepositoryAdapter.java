@@ -7,6 +7,8 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Repository
 @RequiredArgsConstructor
@@ -22,6 +24,11 @@ public class CouponRepositoryAdapter implements CouponRepository {
     @Override
     public Optional<Coupon> findActiveById(UUID couponId) {
         return couponJpaRepository.findByIdAndDeletedAtIsNull(couponId);
+    }
+
+    @Override
+    public Page<Coupon> findAllActive(Pageable pageable) {
+        return couponJpaRepository.findAllByDeletedAtIsNull(pageable);
     }
 
     @Override
