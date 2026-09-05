@@ -9,12 +9,14 @@ import com.sub9.orderservice.coupon.domain.model.UserCoupon;
 import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
 import com.sub9.orderservice.coupon.domain.repository.UserCouponRepository;
 import jakarta.persistence.EntityManager;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -146,7 +148,7 @@ class CouponPersistenceIntegrationTest {
         transaction().executeWithoutResult(status -> couponRepository.save(coupon));
 
         Integer beforeStart = transaction().execute(status -> couponRepository
-                .increaseIssuedQuantityIfIssuable(coupon.getId(), uuidGenerator.generate(), STARTED_AT.minusNanos(1)));
+                .increaseIssuedQuantityIfIssuable(coupon.getId(), uuidGenerator.generate(), STARTED_AT.minusSeconds(1)));
         coupon.delete(uuidGenerator.generate(), STARTED_AT.plusSeconds(1));
         transaction().executeWithoutResult(status -> couponRepository.save(coupon));
         Integer deleted = transaction().execute(status -> couponRepository
@@ -228,7 +230,7 @@ class CouponPersistenceIntegrationTest {
             UserCoupon duplicate = UserCoupon.issue(uuidGenerator.generate(), coupon, userId, STARTED_AT.plusSeconds(1));
             userCouponRepository.save(duplicate);
             entityManager.flush();
-        })).isInstanceOf(DataIntegrityViolationException.class);
+        })).isInstanceOf(ConstraintViolationException.class);
     }
 
     @Test
@@ -243,9 +245,9 @@ class CouponPersistenceIntegrationTest {
                     created_at, created_by, updated_at
                 ) values (?, ?, ?, 'ISSUED', ?, ?, ?, ?, ?, ?)
                 """,
-                uuidGenerator.generate(), coupon.getId(), uuidGenerator.generate(), STARTED_AT,
-                STARTED_AT.plusSeconds(1), uuidGenerator.generate(),
-                CREATED_AT, uuidGenerator.generate(), CREATED_AT))
+                uuidGenerator.generate(), coupon.getId(), uuidGenerator.generate(), Timestamp.from(STARTED_AT),
+                Timestamp.from(STARTED_AT.plusSeconds(1)), uuidGenerator.generate(),
+                Timestamp.from(CREATED_AT), uuidGenerator.generate(), Timestamp.from(CREATED_AT)))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
