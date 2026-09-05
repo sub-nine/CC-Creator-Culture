@@ -144,9 +144,17 @@ class OrderPersistenceIntegrationTest {
                   from information_schema.columns
                  where table_schema = 'public'
                    and table_name in ('p_orders', 'p_order_items')
-                   and column_name in ('created_at', 'updated_at', 'expires_at', 'paid_at', 'canceled_at')
+                   and column_name in ('created_at', 'updated_at')
+                   and data_type = 'timestamp with time zone'
+                """, Integer.class)).isEqualTo(4);
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*)
+                  from information_schema.columns
+                 where table_schema = 'public'
+                   and table_name = 'p_orders'
+                   and column_name in ('expires_at', 'paid_at', 'canceled_at')
                    and data_type = 'timestamp without time zone'
-                """, Integer.class)).isEqualTo(7);
+                """, Integer.class)).isEqualTo(3);
         assertThat(jdbcTemplate.queryForObject("""
                 select count(*)
                   from information_schema.key_column_usage
