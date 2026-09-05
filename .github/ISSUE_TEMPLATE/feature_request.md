@@ -1,8 +1,8 @@
 ---
 name: "🚀 Feature Request"
 about: 새로운 기능 개발 및 도메인 구현 요구사항을 작성합니다.
-title: "[feat] "
-labels: feat
+title: "feat(<도메인>): "
+labels: ["type: feature"]
 assignees: ''
 ---
 

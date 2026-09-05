@@ -120,6 +120,26 @@ public class Order extends BaseEntity {
         return Collections.unmodifiableList(items);
     }
 
+    public void markPaid(Instant processedAt) {
+        validatePaymentResult(processedAt);
+        status = OrderStatus.PAID;
+        paidAt = processedAt;
+    }
+
+    public void markPaymentFailed(Instant processedAt) {
+        validatePaymentResult(processedAt);
+        status = OrderStatus.FAILED;
+    }
+
+    public boolean expire(Instant now) {
+        Objects.requireNonNull(now, "주문 만료 확인 시각은 필수입니다.");
+        if (status != OrderStatus.PENDING_PAYMENT || now.isBefore(expiresAt)) {
+            return false;
+        }
+        status = OrderStatus.EXPIRED;
+        return true;
+    }
+
     public OrderItem changeItemStatus(
             UUID creatorId, UUID orderItemId, OrderItemStatus targetStatus) {
         OrderItem item = items.stream()
@@ -144,6 +164,19 @@ public class Order extends BaseEntity {
                 ? OrderStatus.COMPLETED
                 : OrderStatus.PROCESSING;
         return item;
+    }
+
+    private void validatePaymentResult(Instant processedAt) {
+        Objects.requireNonNull(processedAt, "결제 처리 시각은 필수입니다.");
+        if (status == OrderStatus.EXPIRED) {
+            throw new BusinessException(OrderErrorCode.ORDER_ALREADY_EXPIRED);
+        }
+        if (status != OrderStatus.PENDING_PAYMENT) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS);
+        }
+        if (!processedAt.isBefore(expiresAt)) {
+            throw new BusinessException(OrderErrorCode.ORDER_ALREADY_EXPIRED);
+        }
     }
 
     private void addItems(List<OrderItem> candidates) {
