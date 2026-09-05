@@ -1,6 +1,7 @@
 package com.sub9.orderservice.order.infrastructure.persistence;
 
 import com.sub9.orderservice.order.domain.model.Order;
+import com.sub9.orderservice.order.domain.model.OrderNumber;
 import com.sub9.orderservice.order.domain.model.OrderStatus;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
 import java.time.Instant;
@@ -26,6 +27,11 @@ public class OrderRepositoryAdapter implements OrderRepository {
     @Override
     public Optional<Order> findByIdForUpdate(UUID orderId) {
         return orderJpaRepository.findByIdForUpdate(orderId);
+    }
+
+    @Override
+    public Optional<Order> findByOrderNumberForUpdate(OrderNumber orderNumber) {
+        return orderJpaRepository.findByOrderNumberForUpdate(orderNumber);
     }
 
     @Override
