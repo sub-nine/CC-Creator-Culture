@@ -26,4 +26,9 @@ public class ProductCommandRepositoryImpl implements ProductCommandRepository {
   public Optional<Product> findByIdForUpdate(UUID productId) {
     return jpaRepository.findByIdForUpdate(productId);
   }
+
+  @Override
+  public void incrementViewCount(UUID productId, long viewCount) {
+    jpaRepository.incrementViewCount(productId, viewCount);
+  }
 }

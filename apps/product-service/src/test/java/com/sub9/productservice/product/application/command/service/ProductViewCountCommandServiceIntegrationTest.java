@@ -7,10 +7,10 @@ import static org.mockito.Mockito.*;
 import com.sub9.common.kafka.event.ProductViewSyncEvent;
 import com.sub9.productservice.product.application.command.dto.IncrementDailyViewCountsCommand;
 import com.sub9.productservice.product.application.port.ProductViewCountPublisher;
+import com.sub9.productservice.product.application.port.ProductViewRepository;
 import com.sub9.productservice.product.application.query.dto.ProductViewCount;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductDailyView;
-import com.sub9.productservice.product.application.port.ProductViewRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.product.ProductCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.product.ProductDailyViewCommandJPARepository;
 import com.sub9.productservice.product.infrastructure.scheduler.ProductTotalViewCountScheduler;
@@ -135,15 +135,22 @@ class ProductViewCountCommandServiceIntegrationTest extends AbstractIntegrationT
   @DisplayName("상품 누적 조회수 반영 테스트")
   class SyncTotalViewCountsTests {
     @Test
-    @DisplayName("전날 조회수만 누적하고 삭제된 상품과 없는 상품은 건너뛴다.")
+    @DisplayName("전날 조회수를 DB에 직접 누적하고 삭제된 상품과 없는 상품은 제외한다.")
     void syncTotalViewCounts_success() {
       // given
       UUID creatorId = UUID.randomUUID();
 
       Product product = productRepository.save(Product.create(creatorId, "상품", "설명"));
-      product.incrementViewCount(10L);
       Product deleted = productRepository.save(Product.create(creatorId, "삭제 상품", "설명"));
       deleted.delete(creatorId);
+      entityManager.flush();
+
+      entityManager
+          .createNativeQuery("UPDATE p_products SET view_count = 10 WHERE id = :productId")
+          .setParameter("productId", product.getId())
+          .executeUpdate();
+      entityManager.clear();
+
       LocalDate yesterday = LocalDate.now(Clock.systemUTC()).minusDays(1);
 
       increment(product.getId(), yesterday, 5L);

@@ -7,7 +7,6 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 public interface ProductDailyViewCommandJPARepository
     extends JpaRepository<ProductDailyView, UUID> {
@@ -32,11 +31,7 @@ public interface ProductDailyViewCommandJPARepository
                       view_count = p_product_daily_views.view_count + EXCLUDED.view_count
                   """,
       nativeQuery = true)
-  void upsert(
-      @Param("id") UUID id,
-      @Param("productId") UUID productId,
-      @Param("viewCount") long viewCount,
-      @Param("viewDate") LocalDate viewDate);
+  void upsert(UUID id, UUID productId, long viewCount, LocalDate viewDate);
 
   List<ProductDailyView> findAllByViewDate(LocalDate viewDate);
 }

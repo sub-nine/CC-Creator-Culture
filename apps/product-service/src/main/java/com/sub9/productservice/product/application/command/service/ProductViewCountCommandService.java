@@ -4,11 +4,11 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import com.sub9.common.kafka.event.ProductViewSyncEvent;
 import com.sub9.productservice.product.application.command.dto.IncrementDailyViewCountsCommand;
 import com.sub9.productservice.product.application.port.ProductViewCountPublisher;
+import com.sub9.productservice.product.application.port.ProductViewRepository;
 import com.sub9.productservice.product.application.query.dto.ProductViewCount;
 import com.sub9.productservice.product.domain.model.ProductDailyView;
 import com.sub9.productservice.product.domain.repository.ProductCommandRepository;
 import com.sub9.productservice.product.domain.repository.ProductDailyViewCommandRepository;
-import com.sub9.productservice.product.application.port.ProductViewRepository;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
@@ -62,16 +62,14 @@ public class ProductViewCountCommandService {
 
   public void syncTotalViewCounts() {
     // TODO : 테이블에 반영되지 않은 조회수는 누락될 것으로 보임 추후 테이블 + Redis 동시 집계하도록 수정 필요 MVP 이후
-    //        스케쥴러 중복 실행도 고려해봐야 함
+    //        스케쥴러 동시성도 고려해봐야 함
     List<ProductDailyView> previousDayViewCounts =
         productDailyViewCommandRepository.findAllByViewDate(
             LocalDate.now(Clock.systemUTC()).minusDays(1));
 
     for (ProductDailyView dailyView : previousDayViewCounts) {
-      // TODO : 실패 시 처리 방안 고려해봐야함 MVP 이후
-      productCommandRepository
-          .findByIdAndDeletedAtIsNull(dailyView.getProductId())
-          .ifPresent(product -> product.incrementViewCount(dailyView.getViewCount()));
+      productCommandRepository.incrementViewCount(
+          dailyView.getProductId(), dailyView.getViewCount());
     }
   }
 }
