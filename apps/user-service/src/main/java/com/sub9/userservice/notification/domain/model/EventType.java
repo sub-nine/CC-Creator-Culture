@@ -5,7 +5,7 @@ public enum EventType {
     PRODUCT_LOW_STOCK, //재고부족
     PRODUCT_SOLD_OUT,  //품절
     PRODUCT_RESTOCKED, //재입고
-    USER_FOLLOWED,     //팔로우
+
     ORDER_CREATED,     //주문 생성
     ORDER_CANCELLED,   //주문 취소
     PAYMENT_PAID,      //결제 성공
