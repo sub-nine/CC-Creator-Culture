@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.infrastructure.command.sku;
+package com.sub9.productservice.product.infrastructure.persistence.command.sku;
 
 import com.sub9.productservice.product.domain.model.Sku;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.infrastructure.command.stock;
+package com.sub9.productservice.product.infrastructure.persistence.command.stock;
 
 import com.sub9.productservice.product.domain.model.Stock;
 import com.sub9.productservice.product.domain.repository.StockCommandRepository;
@@ -10,7 +10,7 @@ import java.util.UUID;
 
 @Repository
 @RequiredArgsConstructor
-public class StockCommandRepositoryAdapter implements StockCommandRepository {
+public class StockCommandRepositoryImpl implements StockCommandRepository {
   private final StockCommandJpaRepository stockCommandJpaRepository;
 
   @Override

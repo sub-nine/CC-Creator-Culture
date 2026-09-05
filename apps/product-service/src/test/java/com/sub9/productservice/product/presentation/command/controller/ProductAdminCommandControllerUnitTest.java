@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.presentation.command;
+package com.sub9.productservice.product.presentation.command.controller;
 
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -10,7 +10,6 @@ import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.product.application.command.dto.UpdateProductStatusCommand;
 import com.sub9.productservice.product.application.command.service.ProductCommandService;
-import com.sub9.productservice.product.presentation.command.controller.ProductAdminCommandController;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.Map;
 import java.util.UUID;
@@ -35,7 +34,7 @@ class ProductAdminCommandControllerUnitTest extends AbstractControllerTest {
   }
 
   @Test
-  @DisplayName("관리자의 유효한 요청이면 상품 상태를 수정하고 200을 반환한다")
+  @DisplayName("관리자가 상품 상태를 수정하고 200을 반환한다")
   void updateProductStatus_success() throws Exception {
     // given
     Map<String, Object> request = Map.of("status", "SUSPENDED");
