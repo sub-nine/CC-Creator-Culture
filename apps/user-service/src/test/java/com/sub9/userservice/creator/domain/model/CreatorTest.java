@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sub9.common.identifier.UuidV7Generator;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,7 +30,7 @@ class CreatorTest {
         assertThat(creator.getApprovedBy()).isNull();
         assertThat(creator.getCreatedBy()).isNull();
         assertThat(creator.getUpdatedBy()).isEqualTo(userId);
-        assertThat(creator.getCreatedAt()).isEqualTo(LocalDateTime.of(2026, 9, 1, 2, 0));
+        assertThat(creator.getCreatedAt()).isEqualTo(createdAt);
     }
 
     @Test
@@ -45,7 +44,7 @@ class CreatorTest {
         creator.softDelete(firstActorId, Instant.parse("2026-09-01T03:00:00Z"));
         creator.softDelete(uuidGenerator.generate(), Instant.parse("2026-09-01T04:00:00Z"));
 
-        assertThat(creator.getDeletedAt()).isEqualTo(LocalDateTime.of(2026, 9, 1, 3, 0));
+        assertThat(creator.getDeletedAt()).isEqualTo(Instant.parse("2026-09-01T03:00:00Z"));
         assertThat(creator.getDeletedBy()).isEqualTo(firstActorId);
         assertThat(creator.getUpdatedAt()).isEqualTo(creator.getDeletedAt());
         assertThat(creator.getUpdatedBy()).isEqualTo(firstActorId);

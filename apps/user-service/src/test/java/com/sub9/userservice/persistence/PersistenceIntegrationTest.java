@@ -145,6 +145,21 @@ class PersistenceIntegrationTest {
         assertThat(foreignKeyCount).isEqualTo(8);
     }
 
+    @Test
+    @DisplayName("사용자와 창작자의 감사 시각 컬럼을 timestamp with time zone으로 생성한다")
+    void when_schema_is_created_audit_timestamp_columns_include_time_zone() {
+        Integer timestampWithTimeZoneCount = jdbcTemplate.queryForObject("""
+                select count(*)
+                  from information_schema.columns
+                 where table_schema = 'private'
+                   and table_name in ('p_users', 'p_creators')
+                   and column_name in ('created_at', 'updated_at', 'deleted_at')
+                   and data_type = 'timestamp with time zone'
+                """, Integer.class);
+
+        assertThat(timestampWithTimeZoneCount).isEqualTo(6);
+    }
+
     private User createUser(String email, String nickname, String phone, UserRole role) {
         UUID userId = uuidGenerator.generate();
         return User.create(userId, email, "encoded-password", nickname, phone,
