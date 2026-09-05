@@ -16,14 +16,14 @@ public class SlackWebhookClient {
     private final SlackProperties properties;
 
     public SlackWebhookClient(
-            WebClient
-                    .Builder builder,
-             SlackProperties properties) {
-        this.webClient = builder.build();
+            WebClient webClient,
+            SlackProperties properties
+    ) {
+        this.webClient = webClient;
         this.properties = properties;
     }
 
-    /** destination에 연결된 URL로 text JSON을 보내고 최대 5초 기다립니다. */
+    /** Sends a text JSON payload to the webhook URL for the destination and waits up to 5 seconds. */
     public void send(
             String destination,
             String message)
