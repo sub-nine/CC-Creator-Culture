@@ -22,6 +22,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
@@ -95,6 +97,28 @@ class CouponPersistenceIntegrationTest {
     }
 
     @Test
+    @DisplayName("쿠폰 목록은 삭제된 쿠폰을 제외하고 요청한 순서로 조회한다")
+    void when_coupon_list_is_queried_deleted_coupon_is_excluded_and_sort_is_applied() {
+        Coupon earlier = coupon("먼저 시작하는 쿠폰", STARTED_AT);
+        Coupon later = coupon("나중에 시작하는 쿠폰", STARTED_AT.plusSeconds(60));
+        Coupon deleted = coupon("삭제된 쿠폰", STARTED_AT.plusSeconds(120));
+        deleted.delete(uuidGenerator.generate(), CREATED_AT.plusSeconds(1));
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(earlier);
+            couponRepository.save(later);
+            couponRepository.save(deleted);
+        });
+
+        var result = couponRepository.findAllActive(PageRequest.of(
+                0, 10, Sort.by(Sort.Direction.DESC, "startedAt")));
+
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getContent())
+                .extracting(Coupon::getCouponName)
+                .containsExactly("나중에 시작하는 쿠폰", "먼저 시작하는 쿠폰");
+    }
+
+    @Test
     @DisplayName("발급 가능한 쿠폰만 조건부로 수량과 수정 감사를 갱신한다")
     void when_coupon_is_issuable_conditional_update_changes_quantity_and_audit() {
         Coupon coupon = coupon(1);
@@ -130,6 +154,28 @@ class CouponPersistenceIntegrationTest {
 
         assertThat(beforeStart).isZero();
         assertThat(deleted).isZero();
+    }
+
+    @Test
+    @DisplayName("활성 쿠폰만 요청한 정렬과 페이징으로 조회한다")
+    void when_coupons_are_queried_only_active_coupons_are_paged() {
+        Coupon older = coupon(10);
+        Coupon newer = Coupon.create(
+                uuidGenerator.generate(), "새 쿠폰", 10, 10,
+                STARTED_AT.plusSeconds(1), EXPIRED_AT, uuidGenerator.generate(), CREATED_AT.plusSeconds(1));
+        Coupon deleted = coupon(10);
+        deleted.delete(uuidGenerator.generate(), STARTED_AT);
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(older);
+            couponRepository.save(newer);
+            couponRepository.save(deleted);
+        });
+
+        var result = couponRepository.findAllActive(PageRequest.of(
+                0, 1, Sort.by(Sort.Direction.DESC, "startedAt")));
+
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getContent()).extracting(Coupon::getId).containsExactly(newer.getId());
     }
 
     @Test
@@ -207,6 +253,12 @@ class CouponPersistenceIntegrationTest {
         return Coupon.create(
                 uuidGenerator.generate(), "영속성 테스트 쿠폰", 10, totalQuantity,
                 STARTED_AT, EXPIRED_AT, uuidGenerator.generate(), CREATED_AT);
+    }
+
+    private Coupon coupon(String couponName, Instant startedAt) {
+        return Coupon.create(
+                uuidGenerator.generate(), couponName, 10, 100,
+                startedAt, EXPIRED_AT, uuidGenerator.generate(), CREATED_AT);
     }
 
     private TransactionTemplate transaction() {
