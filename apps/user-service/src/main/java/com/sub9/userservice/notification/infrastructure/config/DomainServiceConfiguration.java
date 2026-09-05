@@ -6,8 +6,11 @@ import com.sub9.userservice.notification.domain.service.NotificationMessageFacto
 import com.sub9.userservice.notification.domain.service.RecipientResolver;
 import com.sub9.userservice.notification.domain.service.SensitiveDataMasker;
 import com.sub9.userservice.notification.domain.service.SlackPolicy;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.List;
 
 @Configuration
 public class DomainServiceConfiguration {
@@ -33,5 +36,17 @@ public class DomainServiceConfiguration {
     @Bean
     SensitiveDataMasker sensitiveDataMasker() {
         return new SensitiveDataMasker();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(FollowerLookup.class)
+    FollowerLookup followerLookup() {
+        return creatorId -> List.of();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(WishlistLookup.class)
+    WishlistLookup wishlistLookup() {
+        return productId -> List.of();
     }
 }
