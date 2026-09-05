@@ -1,7 +1,7 @@
-local viewerKey = KEYS[1] -- 방문자 ID
+local viewerKey = KEYS[1] -- 방문자별 조회 여부 확인 키
 local viewCountKey = KEYS[2] -- 조회수 집계 키
 
-local ttl = ARGV[1] -- 중복 방지 TTL
+local ttl = tonumber(ARGV[1])
 local productId = ARGV[2] -- 상품 PK
 
 local result = redis.call(
@@ -13,13 +13,12 @@ local result = redis.call(
         ttl
 )
 
---
 if not result then
     return 0
 end
 
 redis.call(
-
+        'HINCRBY',
         viewCountKey,
         productId,
         1

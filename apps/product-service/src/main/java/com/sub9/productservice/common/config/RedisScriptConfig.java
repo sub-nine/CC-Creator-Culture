@@ -9,6 +9,6 @@ import org.springframework.data.redis.core.script.RedisScript;
 public class RedisScriptConfig {
   @Bean
   public RedisScript<Long> viewCountScript() {
-    return RedisScript.of(new ClassPathResource("redis/view_count.lua"));
+    return RedisScript.of(new ClassPathResource("redis/view_count.lua"), Long.class);
   }
 }
