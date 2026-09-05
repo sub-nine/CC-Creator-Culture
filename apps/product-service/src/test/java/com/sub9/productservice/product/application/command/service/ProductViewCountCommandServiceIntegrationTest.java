@@ -72,15 +72,18 @@ class ProductViewCountCommandServiceIntegrationTest extends AbstractIntegrationT
       ArgumentCaptor<ProductViewSyncEvent> captor =
           ArgumentCaptor.forClass(ProductViewSyncEvent.class);
 
+      verify(productViewCountPublisher).publish(captor.capture());
+
       assertThat(count).isEqualTo(1);
       assertThat(captor.getValue().eventId()).isNotNull();
       assertThat(captor.getValue().viewDate()).isBetween(before, LocalDate.now(Clock.systemUTC()));
       assertThat(captor.getValue().productViewCounts())
           .containsExactly(new ProductViewSyncEvent.ProductViewCount(productId, 3L));
+
+      verify(productViewRepository, never()).deleteAllViewCount();
+
       publishResult.complete(null);
 
-      verify(productViewCountPublisher).publish(captor.capture());
-      verify(productViewRepository, never()).deleteAllViewCount();
       verify(productViewRepository).deleteAllViewCount();
     }
 
