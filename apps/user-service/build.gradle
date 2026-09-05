@@ -12,10 +12,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
-    // Redis 湲곕컲 ?몄쬆 ?좏겙 愿由?
+    // Redis 기반 인증 토큰 관리
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
-    // JWT 諛쒓툒 諛?寃利?
+    // JWT 발급 및 검증
     implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
@@ -33,13 +33,13 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
 
-    // JUnit?먯꽌 Testcontainer???쒖옉怨?醫낅즺 ?섎챸二쇨린瑜?愿由ы븯湲??꾪븳 ?뺤옣 紐⑤뱢
+    // JUnit에서 Testcontainers의 시작과 종료 생명주기를 관리하기 위한 확장 모듈
     testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
-    // ?ㅼ젣 PostgreSQL?먯꽌 JPA 留ㅽ븨怨?DB ?쒖빟??寃利앺븯湲??꾪븳 ?뚯뒪??而⑦뀒?대꼫
+    // 실제 PostgreSQL에서 JPA 매핑과 DB 제약을 검증하기 위한 테스트 컨테이너
     testImplementation 'org.testcontainers:testcontainers-postgresql'
 
     compileOnly 'org.projectlombok:lombok'
-    // ?ㅼ젙 硫뷀??곗씠???앹꽦
+    // 설정 메타데이터 생성
     annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
     annotationProcessor 'org.projectlombok:lombok'
     testCompileOnly 'org.projectlombok:lombok'
