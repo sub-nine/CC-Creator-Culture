@@ -1,7 +1,6 @@
 package com.sub9.orderservice.coupon.domain.model;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -31,11 +30,9 @@ public class Coupon extends CouponBaseEntity {
     @Column(name = "issued_quantity", nullable = false)
     private int issuedQuantity;
 
-    @Convert(disableConversion = true)
     @Column(name = "started_at", nullable = false, columnDefinition = "timestamp with time zone")
     private Instant startedAt;
 
-    @Convert(disableConversion = true)
     @Column(name = "expired_at", nullable = false, columnDefinition = "timestamp with time zone")
     private Instant expiredAt;
 

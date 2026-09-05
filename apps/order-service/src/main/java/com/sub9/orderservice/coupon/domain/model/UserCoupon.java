@@ -1,7 +1,6 @@
 package com.sub9.orderservice.coupon.domain.model;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -29,11 +28,9 @@ public class UserCoupon extends CouponBaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private UserCouponStatus status;
 
-    @Convert(disableConversion = true)
     @Column(name = "issued_at", nullable = false, updatable = false, columnDefinition = "timestamp with time zone")
     private Instant issuedAt;
 
-    @Convert(disableConversion = true)
     @Column(name = "used_at", columnDefinition = "timestamp with time zone")
     private Instant usedAt;
 

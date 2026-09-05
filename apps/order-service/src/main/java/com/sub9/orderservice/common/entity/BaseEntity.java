@@ -1,7 +1,6 @@
 package com.sub9.orderservice.common.entity;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
@@ -26,12 +25,10 @@ public abstract class BaseEntity {
     private UUID id;
 
     @CreatedDate
-    @Convert(disableConversion = true)
     @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamp with time zone")
     private Instant createdAt;
 
     @LastModifiedDate
-    @Convert(disableConversion = true)
     @Column(name = "updated_at", nullable = false, columnDefinition = "timestamp with time zone")
     private Instant updatedAt;
 

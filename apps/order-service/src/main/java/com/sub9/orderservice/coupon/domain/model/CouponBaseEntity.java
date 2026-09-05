@@ -1,7 +1,6 @@
 package com.sub9.orderservice.coupon.domain.model;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import java.time.Instant;
@@ -23,7 +22,6 @@ public abstract class CouponBaseEntity {
 
     // INSERT 시 생성 시각이 전달되지 않으면 데이터베이스의 현재 시각을 기본값으로 사용한다.
     @ColumnDefault("CURRENT_TIMESTAMP")
-    @Convert(disableConversion = true)
     @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamp with time zone")
     private Instant createdAt;
 
@@ -32,14 +30,12 @@ public abstract class CouponBaseEntity {
 
     // INSERT 시 수정 시각이 전달되지 않으면 데이터베이스의 현재 시각을 기본값으로 사용한다.
     @ColumnDefault("CURRENT_TIMESTAMP")
-    @Convert(disableConversion = true)
     @Column(name = "updated_at", nullable = false, columnDefinition = "timestamp with time zone")
     private Instant updatedAt;
 
     @Column(name = "updated_by")
     private UUID updatedBy;
 
-    @Convert(disableConversion = true)
     @Column(name = "deleted_at", columnDefinition = "timestamp with time zone")
     private Instant deletedAt;
 

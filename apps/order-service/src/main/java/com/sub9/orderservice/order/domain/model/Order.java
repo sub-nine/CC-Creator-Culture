@@ -2,13 +2,11 @@ package com.sub9.orderservice.order.domain.model;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.orderservice.common.entity.BaseEntity;
-import com.sub9.orderservice.common.persistence.InstantTimestampConverter;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -83,16 +81,13 @@ public class Order extends BaseEntity {
     @Embedded
     private ShippingAddress shippingAddress;
 
-    @Convert(converter = InstantTimestampConverter.class)
-    @Column(name = "expires_at", nullable = false, updatable = false, columnDefinition = "timestamp")
+    @Column(name = "expires_at", nullable = false, updatable = false, columnDefinition = "timestamp with time zone")
     private Instant expiresAt;
 
-    @Convert(converter = InstantTimestampConverter.class)
-    @Column(name = "paid_at", columnDefinition = "timestamp")
+    @Column(name = "paid_at", columnDefinition = "timestamp with time zone")
     private Instant paidAt;
 
-    @Convert(converter = InstantTimestampConverter.class)
-    @Column(name = "canceled_at", columnDefinition = "timestamp")
+    @Column(name = "canceled_at", columnDefinition = "timestamp with time zone")
     private Instant canceledAt;
 
     @Version
