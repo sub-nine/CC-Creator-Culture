@@ -36,8 +36,8 @@ import lombok.NoArgsConstructor;
 public class Creator extends BaseAuditEntity {
 
     @Id
-    @Column(name = "creator_id", nullable = false, updatable = false)
-    private UUID creatorId;     // 창작자 정보의 식별자
+    @Column(name = "id", nullable = false, updatable = false)
+    private UUID id;            // 창작자 정보의 식별자
 
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;        // 연결된 로그인 계정의 식별자
@@ -89,10 +89,10 @@ public class Creator extends BaseAuditEntity {
             foreignKey = @ForeignKey(name = "fk_creators_deleted_by"))
     private User deletedByUser;
 
-    private Creator(UUID creatorId, UUID userId, String creatorName,
+    private Creator(UUID id, UUID userId, String creatorName,
             String businessRegistrationNumber, Instant now) {
         // 필수값 누락을 생성 시점에 차단해 불완전한 Creator가 만들어지지 않도록 한다.
-        this.creatorId = requireUuidV7(creatorId, "creatorId");
+        this.id = requireUuidV7(id, "id");
         this.userId = requireUuidV7(userId, "userId");
         this.creatorName = Objects.requireNonNull(creatorName, "creatorName must not be null");
         this.businessRegistrationNumber = Objects.requireNonNull(
@@ -104,9 +104,9 @@ public class Creator extends BaseAuditEntity {
         initializeAudit(null, userId, now);
     }
 
-    public static Creator createPending(UUID creatorId, UUID userId, String creatorName,
+    public static Creator createPending(UUID id, UUID userId, String creatorName,
             String businessRegistrationNumber, Instant now) {
-        return new Creator(creatorId, userId, creatorName, businessRegistrationNumber, now);
+        return new Creator(id, userId, creatorName, businessRegistrationNumber, now);
     }
 
     public void softDelete(UUID actorId, Instant now) {

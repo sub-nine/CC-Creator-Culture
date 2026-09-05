@@ -8,6 +8,6 @@ public record CustomerSignupResponse(UUID userId, String email, String nickname,
 
     public static CustomerSignupResponse from(User user) {
         return new CustomerSignupResponse(
-                user.getUserId(), user.getEmail(), user.getNickname(), user.getRole());
+                user.getId(), user.getEmail(), user.getNickname(), user.getRole());
     }
 }

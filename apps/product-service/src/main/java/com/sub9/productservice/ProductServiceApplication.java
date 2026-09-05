@@ -1,6 +1,6 @@
 package com.sub9.productservice;
 
-import com.sub9.productservice.config.kafka.KafkaProperties;
+import com.sub9.productservice.common.config.kafka.KafkaProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

@@ -17,3 +17,17 @@ spring:
           time_zone: UTC
         hbm2ddl:
           create_namespaces: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      connect-timeout: 2s
+      timeout: 2s
+
+auth:
+  jwt:
+    secret: ${JWT_SECRET}
+    access-token-expiration: 30m
+    refresh-token-expiration: 7d
+    clock-skew: 60s

@@ -1,14 +1,15 @@
 package com.sub9.productservice.product.domain.model;
 
-import com.github.f4b6a3.uuid.UuidCreator;
+import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.common.entity.BaseEntity;
+import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.util.Objects;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.math.BigDecimal;
-import java.util.UUID;
 
 @Getter
 @Entity
@@ -17,10 +18,6 @@ import java.util.UUID;
     name = "p_products",
     indexes = {@Index(name = "idx_products_creator_id", columnList = "creator_id")})
 public class Product extends BaseEntity {
-  @Id
-  @Column(name = "product_id")
-  private UUID id;
-
   @Column(nullable = false)
   private UUID creatorId;
 
@@ -43,7 +40,6 @@ public class Product extends BaseEntity {
 
   public static Product create(UUID creatorId, String name, String content) {
     Product product = new Product();
-    product.id = UuidCreator.getTimeOrderedEpoch();
     product.creatorId = creatorId;
     product.name = name;
     product.content = content;
@@ -53,5 +49,30 @@ public class Product extends BaseEntity {
     product.status = ProductStatus.ACTIVE;
 
     return product;
+  }
+
+  public void validateOwner(UUID creatorId) {
+    if (!Objects.equals(creatorId, this.creatorId)) {
+      throw new BusinessException(ProductErrorCode.PRODUCT_ACCESS_DENIED);
+    }
+  }
+
+  public void updateStatusByCreator(ProductStatus productStatus) {
+    if (this.status == ProductStatus.SUSPENDED || productStatus == ProductStatus.SUSPENDED) {
+      throw new BusinessException(ProductErrorCode.INVALID_PRODUCT_STATUS_TRANSITION);
+    }
+    this.status = productStatus;
+  }
+
+  public void updateStatusByAdmin(ProductStatus productStatus) {
+    if (this.status == ProductStatus.INACTIVE || productStatus == ProductStatus.INACTIVE) {
+      throw new BusinessException(ProductErrorCode.INVALID_PRODUCT_STATUS_TRANSITION);
+    }
+    this.status = productStatus;
+  }
+
+  public void update(String name, String content) {
+    this.name = name;
+    this.content = content;
   }
 }

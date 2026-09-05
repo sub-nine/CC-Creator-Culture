@@ -22,4 +22,9 @@ public class ProductCommandRepositoryAdapter implements ProductCommandRepository
   public Optional<Product> findByIdAndDeletedAtIsNull(UUID productId) {
     return jpaRepository.findByIdAndDeletedAtIsNull(productId);
   }
+
+  @Override
+  public Optional<Product> findByIdForUpdate(UUID productId) {
+    return jpaRepository.findByIdForUpdate(productId);
+  }
 }
