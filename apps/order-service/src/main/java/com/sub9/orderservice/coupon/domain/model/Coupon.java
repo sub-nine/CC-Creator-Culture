@@ -1,7 +1,9 @@
 package com.sub9.orderservice.coupon.domain.model;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Objects;
@@ -13,7 +15,18 @@ import org.hibernate.annotations.ColumnDefault;
 
 @Getter
 @Entity
-@Table(name = "p_coupons")
+@Table(
+        name = "p_coupons",
+        indexes = {
+                @Index(name = "idx_coupon_period", columnList = "started_at, expired_at"),
+                @Index(name = "idx_coupon_deleted_at", columnList = "deleted_at")
+        },
+        check = {
+                @CheckConstraint(name = "chk_coupon_discount_rate", constraint = "discount_rate between 1 and 100"),
+                @CheckConstraint(name = "chk_coupon_total_quantity", constraint = "total_quantity >= 1"),
+                @CheckConstraint(name = "chk_coupon_quantity", constraint = "issued_quantity >= 0 and issued_quantity <= total_quantity"),
+                @CheckConstraint(name = "chk_coupon_period", constraint = "started_at < expired_at")
+        })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Coupon extends CouponBaseEntity {
 

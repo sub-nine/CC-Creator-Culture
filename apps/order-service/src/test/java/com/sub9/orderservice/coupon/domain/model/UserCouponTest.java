@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 class UserCouponTest {
 
     private static final Instant ISSUED_AT = Instant.parse("2026-09-01T11:00:01Z");
+    private static final Instant EXPIRED_AT = Instant.parse("2026-09-03T14:59:59Z");
 
     private final UuidV7Generator uuidGenerator = new UuidV7Generator();
 
@@ -86,9 +87,9 @@ class UserCouponTest {
 
         assertThatThrownBy(() -> UserCoupon.issue(id, null, userId, ISSUED_AT))
                 .isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> UserCoupon.issue(id, couponId, null, ISSUED_AT))
+        assertThatThrownBy(() -> UserCoupon.issue(id, coupon(couponId), null, ISSUED_AT))
                 .isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> UserCoupon.issue(id, couponId, userId, null))
+        assertThatThrownBy(() -> UserCoupon.issue(id, coupon(couponId), userId, null))
                 .isInstanceOf(NullPointerException.class);
     }
 
@@ -96,12 +97,19 @@ class UserCouponTest {
     @DisplayName("UUID v7이 아닌 사용자 쿠폰 식별자를 거부한다")
     void when_user_coupon_id_is_not_uuid_v7_creation_is_rejected() {
         assertThatThrownBy(() -> UserCoupon.issue(
-                UUID.randomUUID(), uuidGenerator.generate(), uuidGenerator.generate(), ISSUED_AT))
+                UUID.randomUUID(), coupon(uuidGenerator.generate()), uuidGenerator.generate(), ISSUED_AT))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("식별자는 UUID v7 형식이어야 합니다.");
     }
 
     private UserCoupon issue(UUID couponId, UUID userId) {
-        return UserCoupon.issue(uuidGenerator.generate(), couponId, userId, ISSUED_AT);
+        return UserCoupon.issue(uuidGenerator.generate(), coupon(couponId), userId, ISSUED_AT);
+    }
+
+    private Coupon coupon(UUID couponId) {
+        return Coupon.create(
+                couponId, "쿠폰", 10, 100,
+                ISSUED_AT.minusSeconds(60), EXPIRED_AT,
+                uuidGenerator.generate(), ISSUED_AT.minusSeconds(60));
     }
 }
