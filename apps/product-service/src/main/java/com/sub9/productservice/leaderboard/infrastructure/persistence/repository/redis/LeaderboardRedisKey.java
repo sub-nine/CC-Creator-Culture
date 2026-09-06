@@ -1,4 +1,4 @@
-package com.sub9.productservice.leaderboard.infrastructure.persistence.redis;
+package com.sub9.productservice.leaderboard.infrastructure.persistence.repository.redis;
 
 import com.sub9.productservice.leaderboard.domain.model.LeaderboardType;
 

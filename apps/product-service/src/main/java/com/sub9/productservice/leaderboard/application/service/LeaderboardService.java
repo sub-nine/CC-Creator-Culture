@@ -78,7 +78,7 @@ public class LeaderboardService {
         // 오늘자 실시간 랭킹(redis) + 기간 내 스냅샷(DB) 조회
         List<RankedMember> currentRankedMembers = redisRepository.getRankedMembers(leaderboardType);
         List<LeaderboardSnapshot> periodLeaderboardSnapshots = startDate.equals(endDate) ? List.of() :
-                leaderboardSnapshotRepository.findLeaderboardSnapshotByDateRange(
+                leaderboardSnapshotRepository.findLeaderboardSnapshotsByDateRange(
                         leaderboardType,
                         startDate,
                         endDate

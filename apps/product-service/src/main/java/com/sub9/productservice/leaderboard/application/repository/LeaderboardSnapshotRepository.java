@@ -8,5 +8,5 @@ import java.util.List;
 
 public interface LeaderboardSnapshotRepository {
 
-    List<LeaderboardSnapshot> findLeaderboardSnapshotByDateRange(LeaderboardType type, LocalDate startDate, LocalDate endDate);
+    List<LeaderboardSnapshot> findLeaderboardSnapshotsByDateRange(LeaderboardType type, LocalDate startDate, LocalDate endDate);
 }
