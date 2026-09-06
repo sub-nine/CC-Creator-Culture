@@ -7,8 +7,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.GlobalExceptionHandler;
+import com.sub9.orderservice.coupon.application.dto.IssueDispatchResult;
 import com.sub9.orderservice.coupon.application.service.CouponCommandService;
+import com.sub9.orderservice.coupon.application.service.CouponIssueService;
+import com.sub9.orderservice.coupon.domain.exception.CouponErrorCode;
+import com.sub9.orderservice.coupon.infrastructure.redis.CouponRedisStorageException;
 import com.sub9.orderservice.coupon.presentation.request.CreateCouponRequest;
 import com.sub9.orderservice.coupon.presentation.response.CouponResponse;
 import java.time.Instant;
@@ -32,9 +37,12 @@ import org.springframework.test.web.servlet.MockMvc;
 class CouponCommandControllerTest {
     private static final UUID USER_ID = UUID.fromString("01990a00-0000-7000-8000-000000000001");
     private static final UUID COUPON_ID = UUID.fromString("01990a00-0000-7000-8000-000000000002");
+    private static final UUID USER_COUPON_ID =
+            UUID.fromString("01990a00-0000-7000-8000-000000000003");
 
     @Autowired private MockMvc mockMvc;
     @MockitoBean private CouponCommandService couponCommandService;
+    @MockitoBean private CouponIssueService couponIssueService;
 
     @Test
     @DisplayName("유효한 요청과 사용자 헤더로 쿠폰을 생성하면 201을 반환한다")
@@ -72,6 +80,74 @@ class CouponCommandControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("COMMON_0003"));
+    }
+
+    @Test
+    @DisplayName("쿠폰 동기 발급에 성공하면 사용자 쿠폰 식별자와 201을 반환한다")
+    void when_coupon_issue_succeeds_created_response_is_returned() throws Exception {
+        when(couponIssueService.issue(COUPON_ID, USER_ID))
+                .thenReturn(new IssueDispatchResult.Completed(USER_COUPON_ID));
+
+        mockMvc.perform(post("/api/v1/coupons/{couponId}/issue", COUPON_ID)
+                        .header("X-User-Id", USER_ID))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.message").value("쿠폰이 발급되었습니다."))
+                .andExpect(jsonPath("$.data.userCouponId").value(USER_COUPON_ID.toString()));
+    }
+
+    @Test
+    @DisplayName("발급 요청에 사용자 헤더가 없으면 400을 반환한다")
+    void when_coupon_issue_user_header_is_missing_bad_request_is_returned() throws Exception {
+        mockMvc.perform(post("/api/v1/coupons/{couponId}/issue", COUPON_ID))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("COMMON_0002"));
+    }
+
+    @Test
+    @DisplayName("발급 기간이 아니면 쿠폰 기간 오류와 400을 반환한다")
+    void when_coupon_is_outside_issue_period_bad_request_is_returned() throws Exception {
+        assertIssueError(CouponErrorCode.NOT_IN_ISSUE_PERIOD, 400, "COUPON_0002");
+    }
+
+    @Test
+    @DisplayName("쿠폰이 없으면 쿠폰 조회 오류와 404를 반환한다")
+    void when_coupon_does_not_exist_not_found_is_returned() throws Exception {
+        assertIssueError(CouponErrorCode.COUPON_NOT_FOUND, 404, "COUPON_0001");
+    }
+
+    @Test
+    @DisplayName("쿠폰이 품절되면 품절 오류와 409를 반환한다")
+    void when_coupon_is_sold_out_conflict_is_returned() throws Exception {
+        assertIssueError(CouponErrorCode.SOLD_OUT, 409, "COUPON_0003");
+    }
+
+    @Test
+    @DisplayName("이미 발급받은 쿠폰이면 중복 오류와 409를 반환한다")
+    void when_coupon_is_already_issued_conflict_is_returned() throws Exception {
+        assertIssueError(CouponErrorCode.ALREADY_ISSUED, 409, "COUPON_0004");
+    }
+
+    @Test
+    @DisplayName("Redis 장애가 발생하면 서비스 일시 중단 오류와 503을 반환한다")
+    void when_redis_fails_service_unavailable_is_returned() throws Exception {
+        when(couponIssueService.issue(COUPON_ID, USER_ID))
+                .thenThrow(new CouponRedisStorageException());
+
+        mockMvc.perform(post("/api/v1/coupons/{couponId}/issue", COUPON_ID)
+                        .header("X-User-Id", USER_ID))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.errorCode").value("COMMON_0009"));
+    }
+
+    private void assertIssueError(
+            CouponErrorCode errorCode, int expectedStatus, String expectedErrorCode) throws Exception {
+        when(couponIssueService.issue(COUPON_ID, USER_ID))
+                .thenThrow(new BusinessException(errorCode));
+
+        mockMvc.perform(post("/api/v1/coupons/{couponId}/issue", COUPON_ID)
+                        .header("X-User-Id", USER_ID))
+                .andExpect(status().is(expectedStatus))
+                .andExpect(jsonPath("$.errorCode").value(expectedErrorCode));
     }
 
     private String validRequest() {
