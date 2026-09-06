@@ -1,4 +1,4 @@
-package com.sub9.orderservice.cart.infrastructure.feign.exception;
+package com.sub9.orderservice.cart.infrastructure.client.exception;
 
 import com.sub9.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;

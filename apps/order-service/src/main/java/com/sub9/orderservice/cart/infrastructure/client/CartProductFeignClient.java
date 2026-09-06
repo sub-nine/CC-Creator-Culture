@@ -1,6 +1,7 @@
-package com.sub9.orderservice.cart.infrastructure.feign;
+package com.sub9.orderservice.cart.infrastructure.client;
 
-import com.sub9.orderservice.cart.application.dto.CartItemProducInfo;
+import com.sub9.orderservice.cart.application.dto.CartItemInfo;
+import com.sub9.orderservice.cart.application.dto.CartProductInfo;
 import com.sub9.orderservice.config.OpenFeignConfig;
 import java.util.List;
 import java.util.UUID;
@@ -20,5 +21,5 @@ public interface CartProductFeignClient {
   void validateSkuForCart(@PathVariable UUID skuId);
 
   @PostMapping
-  List<CartItemProducInfo> getCartItemProducts(List<UUID> skuIds);
+  List<CartProductInfo> getCartItemProducts(List<UUID> skuIds);
 }
