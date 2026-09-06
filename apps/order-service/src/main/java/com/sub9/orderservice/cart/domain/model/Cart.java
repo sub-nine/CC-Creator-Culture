@@ -1,10 +1,6 @@
 package com.sub9.orderservice.cart.domain.model;
 
-import com.sub9.common.exception.BusinessException;
-import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import jakarta.persistence.*;
-
-import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;

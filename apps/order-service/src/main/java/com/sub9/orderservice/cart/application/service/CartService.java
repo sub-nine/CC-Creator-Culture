@@ -11,12 +11,14 @@ import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import com.sub9.orderservice.cart.domain.model.Cart;
 import com.sub9.orderservice.cart.domain.repository.CartRepository;
 import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
-import java.util.List;
-import java.util.UUID;
+import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -53,15 +55,15 @@ public class CartService implements CartSnapshotPort {
   @Transactional(readOnly = true)
   public List<CartItemSnapshot> getCartItems(UUID customerId, List<UUID> cartItemIds) {
     throw new UnsupportedOperationException("개발 중 입니다.");
-    //    List<Cart> carts = cartRepository.findAllByUserIdAndIdIn(customerId, cartItemIds);
-    //
-    //    if (carts.size() != cartItemIds.size()) throw new
-    // BusinessException(OrderErrorCode.INVALID_ORDER_ITEMS);
-    //
-    //    return cartProductPort.getCartItemProducts(cartItemIds)
-    //            .stream()
-    //            .map(this::toSnapshot)
-    //            .toList();
+        List<Cart> carts = cartRepository.findAllByUserIdAndIdIn(customerId, cartItemIds);
+
+        if (carts.size() != cartItemIds.size()) throw new
+     BusinessException(OrderErrorCode.INVALID_ORDER_ITEMS);
+
+        return cartProductPort.getCartItemProducts(cartItemIds)
+                .stream()
+                .map(this::toSnapshot)
+                .toList();
   }
 
   private CartItemSnapshot toSnapshot(CartItemProducInfo item) {
