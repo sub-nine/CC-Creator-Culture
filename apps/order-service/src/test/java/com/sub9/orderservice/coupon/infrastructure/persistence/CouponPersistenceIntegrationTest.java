@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.coupon.domain.model.Coupon;
 import com.sub9.orderservice.coupon.domain.model.UserCoupon;
+import com.sub9.orderservice.coupon.domain.model.UserCouponStatus;
 import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
 import com.sub9.orderservice.coupon.domain.repository.UserCouponRepository;
 import jakarta.persistence.EntityManager;
@@ -118,6 +119,63 @@ class CouponPersistenceIntegrationTest {
         assertThat(result.getContent())
                 .extracting(Coupon::getCouponName)
                 .containsExactly("나중에 시작하는 쿠폰", "먼저 시작하는 쿠폰");
+    }
+
+    @Test
+    @DisplayName("내 쿠폰 목록은 다른 사용자를 제외하고 발급 시각 순서로 페이징한다")
+    void when_user_coupons_are_queried_only_owner_coupons_are_paged() {
+        Coupon earlierCoupon = coupon("먼저 발급된 사용자 쿠폰", STARTED_AT);
+        Coupon laterCoupon = coupon("나중에 발급된 사용자 쿠폰", STARTED_AT);
+        Coupon otherCoupon = coupon("다른 사용자 쿠폰", STARTED_AT);
+        UUID ownerId = uuidGenerator.generate();
+        UUID otherUserId = uuidGenerator.generate();
+        UserCoupon earlier = UserCoupon.issue(
+                uuidGenerator.generate(), earlierCoupon, ownerId, STARTED_AT);
+        UserCoupon later = UserCoupon.issue(
+                uuidGenerator.generate(), laterCoupon, ownerId, STARTED_AT.plusSeconds(1));
+        UserCoupon other = UserCoupon.issue(
+                uuidGenerator.generate(), otherCoupon, otherUserId, STARTED_AT.plusSeconds(2));
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(earlierCoupon);
+            couponRepository.save(laterCoupon);
+            couponRepository.save(otherCoupon);
+            userCouponRepository.save(earlier);
+            userCouponRepository.save(later);
+            userCouponRepository.save(other);
+        });
+
+        var result = userCouponRepository.findAllByUserId(
+                ownerId, null,
+                PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "issuedAt")));
+
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getContent()).extracting(UserCoupon::getId)
+                .containsExactly(later.getId());
+    }
+
+    @Test
+    @DisplayName("내 쿠폰 목록은 요청한 사용 상태만 조회한다")
+    void when_user_coupon_status_is_given_only_matching_status_is_returned() {
+        Coupon issuedCoupon = coupon("발급 상태 사용자 쿠폰", STARTED_AT);
+        Coupon usedCoupon = coupon("사용 상태 사용자 쿠폰", STARTED_AT);
+        UUID userId = uuidGenerator.generate();
+        UserCoupon issued = UserCoupon.issue(
+                uuidGenerator.generate(), issuedCoupon, userId, STARTED_AT);
+        UserCoupon used = UserCoupon.issue(
+                uuidGenerator.generate(), usedCoupon, userId, STARTED_AT.plusSeconds(1));
+        used.use(userId, uuidGenerator.generate(), STARTED_AT.plusSeconds(2));
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(issuedCoupon);
+            couponRepository.save(usedCoupon);
+            userCouponRepository.save(issued);
+            userCouponRepository.save(used);
+        });
+
+        var result = userCouponRepository.findAllByUserId(
+                userId, UserCouponStatus.USED, PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).extracting(UserCoupon::getId)
+                .containsExactly(used.getId());
     }
 
     @Test
