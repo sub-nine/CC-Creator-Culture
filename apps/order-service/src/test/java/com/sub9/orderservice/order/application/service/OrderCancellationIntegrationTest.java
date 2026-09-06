@@ -11,11 +11,16 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sub9.common.dto.response.ErrorResponse;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.common.identifier.UuidV7Generator;
+import com.sub9.orderservice.common.security.GatewayHeaderAuthenticationFilter;
 import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
@@ -38,6 +43,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,16 +51,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -82,6 +92,7 @@ import tools.jackson.databind.JsonNode;
         PaymentCancellationPort.class
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@AutoConfigureMockMvc
 @ExtendWith(OutputCaptureExtension.class)
 @DisplayName("전체 주문 취소 PostgreSQL 연동")
 class OrderCancellationIntegrationTest {
@@ -101,6 +112,9 @@ class OrderCancellationIntegrationTest {
 
     @Autowired
     private OrderCancellationService service;
+
+    @Autowired
+    private MockMvc mockMvc;
 
     @Autowired
     private OrderCommandIdempotencyService idempotencyService;
@@ -318,6 +332,76 @@ class OrderCancellationIntegrationTest {
         assertThat(jdbcTemplate.queryForObject("select count(*) from p_order_command_requests", Integer.class)).isZero();
         assertThat(restored(order).getStatus()).isEqualTo(OrderStatus.PAID);
         verifyNoInteractions(paymentPort, stockPort, couponUsagePort);
+    }
+
+    @Test
+    @DisplayName("취소 API의 최초 응답과 저장된 재응답이 일치하고 협업 기능은 한 번만 호출한다")
+    void when_http_cancellation_is_repeated_saved_response_is_returned() throws Exception {
+        Order order = savedPaidOrder();
+        String firstResponse = mockMvc.perform(cancelRequest(CUSTOMER_ID, order)
+                        .header("Idempotency-Key", KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orderNumber").value(order.getOrderNumber().toString()))
+                .andExpect(jsonPath("$.data.status").value("CANCELED"))
+                .andExpect(jsonPath("$.data.canceledAt").isString())
+                .andReturn().getResponse().getContentAsString();
+
+        mockMvc.perform(cancelRequest(CUSTOMER_ID, order).header("Idempotency-Key", KEY))
+                .andExpect(status().isOk())
+                .andExpect(content().json(firstResponse));
+
+        assertThat(jsonCodec.decodeResponse(firstResponse)).isEqualTo(jsonCodec.decodeResponse(
+                jdbcTemplate.queryForObject("select response_payload::text from p_order_command_requests",
+                        String.class)));
+        verify(paymentPort).cancel(eq(order.getId()), any(), any());
+        verify(stockPort).restore(eq(order.getId()), anyList(), eq(StockPort.RestoreReason.ORDER_CANCEL));
+        verifyNoInteractions(couponUsagePort);
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidKeys")
+    @DisplayName("취소 API의 잘못된 멱등 키는 명령 저장과 협업 호출 전에 거부한다")
+    void when_http_key_is_invalid_validation_rejects_before_any_changes(String key) throws Exception {
+        Order order = savedPaidOrder();
+
+        mockMvc.perform(cancelRequest(CUSTOMER_ID, order).header("Idempotency-Key", key))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.VALIDATION_ERROR.code()));
+
+        assertThat(jdbcTemplate.queryForObject("select count(*) from p_order_command_requests", Integer.class)).isZero();
+        assertThat(restored(order).getStatus()).isEqualTo(OrderStatus.PAID);
+        verifyNoInteractions(paymentPort, stockPort, couponUsagePort);
+    }
+
+    @Test
+    @DisplayName("타인 주문 취소는 403으로 응답하고 같은 요청에도 실패 결과를 재사용한다")
+    void when_http_customer_does_not_own_order_forbidden_is_replayed() throws Exception {
+        Order order = savedPaidOrder();
+        UUID anotherCustomer = uuidGenerator.generate();
+        String firstResponse = mockMvc.perform(cancelRequest(anotherCustomer, order)
+                        .header("Idempotency-Key", KEY))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(OrderErrorCode.ORDER_ACCESS_DENIED.code()))
+                .andReturn().getResponse().getContentAsString();
+
+        mockMvc.perform(cancelRequest(anotherCustomer, order).header("Idempotency-Key", KEY))
+                .andExpect(status().isForbidden())
+                .andExpect(content().json(firstResponse));
+
+        assertThat(restored(order).getStatus()).isEqualTo(OrderStatus.PAID);
+        verifyNoInteractions(paymentPort, stockPort, couponUsagePort);
+    }
+
+    private MockHttpServletRequestBuilder cancelRequest(UUID customerId, Order order) {
+        return post("/api/v1/orders/{orderNumber}/cancel", order.getOrderNumber().toString())
+                .header(GatewayHeaderAuthenticationFilter.USER_ID_HEADER, customerId)
+                .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, "CUSTOMER")
+                .header(GatewayHeaderAuthenticationFilter.TOKEN_ID_HEADER, uuidGenerator.generate())
+                .header(GatewayHeaderAuthenticationFilter.TOKEN_EXPIRES_AT_HEADER, 1_788_400_000L);
+    }
+
+    private static Stream<String> invalidKeys() {
+        return Stream.of("", " ", "a".repeat(101), "취소요청");
     }
 
     private void recordPayment(boolean fail) {

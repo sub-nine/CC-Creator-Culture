@@ -1,15 +1,21 @@
 package com.sub9.orderservice.order.presentation.controller;
 
+import com.sub9.common.exception.BusinessException;
+import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.orderservice.common.security.GatewayAuthenticationPrincipal;
 import com.sub9.orderservice.order.application.service.CreateOrderCommand;
+import com.sub9.orderservice.order.application.service.OrderCancellationResult;
+import com.sub9.orderservice.order.application.service.OrderCancellationService;
 import com.sub9.orderservice.order.application.service.OrderCreationResult;
 import com.sub9.orderservice.order.application.service.OrderCreationService;
+import com.sub9.orderservice.order.domain.model.OrderNumber;
 import com.sub9.orderservice.order.presentation.request.CreateOrderRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -22,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderCommandController {
 
     private final OrderCreationService orderCreationService;
+    private final OrderCancellationService orderCancellationService;
 
     @PostMapping
     public ResponseEntity<Object> createOrder(
@@ -33,6 +40,24 @@ public class OrderCommandController {
                 idempotencyKey,
                 toCommand(request));
         return ResponseEntity.status(result.httpStatus()).body(result.responseBody());
+    }
+
+    @PostMapping("/{orderNumber}/cancel")
+    public ResponseEntity<Object> cancelOrder(
+            @AuthenticationPrincipal GatewayAuthenticationPrincipal principal,
+            @PathVariable String orderNumber,
+            @RequestHeader("Idempotency-Key") String idempotencyKey) {
+        OrderCancellationResult result = orderCancellationService.cancel(
+                principal.userId(), idempotencyKey, parseOrderNumber(orderNumber));
+        return ResponseEntity.status(result.httpStatus()).body(result.responseBody());
+    }
+
+    private static OrderNumber parseOrderNumber(String value) {
+        try {
+            return OrderNumber.from(value);
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST);
+        }
     }
 
     private CreateOrderCommand toCommand(CreateOrderRequest request) {
