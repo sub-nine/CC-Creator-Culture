@@ -26,4 +26,9 @@ public class CartRepositoryAdapter implements CartRepository {
   public int countByUserId(UUID userId) {
     return jpaRepository.countByUserId(userId);
   }
+
+  @Override
+  public void deleteAllByUserIdAndIdIn(UUID userId, List<UUID> cartIds) {
+    jpaRepository.deleteAllByUserIdAndIdIn(userId, cartIds);
+  }
 }

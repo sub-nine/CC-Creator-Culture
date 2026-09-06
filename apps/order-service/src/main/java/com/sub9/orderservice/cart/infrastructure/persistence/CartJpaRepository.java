@@ -9,4 +9,6 @@ public interface CartJpaRepository extends JpaRepository<Cart, UUID> {
   List<Cart> findAllByUserIdAndIdIn(UUID userId, List<UUID> cartItemIds);
 
   int countByUserId(UUID userId);
+
+  void deleteAllByUserIdAndIdIn(UUID userId, List<UUID> cartIds);
 }

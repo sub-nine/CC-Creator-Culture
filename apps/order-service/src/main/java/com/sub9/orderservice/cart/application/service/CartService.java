@@ -4,6 +4,7 @@ import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.cart.application.dto.AddCartItemCommand;
 import com.sub9.orderservice.cart.application.dto.CartItemProducInfo;
+import com.sub9.orderservice.cart.application.dto.DeleteCartItemCommand;
 import com.sub9.orderservice.cart.application.port.CartProductPort;
 import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import com.sub9.orderservice.cart.domain.model.Cart;
@@ -76,5 +77,9 @@ public class CartService implements CartSnapshotPort {
     //            item.quantity()
     //    );
 
+  }
+
+  public void removeCartItem(DeleteCartItemCommand command) {
+    cartRepository.deleteAllByUserIdAndIdIn(command.userId(), command.cartIds());
   }
 }
