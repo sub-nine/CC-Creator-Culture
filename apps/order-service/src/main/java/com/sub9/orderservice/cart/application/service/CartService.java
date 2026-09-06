@@ -5,6 +5,7 @@ import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.cart.application.dto.AddCartItemCommand;
 import com.sub9.orderservice.cart.application.dto.CartItemProducInfo;
 import com.sub9.orderservice.cart.application.dto.DeleteCartItemCommand;
+import com.sub9.orderservice.cart.application.dto.UpdateCartItemCommand;
 import com.sub9.orderservice.cart.application.port.CartProductPort;
 import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import com.sub9.orderservice.cart.domain.model.Cart;
@@ -77,6 +78,15 @@ public class CartService implements CartSnapshotPort {
     //            item.quantity()
     //    );
 
+  }
+
+  public void updateCartItem(UpdateCartItemCommand command) {
+    Cart cartItem =
+        cartRepository
+            .findByIdAndUserId(command.cartId(), command.userId())
+            .orElseThrow(() -> new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND));
+
+    cartItem.changeQuantity(command.quantity());
   }
 
   public void removeCartItem(DeleteCartItemCommand command) {

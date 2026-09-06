@@ -4,8 +4,10 @@ import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.orderservice.cart.application.service.CartService;
 import com.sub9.orderservice.cart.presentation.request.AddCartItemRequest;
 import com.sub9.orderservice.cart.presentation.request.DeleteCartItemRequest;
+import com.sub9.orderservice.cart.presentation.request.UpdateCartItemRequest;
 import com.sub9.orderservice.common.security.GatewayAuthenticationPrincipal;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +24,15 @@ public class CartController {
       @Valid @RequestBody AddCartItemRequest request) {
     cartService.addCartItem(request.toCommand(principal.userId()));
     return ApiResponse.success("장바구니 등록 성공", null);
+  }
+
+  @PatchMapping("/{cartId}")
+  public ApiResponse<Void> updateCartItem(
+      @AuthenticationPrincipal GatewayAuthenticationPrincipal principal,
+      @PathVariable("cartId") UUID cartId,
+      @Valid @RequestBody UpdateCartItemRequest request) {
+    cartService.updateCartItem(request.toCommand(principal.userId(), cartId));
+    return ApiResponse.success("상품 수량이 변경되었습니다.", null);
   }
 
   @PostMapping("/delete")

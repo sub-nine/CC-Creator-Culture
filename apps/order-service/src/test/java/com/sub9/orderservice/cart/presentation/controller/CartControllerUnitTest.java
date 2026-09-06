@@ -2,17 +2,23 @@ package com.sub9.orderservice.cart.presentation.controller;
 
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.orderservice.cart.application.dto.AddCartItemCommand;
+import com.sub9.orderservice.cart.application.dto.DeleteCartItemCommand;
+import com.sub9.orderservice.cart.application.dto.UpdateCartItemCommand;
 import com.sub9.orderservice.cart.application.service.CartService;
 import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import com.sub9.orderservice.cart.presentation.request.AddCartItemRequest;
+import com.sub9.orderservice.cart.presentation.request.DeleteCartItemRequest;
+import com.sub9.orderservice.cart.presentation.request.UpdateCartItemRequest;
 import com.sub9.orderservice.support.AbstractControllerTest;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,7 +39,7 @@ class CartControllerUnitTest extends AbstractControllerTest {
   @DisplayName("장바구니 등록 API 테스트")
   class AddCartItemTests {
     @Test
-    @DisplayName("장바구니 등록에 성공하고 응답을 반환한다.")
+    @DisplayName("장바구니 등록에 성공하면 성공 응답을 반환한다.")
     void addCartItem_success() throws Exception {
       // given
       AddCartItemRequest request = new AddCartItemRequest(skuId, 2);
@@ -61,9 +67,9 @@ class CartControllerUnitTest extends AbstractControllerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {0, -1})
-    @DisplayName("수량이 0 이하이면 400 예외가 발생해야한다.")
-    void addCartItem_fails_when_quantity_not_positive(int quantity) throws Exception {
+    @ValueSource(ints = {0, -1, 100})
+    @DisplayName("수량이 1~99 범위를 벗어나면 400 예외가 발생해야한다.")
+    void addCartItem_fails_when_quantity_out_of_range(int quantity) throws Exception {
       // given
       AddCartItemRequest request = new AddCartItemRequest(skuId, quantity);
 
@@ -76,7 +82,7 @@ class CartControllerUnitTest extends AbstractControllerTest {
     }
 
     @Test
-    @DisplayName("인증 정보가 없으면 401 예외가 발생해야한다..")
+    @DisplayName("인증 정보가 없으면 401 예외가 발생해야한다.")
     void addCartItem_fails_when_unauthenticated() throws Exception {
       // given
       AddCartItemRequest request = new AddCartItemRequest(skuId, 2);
@@ -108,8 +114,102 @@ class CartControllerUnitTest extends AbstractControllerTest {
     }
   }
 
+  @Nested
+  @DisplayName("장바구니 수정 API 테스트")
+  class UpdateCartItemTests {
+    @Test
+    @DisplayName("장바구니 수정에 성공하면 성공 응답을 반환한다.")
+    void updateCartItem_success() throws Exception {
+      // given
+      UUID cartId = UUID.randomUUID();
+      UpdateCartItemRequest request = new UpdateCartItemRequest(3);
+
+      // when & then
+      mockMvc
+          .perform(
+              authenticatedRequest(patch("/api/v1/cart/items/{cartId}", cartId))
+                  .content(jsonMapper.writeValueAsString(request)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.message").value("상품 수량이 변경되었습니다."));
+      verify(cartService).updateCartItem(new UpdateCartItemCommand(userId, cartId, 3));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1, 100})
+    @DisplayName("수량이 1~99 범위를 벗어나면 400 예외가 발생해야한다.")
+    void updateCartItem_fails_when_quantity_out_of_range(int quantity) throws Exception {
+      // given
+      UpdateCartItemRequest request = new UpdateCartItemRequest(quantity);
+
+      // when & then
+      mockMvc
+          .perform(
+              authenticatedRequest(patch("/api/v1/cart/items/{cartId}", UUID.randomUUID()))
+                  .content(jsonMapper.writeValueAsString(request)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.VALIDATION_ERROR.code()));
+      verifyNoInteractions(cartService);
+    }
+
+    @Test
+    @DisplayName("본인 소유의 항목이 없으면 404 예외가 발생해야한다.")
+    void updateCartItem_fails_when_cart_item_not_found() throws Exception {
+      // given
+      UUID cartId = UUID.randomUUID();
+      willThrow(new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND))
+          .given(cartService)
+          .updateCartItem(new UpdateCartItemCommand(userId, cartId, 3));
+
+      // when & then
+      mockMvc
+          .perform(
+              authenticatedRequest(patch("/api/v1/cart/items/{cartId}", cartId))
+                  .content(jsonMapper.writeValueAsString(new UpdateCartItemRequest(3))))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.errorCode").value(CartErrorCode.CART_ITEM_NOT_FOUND.code()));
+    }
+  }
+
+  @Nested
+  @DisplayName("장바구니 삭제 API 테스트")
+  class RemoveCartItemTests {
+    @Test
+    @DisplayName("장바구니 삭제에 성공하면 성공 응답을 반환한다.")
+    void removeCartItem_success() throws Exception {
+      // given
+      List<UUID> cartIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+      DeleteCartItemRequest request = new DeleteCartItemRequest(cartIds);
+
+      // when & then
+      mockMvc
+          .perform(
+              authenticatedRequest(post("/api/v1/cart/items/delete"))
+                  .content(jsonMapper.writeValueAsString(request)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.message").value("상품이 장바구니에서 삭제되었습니다"));
+      verify(cartService).removeCartItem(new DeleteCartItemCommand(userId, cartIds));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"cartIds\":null}", "{\"cartIds\":[]}", "{\"cartIds\":[null]}"})
+    @DisplayName("유효성 체크에 실패하면 400 응답을 반환한다.")
+    void removeCartItem_fails_when_cart_ids_invalid(String content) throws Exception {
+      // when & then
+      mockMvc
+          .perform(authenticatedRequest(post("/api/v1/cart/items/delete")).content(content))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.VALIDATION_ERROR.code()));
+      verifyNoInteractions(cartService);
+    }
+  }
+
   private MockHttpServletRequestBuilder authenticatedRequest() {
-    return post("/api/v1/cart/items")
+    return authenticatedRequest(post("/api/v1/cart/items"));
+  }
+
+  private MockHttpServletRequestBuilder authenticatedRequest(
+      MockHttpServletRequestBuilder request) {
+    return request
         .header("X-User-Id", userId)
         .header("X-User-Role", "CUSTOMER")
         .header("X-Token-Id", UUID.randomUUID())

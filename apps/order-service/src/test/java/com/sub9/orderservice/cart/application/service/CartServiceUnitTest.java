@@ -13,6 +13,8 @@ import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import com.sub9.orderservice.cart.domain.repository.CartRepository;
 import com.sub9.orderservice.cart.infrastructure.feign.exception.CartProductClientErrorCode;
 import java.util.UUID;
+import java.util.Optional;
+import com.sub9.orderservice.cart.application.dto.UpdateCartItemCommand;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -52,7 +54,7 @@ class CartServiceUnitTest {
     }
 
     @Test
-    @DisplayName("이미 등록된 SKU의 제약 위반은 중복 등록 오류로 변환한다.")
+    @DisplayName("중복된 상품이 있으면 CART_ITEM_ALREADY_EXISTS 예외가 발생해야한다.")
     void addCartItem_fails_when_cart_item_already_exists() {
       // given
       given(cartRepository.saveAndFlush(any()))
@@ -93,6 +95,27 @@ class CartServiceUnitTest {
           .isInstanceOf(BusinessException.class)
           .hasMessage(CommonErrorCode.SERVICE_UNAVAILABLE.message());
       verify(cartRepository, never()).saveAndFlush(any());
+    }
+  }
+
+  @Nested
+  @DisplayName("장바구니 수정 실패 테스트")
+  class UpdateCartItemTests {
+    @Test
+    @DisplayName("해당 상품이 등록되어 있지 않으면 CART_ITEM_NOT_FOUND 예외가 발생해야한다.")
+    void updateCartItem_fails_when_cart_item_not_found() {
+      // given
+      UpdateCartItemCommand updateCommand =
+          new UpdateCartItemCommand(command.userId(), UUID.randomUUID(), 3);
+      given(cartRepository.findByIdAndUserId(updateCommand.cartId(), updateCommand.userId()))
+          .willReturn(Optional.empty());
+
+      // when & then
+      assertThatThrownBy(() -> cartService.updateCartItem(updateCommand))
+          .isInstanceOf(BusinessException.class)
+          .hasMessage(CartErrorCode.CART_ITEM_NOT_FOUND.message());
+      verify(cartRepository).findByIdAndUserId(updateCommand.cartId(), updateCommand.userId());
+      verifyNoInteractions(cartProductPort);
     }
   }
 }
