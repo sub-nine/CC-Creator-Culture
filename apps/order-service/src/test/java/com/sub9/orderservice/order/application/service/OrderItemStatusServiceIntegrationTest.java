@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.domain.model.Money;
 import com.sub9.orderservice.order.domain.model.Order;
@@ -47,7 +48,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         CartSnapshotPort.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
-        StockPort.class
+        StockPort.class,
+        PaymentCancellationPort.class
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @DisplayName("창작자 주문 상품 상태 변경 PostgreSQL 연동")

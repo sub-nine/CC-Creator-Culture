@@ -3,6 +3,7 @@ package com.sub9.orderservice;
 import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,7 +19,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
         CartSnapshotPort.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
-        StockPort.class
+        StockPort.class,
+        PaymentCancellationPort.class
 })
 class OrderServiceApplicationTests {
 

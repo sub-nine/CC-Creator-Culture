@@ -16,6 +16,7 @@ import com.sub9.orderservice.order.application.port.output.CouponApplicationPort
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort.AppliedCoupon;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.StockOperationUncertainException;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.domain.model.OrderCommandStatus;
 import com.sub9.orderservice.order.presentation.response.CreateOrderResponse;
@@ -49,7 +50,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         CartSnapshotPort.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
-        StockPort.class
+        StockPort.class,
+        PaymentCancellationPort.class
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @DisplayName("주문 생성 PostgreSQL 연동")

@@ -12,6 +12,7 @@ import com.sub9.common.exception.BusinessException;
 import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.application.port.output.StockPort.RestoreReason;
 import com.sub9.orderservice.order.application.port.output.StockRestoreCommand;
@@ -64,7 +65,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         CartSnapshotPort.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
-        StockPort.class
+        StockPort.class,
+        PaymentCancellationPort.class
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @DisplayName("결제 결과와 주문 만료 PostgreSQL 경쟁")
