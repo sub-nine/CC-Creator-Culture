@@ -2,22 +2,68 @@ package com.sub9.orderservice.payment.domain.model;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.orderservice.common.entity.BaseEntity;
+import com.sub9.orderservice.common.persistence.InstantTimestampConverter;
 import com.sub9.orderservice.order.domain.model.Money;
+import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.payment.domain.exception.PaymentErrorCode;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
+import jakarta.persistence.Embedded;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
+@Entity
+@Table(name = "p_payments", schema = "public")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Payment extends BaseEntity {
 
-    private final UUID orderId;
-    private final PaymentMethod method;
-    private final Money amount;
-    private final PaymentStatus status;
-    private final String failureCode;
-    private final Instant processedAt;
+    @Column(name = "order_id", nullable = false, updatable = false)
+    private UUID orderId;
+
+    // 주문 ID로 생성하는 인터페이스를 유지하면서 DB 외래 키를 생성한다.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id", nullable = false, insertable = false, updatable = false,
+            foreignKey = @ForeignKey(name = "fk_payments_order"))
+    @Getter(AccessLevel.NONE)
+    private Order order;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "method", nullable = false, updatable = false, length = 20)
+    private PaymentMethod method;
+
+    @Embedded
+    @AttributeOverride(name = "amount", column = @Column(name = "amount", nullable = false, updatable = false))
+    private Money amount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, updatable = false, length = 20)
+    private PaymentStatus status;
+
+    @Column(name = "failure_code", updatable = false, length = 50)
+    private String failureCode;
+
+    @Convert(converter = InstantTimestampConverter.class)
+    @Column(name = "processed_at", nullable = false, updatable = false, columnDefinition = "timestamp")
+    private Instant processedAt;
+
+    @OneToOne(mappedBy = "payment", fetch = FetchType.LAZY,
+            cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     private PaymentCancellation cancellation;
 
     private Payment(UUID id, UUID orderId, Money amount, PaymentStatus status, Instant processedAt) {
@@ -39,7 +85,7 @@ public class Payment extends BaseEntity {
         if (status != PaymentStatus.SUCCESS || cancellation != null) {
             throw new BusinessException(PaymentErrorCode.INVALID_PAYMENT_CANCELLATION);
         }
-        cancellation = new PaymentCancellation(cancellationId, getId(), commandRequestId, amount, canceledAt);
+        cancellation = new PaymentCancellation(cancellationId, this, commandRequestId, amount, canceledAt);
         return cancellation;
     }
 }
