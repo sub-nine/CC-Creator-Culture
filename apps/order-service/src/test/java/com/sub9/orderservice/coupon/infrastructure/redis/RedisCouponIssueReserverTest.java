@@ -38,15 +38,16 @@ class RedisCouponIssueReserverTest {
 
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private CouponIssueReserveScript reserveScript;
+    @Mock private CouponIssueReleaseScript releaseScript;
     @Mock private RedisScript<Long> script;
+    @Mock private RedisScript<Long> releaseRedisScript;
     @Mock private ValueOperations<String, String> valueOperations;
     private RedisCouponIssueReserver reserver;
 
     @BeforeEach
     void setUp() {
-        when(reserveScript.value()).thenReturn(script);
         reserver = new RedisCouponIssueReserver(
-                redisTemplate, reserveScript, Clock.fixed(NOW, ZoneOffset.UTC));
+                redisTemplate, reserveScript, releaseScript, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -112,11 +113,64 @@ class RedisCouponIssueReserverTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
+    @Test
+    @DisplayName("보상 시 reservationId와 쿠폰·사용자 Redis 키를 Lua에 전달한다")
+    void releases_reservation_with_owner_id() {
+        when(releaseScript.value()).thenReturn(releaseRedisScript);
+        whenExecuteRelease().thenReturn(1L);
+
+        assertThatCode(() -> reserver.rollback(reservation())).doesNotThrowAnyException();
+
+        verify(redisTemplate).execute(
+                releaseRedisScript,
+                List.of(CouponRedisKey.remaining(COUPON_ID), CouponRedisKey.issued(COUPON_ID, USER_ID)),
+                RESERVATION_ID.toString());
+    }
+
+    @Test
+    @DisplayName("이미 해제됐거나 소유권이 다르거나 수량 키가 소실된 보상은 반복 적용하지 않는다")
+    void handles_idempotent_and_non_owner_release_results() {
+        when(releaseScript.value()).thenReturn(releaseRedisScript);
+        whenExecuteRelease().thenReturn(0L, -1L, 2L);
+
+        assertThatCode(() -> reserver.rollback(reservation())).doesNotThrowAnyException();
+        assertThatCode(() -> reserver.rollback(reservation())).doesNotThrowAnyException();
+        assertThatCode(() -> reserver.rollback(reservation())).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("보상 Redis 호출 실패를 쿠폰 Redis 저장 오류로 변환한다")
+    void converts_release_redis_failure() {
+        when(releaseScript.value()).thenReturn(releaseRedisScript);
+        whenExecuteRelease().thenThrow(new QueryTimeoutException("Redis timeout"));
+
+        assertThatThrownBy(() -> reserver.rollback(reservation()))
+                .isInstanceOf(CouponRedisStorageException.class);
+    }
+
+    @Test
+    @DisplayName("알 수 없는 보상 Lua 결과는 내부 상태 오류로 처리한다")
+    void rejects_unknown_release_result() {
+        when(releaseScript.value()).thenReturn(releaseRedisScript);
+        whenExecuteRelease().thenReturn(99L);
+
+        assertThatThrownBy(() -> reserver.rollback(reservation()))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
     private org.mockito.stubbing.OngoingStubbing<Long> whenExecuteReserve() {
+        when(reserveScript.value()).thenReturn(script);
         return when(redisTemplate.execute(
                 script,
                 List.of(CouponRedisKey.remaining(COUPON_ID), CouponRedisKey.issued(COUPON_ID, USER_ID)),
                 "600", RESERVATION_ID.toString()));
+    }
+
+    private org.mockito.stubbing.OngoingStubbing<Long> whenExecuteRelease() {
+        return when(redisTemplate.execute(
+                releaseRedisScript,
+                List.of(CouponRedisKey.remaining(COUPON_ID), CouponRedisKey.issued(COUPON_ID, USER_ID)),
+                RESERVATION_ID.toString()));
     }
 
     private CouponIssueTarget target() {

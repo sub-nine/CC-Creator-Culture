@@ -54,7 +54,8 @@ class RedisCouponIssueReserverIntegrationTest {
         redisTemplate = new StringRedisTemplate(connectionFactory);
         redisTemplate.afterPropertiesSet();
         reserver = new RedisCouponIssueReserver(
-                redisTemplate, new CouponIssueReserveScript(), Clock.fixed(NOW, ZoneOffset.UTC));
+                redisTemplate, new CouponIssueReserveScript(), new CouponIssueReleaseScript(),
+                Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @AfterAll
@@ -147,6 +148,59 @@ class RedisCouponIssueReserverIntegrationTest {
             assertThat(successCount).isEqualTo(quantity);
             assertThat(redisTemplate.opsForValue().get(CouponRedisKey.remaining(COUPON_ID))).isEqualTo("0");
         }
+    }
+
+    @Test
+    @DisplayName("선점 소유자가 보상하면 사용자 선점 키를 삭제하고 잔여 수량을 복구한다")
+    void owner_releases_reservation_and_restores_quantity() {
+        redisTemplate.opsForValue().set(CouponRedisKey.remaining(COUPON_ID), "2");
+        CouponReservation reservation = reservation(USER_ID, RESERVATION_ID);
+        reserver.reserve(target(2), reservation);
+
+        reserver.rollback(reservation);
+
+        assertThat(redisTemplate.opsForValue().get(CouponRedisKey.remaining(COUPON_ID))).isEqualTo("2");
+        assertThat(redisTemplate.hasKey(CouponRedisKey.issued(COUPON_ID, USER_ID))).isFalse();
+    }
+
+    @Test
+    @DisplayName("같은 보상을 반복해도 잔여 수량은 한 번만 복구한다")
+    void repeated_release_restores_quantity_only_once() {
+        redisTemplate.opsForValue().set(CouponRedisKey.remaining(COUPON_ID), "2");
+        CouponReservation reservation = reservation(USER_ID, RESERVATION_ID);
+        reserver.reserve(target(2), reservation);
+
+        reserver.rollback(reservation);
+        reserver.rollback(reservation);
+
+        assertThat(redisTemplate.opsForValue().get(CouponRedisKey.remaining(COUPON_ID))).isEqualTo("2");
+    }
+
+    @Test
+    @DisplayName("다른 reservationId는 기존 선점과 잔여 수량을 변경하지 않는다")
+    void non_owner_cannot_release_reservation() {
+        redisTemplate.opsForValue().set(CouponRedisKey.remaining(COUPON_ID), "2");
+        reserver.reserve(target(2), reservation(USER_ID, RESERVATION_ID));
+
+        reserver.rollback(reservation(USER_ID, new UuidV7Generator().generate()));
+
+        assertThat(redisTemplate.opsForValue().get(CouponRedisKey.remaining(COUPON_ID))).isEqualTo("1");
+        assertThat(redisTemplate.opsForValue().get(CouponRedisKey.issued(COUPON_ID, USER_ID)))
+                .isEqualTo(RESERVATION_ID.toString());
+    }
+
+    @Test
+    @DisplayName("잔여 수량 키가 소실되면 임의 수량을 만들지 않고 소유한 선점 키만 정리한다")
+    void missing_quantity_key_does_not_create_inaccurate_quantity() {
+        redisTemplate.opsForValue().set(CouponRedisKey.remaining(COUPON_ID), "2");
+        CouponReservation reservation = reservation(USER_ID, RESERVATION_ID);
+        reserver.reserve(target(2), reservation);
+        redisTemplate.delete(CouponRedisKey.remaining(COUPON_ID));
+
+        reserver.rollback(reservation);
+
+        assertThat(redisTemplate.hasKey(CouponRedisKey.remaining(COUPON_ID))).isFalse();
+        assertThat(redisTemplate.hasKey(CouponRedisKey.issued(COUPON_ID, USER_ID))).isFalse();
     }
 
     private CouponIssueTarget target(int remainingQuantity) {
