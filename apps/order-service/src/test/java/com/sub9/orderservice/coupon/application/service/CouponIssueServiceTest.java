@@ -47,7 +47,7 @@ class CouponIssueServiceTest {
     void when_coupon_is_issuable_issue_reserves_and_dispatches_in_order() {
         UUID couponId = generator.generate();
         UUID userId = generator.generate();
-        CouponIssueTarget target = new CouponIssueTarget(couponId, NOW.plusSeconds(600));
+        CouponIssueTarget target = new CouponIssueTarget(couponId, NOW.plusSeconds(600), 10);
         var completed = new IssueDispatchResult.Completed(generator.generate());
         given(reader.getIssuable(couponId, NOW)).willReturn(target);
         given(dispatcher.dispatch(ArgumentMatchers.any())).willReturn(completed);
@@ -81,7 +81,7 @@ class CouponIssueServiceTest {
     void when_reservation_fails_issue_stops() {
         UUID couponId = generator.generate();
         UUID userId = generator.generate();
-        CouponIssueTarget target = new CouponIssueTarget(couponId, NOW.plusSeconds(600));
+        CouponIssueTarget target = new CouponIssueTarget(couponId, NOW.plusSeconds(600), 10);
         RuntimeException failure = new RuntimeException("선점 실패");
         given(reader.getIssuable(couponId, NOW)).willReturn(target);
         doThrow(failure).when(reserver)

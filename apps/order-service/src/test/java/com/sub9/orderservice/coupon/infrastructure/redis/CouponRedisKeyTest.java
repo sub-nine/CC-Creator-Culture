@@ -17,4 +17,15 @@ class CouponRedisKeyTest {
         assertThat(CouponRedisKey.remaining(couponId))
                 .isEqualTo("coupon:01990a00-0000-7000-8000-000000000001:remaining");
     }
+
+    @Test
+    @DisplayName("쿠폰과 사용자 식별자로 사용자 선점 키를 생성한다")
+    void creates_issued_user_key() {
+        UUID couponId = UUID.fromString("01990a00-0000-7000-8000-000000000001");
+        UUID userId = UUID.fromString("01990a00-0000-7000-8000-000000000002");
+
+        assertThat(CouponRedisKey.issued(couponId, userId))
+                .isEqualTo("coupon:01990a00-0000-7000-8000-000000000001:issued:"
+                        + "01990a00-0000-7000-8000-000000000002");
+    }
 }
