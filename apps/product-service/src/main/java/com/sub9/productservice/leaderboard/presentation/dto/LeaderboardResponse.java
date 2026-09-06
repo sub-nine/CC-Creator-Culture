@@ -1,6 +1,6 @@
 package com.sub9.productservice.leaderboard.presentation.dto;
 
-import com.sub9.productservice.leaderboard.application.model.LeaderboardPeriod;
+import com.sub9.productservice.leaderboard.domain.model.LeaderboardPeriod;
 
 import java.time.LocalDate;
 import java.util.List;

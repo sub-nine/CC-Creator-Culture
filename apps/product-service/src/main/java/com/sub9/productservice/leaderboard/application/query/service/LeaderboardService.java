@@ -1,12 +1,12 @@
-package com.sub9.productservice.leaderboard.application.service;
+package com.sub9.productservice.leaderboard.application.query.service;
 
 import com.sub9.productservice.category.presentation.query.dto.CategoryResponse;
 import com.sub9.productservice.category.presentation.query.dto.HashtagResponse;
-import com.sub9.productservice.leaderboard.application.model.LeaderboardPeriod;
-import com.sub9.productservice.leaderboard.application.port.CategoryQueryPort;
-import com.sub9.productservice.leaderboard.application.port.HashtagQueryPort;
-import com.sub9.productservice.leaderboard.application.port.RedisClient;
-import com.sub9.productservice.leaderboard.application.repository.LeaderboardSnapshotQueryRepository;
+import com.sub9.productservice.leaderboard.domain.model.LeaderboardPeriod;
+import com.sub9.productservice.leaderboard.application.query.port.CategoryQueryPort;
+import com.sub9.productservice.leaderboard.application.query.port.HashtagQueryPort;
+import com.sub9.productservice.leaderboard.application.query.repository.LeaderboardSnapshotQueryRepository;
+import com.sub9.productservice.leaderboard.application.query.repository.RedisQueryRepository;
 import com.sub9.productservice.leaderboard.domain.entity.LeaderboardSnapshot;
 import com.sub9.productservice.leaderboard.domain.model.LeaderboardType;
 import com.sub9.productservice.leaderboard.domain.model.RankedMember;
@@ -29,22 +29,21 @@ import java.util.stream.Collectors;
 public class LeaderboardService {
     private final CategoryQueryPort categoryQueryPort;
     private final HashtagQueryPort hashtagQueryPort;
-    // TODO: LeaderboardSnapshotQueryRepository 구현 필요
     private final LeaderboardSnapshotQueryRepository leaderboardSnapshotQueryRepository;
-    // TODO: LeaderboardAggregationDomainService 구현 필요
     private final LeaderboardAggregationDomainService leaderboardAggregationDomainService;
-    // TODO: RedisClient 구현필요
-    private final RedisClient redisClient;
+    private final RedisQueryRepository redisQueryRepository;
 
     @Transactional(readOnly = true)
     public LeaderboardResponse getCategoryLeaderboard(LeaderboardPeriod period, int limit) {
+        // TODO: 리더보드 조회 로직 다형성 방식으로 전환 필요
+
         // period를 조회 기간(날짜 range)으로 변환
         LocalDate now = LocalDate.now();
         LocalDate startDate = period.getStartDate(now);
         LocalDate endDate = period.getEndDate(now);
 
         // 오늘자 실시간 랭킹(redis) + 기간 내 스냅샷(DB) 조회
-        List<RankedMember> currentRankedMembers = redisClient.getRankedMembers(LeaderboardType.CATEGORY);
+        List<RankedMember> currentRankedMembers = redisQueryRepository.getRankedMembers(LeaderboardType.CATEGORY);
         List<LeaderboardSnapshot> periodLeaderboardSnapshots =
                 leaderboardSnapshotQueryRepository.findLeaderboardSnapshotByDateRange(startDate, endDate);
 
@@ -77,7 +76,7 @@ public class LeaderboardService {
         LocalDate endDate = period.getEndDate(now);
 
         // 오늘자 실시간 랭킹(redis) + 기간 내 스냅샷(DB) 조회
-        List<RankedMember> currentRankedMembers = redisClient.getRankedMembers(LeaderboardType.HASHTAG);
+        List<RankedMember> currentRankedMembers = redisQueryRepository.getRankedMembers(LeaderboardType.HASHTAG);
         List<LeaderboardSnapshot> periodLeaderboardSnapshots =
                 leaderboardSnapshotQueryRepository.findLeaderboardSnapshotByDateRange(startDate, endDate);
 

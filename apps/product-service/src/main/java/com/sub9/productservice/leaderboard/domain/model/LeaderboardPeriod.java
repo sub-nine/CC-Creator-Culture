@@ -1,4 +1,4 @@
-package com.sub9.productservice.leaderboard.application.model;
+package com.sub9.productservice.leaderboard.domain.model;
 
 import lombok.RequiredArgsConstructor;
 
