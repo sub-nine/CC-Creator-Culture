@@ -55,6 +55,20 @@ public class SecurityConfig {
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(HttpMethod.POST, "/api/v1/orders")
                 .hasRole(GatewayAuthenticationPrincipal.Role.CUSTOMER.name())
+                .requestMatchers(HttpMethod.GET, "/api/v1/orders", "/api/v1/orders/{orderNumber}")
+                .hasRole(GatewayAuthenticationPrincipal.Role.CUSTOMER.name())
+                .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/v1/creator/order-items",
+                        "/api/v1/creator/order-items/{orderItemId}")
+                .hasRole(GatewayAuthenticationPrincipal.Role.CREATOR.name())
+                .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/v1/admin/orders",
+                        "/api/v1/admin/orders/{orderNumber}")
+                .hasAnyRole(
+                        GatewayAuthenticationPrincipal.Role.MANAGER.name(),
+                        GatewayAuthenticationPrincipal.Role.MASTER.name())
                 .anyRequest()
                 .authenticated());
 
