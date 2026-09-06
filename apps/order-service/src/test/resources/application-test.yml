@@ -1,0 +1,23 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+  cloud:
+    discovery:
+      enabled: false
+    config:
+      enabled: false
+      import-check:
+        enabled: false
+    eureka:
+      client:
+        enabled: false
+        register-with-eureka: false
+        fetch-registry: false
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
