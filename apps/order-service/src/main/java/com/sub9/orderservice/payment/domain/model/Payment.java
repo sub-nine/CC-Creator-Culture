@@ -1,7 +1,9 @@
 package com.sub9.orderservice.payment.domain.model;
 
+import com.sub9.common.exception.BusinessException;
 import com.sub9.orderservice.common.entity.BaseEntity;
 import com.sub9.orderservice.order.domain.model.Money;
+import com.sub9.orderservice.payment.domain.exception.PaymentErrorCode;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -16,6 +18,7 @@ public class Payment extends BaseEntity {
     private final PaymentStatus status;
     private final String failureCode;
     private final Instant processedAt;
+    private PaymentCancellation cancellation;
 
     private Payment(UUID id, UUID orderId, Money amount, PaymentStatus status, Instant processedAt) {
         super(id);
@@ -30,5 +33,13 @@ public class Payment extends BaseEntity {
     public static Payment create(UUID id, UUID orderId, Money amount, PaymentStatus status,
             Instant processedAt) {
         return new Payment(id, orderId, amount, status, processedAt);
+    }
+
+    public PaymentCancellation cancel(UUID cancellationId, UUID commandRequestId, Instant canceledAt) {
+        if (status != PaymentStatus.SUCCESS || cancellation != null) {
+            throw new BusinessException(PaymentErrorCode.INVALID_PAYMENT_CANCELLATION);
+        }
+        cancellation = new PaymentCancellation(cancellationId, getId(), commandRequestId, amount, canceledAt);
+        return cancellation;
     }
 }
