@@ -4,6 +4,7 @@ import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.coupon.application.dto.CouponIssueTarget;
 import com.sub9.orderservice.coupon.application.dto.CouponReservation;
 import com.sub9.orderservice.coupon.application.dto.IssueDispatchResult;
+import com.sub9.orderservice.coupon.application.exception.CouponReservationReleaseRequiredException;
 import com.sub9.orderservice.coupon.application.port.CouponIssueDispatcher;
 import com.sub9.orderservice.coupon.application.port.CouponIssueReader;
 import com.sub9.orderservice.coupon.application.port.CouponIssueReserver;
@@ -13,8 +14,10 @@ import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 @Slf4j
+@Service
 @RequiredArgsConstructor
 public class CouponIssueService {
 
@@ -39,6 +42,25 @@ public class CouponIssueService {
         log.debug("[쿠폰 발급][동기][Redis 선점 성공] couponId={} reservationId={}",
                 couponId, reservationId);
 
-        return couponIssueDispatcher.dispatch(reservation);
+        try {
+            return couponIssueDispatcher.dispatch(reservation);
+        } catch (CouponReservationReleaseRequiredException exception) {
+            rollbackReservation(reservation, exception);
+            throw (RuntimeException) exception.getCause();
+        }
+    }
+
+    private void rollbackReservation(
+            CouponReservation reservation, CouponReservationReleaseRequiredException issueFailure) {
+        try {
+            couponIssueReserver.rollback(reservation);
+            log.info("[쿠폰 발급][동기][Redis 보상 완료] couponId={} reservationId={}",
+                    reservation.couponId(), reservation.reservationId());
+        } catch (RuntimeException releaseFailure) {
+            releaseFailure.addSuppressed(issueFailure.getCause());
+            log.error("[쿠폰 발급][동기][Redis 보상 실패] couponId={} reservationId={}",
+                    reservation.couponId(), reservation.reservationId(), releaseFailure);
+            throw releaseFailure;
+        }
     }
 }
