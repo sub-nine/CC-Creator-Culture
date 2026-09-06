@@ -3,6 +3,7 @@ package com.sub9.orderservice.order.presentation.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -16,11 +17,15 @@ import com.sub9.orderservice.common.security.GatewayAuthenticationPrincipal;
 import com.sub9.orderservice.common.security.GatewayHeaderAuthenticationFilter;
 import com.sub9.orderservice.config.SecurityConfig;
 import com.sub9.orderservice.order.application.service.CreateOrderCommand;
+import com.sub9.orderservice.order.application.service.OrderCancellationResult;
+import com.sub9.orderservice.order.application.service.OrderCancellationService;
 import com.sub9.orderservice.order.application.service.OrderCreationResult;
 import com.sub9.orderservice.order.application.service.OrderCreationService;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
+import com.sub9.orderservice.order.domain.model.OrderNumber;
 import com.sub9.orderservice.order.domain.model.OrderStatus;
 import com.sub9.orderservice.order.presentation.response.CreateOrderResponse;
+import com.sub9.orderservice.order.presentation.response.CancelOrderResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -29,6 +34,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -40,7 +46,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 @WebMvcTest(OrderCommandController.class)
 @Import({SecurityConfig.class, GlobalExceptionHandler.class})
-@DisplayName("주문 생성 API")
+@DisplayName("주문 생성과 전체 취소 API")
 class OrderCommandControllerTest {
 
     private static final UUID USER_ID =
@@ -59,6 +65,91 @@ class OrderCommandControllerTest {
 
     @MockitoBean
     private OrderCreationService orderCreationService;
+
+    @MockitoBean
+    private OrderCancellationService orderCancellationService;
+
+    @Test
+    @DisplayName("본문 없이 취소하면 인증 사용자와 주문번호를 전달하고 취소 결과를 반환한다")
+    void when_customer_cancels_without_body_result_is_returned() throws Exception {
+        OrderNumber number = OrderNumber.issue(USER_ID);
+        Instant canceledAt = Instant.parse("2026-09-06T00:00:00Z");
+        when(orderCancellationService.cancel(USER_ID, IDEMPOTENCY_KEY, number))
+                .thenReturn(new OrderCancellationResult(200, ApiResponse.success("주문 취소 성공",
+                        new CancelOrderResponse(number.toString(), OrderStatus.CANCELED, canceledAt))));
+
+        mockMvc.perform(cancelRequest(GatewayAuthenticationPrincipal.Role.CUSTOMER, number.toString())
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("주문 취소 성공"))
+                .andExpect(jsonPath("$.data.orderNumber").value(number.toString()))
+                .andExpect(jsonPath("$.data.status").value("CANCELED"))
+                .andExpect(jsonPath("$.data.canceledAt").value(canceledAt.toString()));
+
+        verify(orderCancellationService).cancel(USER_ID, IDEMPOTENCY_KEY, number);
+    }
+
+    @Test
+    @DisplayName("미인증 취소 요청은 서비스 호출 없이 401을 반환한다")
+    void when_cancellation_is_unauthenticated_unauthorized_is_returned() throws Exception {
+        mockMvc.perform(post("/api/v1/orders/{orderNumber}/cancel", OrderNumber.issue(USER_ID))
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.UNAUTHORIZED.code()));
+
+        verifyNoInteractions(orderCancellationService);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = GatewayAuthenticationPrincipal.Role.class, names = {"CREATOR", "MANAGER", "MASTER"})
+    @DisplayName("소비자가 아닌 역할의 취소 요청은 서비스 호출 없이 403을 반환한다")
+    void when_role_is_not_customer_cancellation_is_forbidden(GatewayAuthenticationPrincipal.Role role)
+            throws Exception {
+        mockMvc.perform(cancelRequest(role, OrderNumber.issue(USER_ID).toString())
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.FORBIDDEN.code()));
+
+        verifyNoInteractions(orderCancellationService);
+    }
+
+    @Test
+    @DisplayName("취소 멱등 키 누락과 잘못된 주문번호는 서비스 호출 없이 400을 반환한다")
+    void when_cancellation_key_is_missing_or_number_is_invalid_bad_request_is_returned() throws Exception {
+        mockMvc.perform(cancelRequest(GatewayAuthenticationPrincipal.Role.CUSTOMER, OrderNumber.issue(USER_ID).toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.BAD_REQUEST.code()));
+        mockMvc.perform(cancelRequest(GatewayAuthenticationPrincipal.Role.CUSTOMER, "invalid-number")
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.BAD_REQUEST.code()));
+
+        verifyNoInteractions(orderCancellationService);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = OrderErrorCode.class, names = {"ORDER_NOT_FOUND", "ORDER_ACCESS_DENIED",
+            "INVALID_ORDER_STATUS", "CANNOT_CANCEL_ORDER_IN_PROGRESS", "IDEMPOTENCY_KEY_REUSED",
+            "ORDER_REQUEST_IN_PROGRESS"})
+    @DisplayName("취소 도메인 오류의 HTTP 상태와 오류 코드를 그대로 반환한다")
+    void when_cancellation_fails_domain_error_is_returned(OrderErrorCode error) throws Exception {
+        OrderNumber number = OrderNumber.issue(USER_ID);
+        when(orderCancellationService.cancel(USER_ID, IDEMPOTENCY_KEY, number))
+                .thenThrow(new BusinessException(error));
+
+        mockMvc.perform(cancelRequest(GatewayAuthenticationPrincipal.Role.CUSTOMER, number.toString())
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY))
+                .andExpect(status().is(error.status().value()))
+                .andExpect(jsonPath("$.errorCode").value(error.code()));
+    }
+
+    private MockHttpServletRequestBuilder cancelRequest(GatewayAuthenticationPrincipal.Role role, String number) {
+        return post("/api/v1/orders/{orderNumber}/cancel", number)
+                .header(GatewayHeaderAuthenticationFilter.USER_ID_HEADER, USER_ID)
+                .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, role.name())
+                .header(GatewayHeaderAuthenticationFilter.TOKEN_ID_HEADER, TOKEN_ID)
+                .header(GatewayHeaderAuthenticationFilter.TOKEN_EXPIRES_AT_HEADER, 1_788_400_000L);
+    }
 
     @Test
     @DisplayName("유효한 CUSTOMER 요청은 주문 생성 명령을 전달하고 201을 반환한다")
