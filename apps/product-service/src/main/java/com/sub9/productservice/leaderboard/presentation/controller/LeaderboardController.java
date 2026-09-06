@@ -2,7 +2,7 @@ package com.sub9.productservice.leaderboard.presentation.controller;
 
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.leaderboard.domain.model.LeaderboardPeriod;
-import com.sub9.productservice.leaderboard.application.query.service.LeaderboardService;
+import com.sub9.productservice.leaderboard.application.service.LeaderboardService;
 import com.sub9.productservice.leaderboard.presentation.dto.LeaderboardResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

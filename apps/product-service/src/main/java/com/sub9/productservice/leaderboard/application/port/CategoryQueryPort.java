@@ -1,4 +1,4 @@
-package com.sub9.productservice.leaderboard.application.query.port;
+package com.sub9.productservice.leaderboard.application.port;
 
 
 import com.sub9.productservice.category.presentation.query.dto.CategoryResponse;

@@ -9,7 +9,7 @@ import com.sub9.productservice.category.presentation.query.dto.CategoryDetailRes
 import com.sub9.productservice.category.presentation.query.dto.CategoryResponse;
 import com.sub9.productservice.category.presentation.query.dto.HashtagResponse;
 import com.sub9.productservice.category.presentation.query.dto.MergeRequestResponse;
-import com.sub9.productservice.leaderboard.application.query.port.CategoryQueryPort;
+import com.sub9.productservice.leaderboard.application.port.CategoryQueryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

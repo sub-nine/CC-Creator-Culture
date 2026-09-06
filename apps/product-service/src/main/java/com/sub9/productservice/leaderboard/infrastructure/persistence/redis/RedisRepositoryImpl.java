@@ -1,9 +1,8 @@
-package com.sub9.productservice.leaderboard.infrastructure.persistence.query.repository;
+package com.sub9.productservice.leaderboard.infrastructure.persistence.redis;
 
-import com.sub9.productservice.leaderboard.application.query.repository.RedisQueryRepository;
+import com.sub9.productservice.leaderboard.application.repository.RedisRepository;
 import com.sub9.productservice.leaderboard.domain.model.LeaderboardType;
 import com.sub9.productservice.leaderboard.domain.model.RankedMember;
-import com.sub9.productservice.leaderboard.infrastructure.persistence.redis.LeaderboardRedisKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -19,7 +18,7 @@ import java.util.UUID;
 @Slf4j
 @Repository
 @RequiredArgsConstructor
-public class RedisQueryRepositoryImpl implements RedisQueryRepository {
+public class RedisRepositoryImpl implements RedisRepository {
 
     private final StringRedisTemplate redisTemplate;
 
