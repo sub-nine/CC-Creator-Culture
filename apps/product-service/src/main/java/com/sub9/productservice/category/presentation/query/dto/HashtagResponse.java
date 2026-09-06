@@ -4,6 +4,7 @@ import java.util.UUID;
 
 public record HashtagResponse(
         UUID id,
-        String name
+        String name,
+        Long usageCount
 ) {
 }
