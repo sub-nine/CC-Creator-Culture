@@ -43,6 +43,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -112,6 +117,9 @@ class OrderCancellationIntegrationTest {
 
     @Autowired
     private OrderCancellationService service;
+
+    @Autowired
+    private OrderItemStatusService itemStatusService;
 
     @Autowired
     private MockMvc mockMvc;
@@ -390,6 +398,163 @@ class OrderCancellationIntegrationTest {
 
         assertThat(restored(order).getStatus()).isEqualTo(OrderStatus.PAID);
         verifyNoInteractions(paymentPort, stockPort, couponUsagePort);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("같거나 다른 키의 동시 취소가 주문과 협업 기능을 한 번만 변경한다")
+    void when_cancellations_overlap_only_one_changes_order_and_collaborators(boolean sameKey) throws Exception {
+        Order order = savedPaidOrder();
+        CountDownLatch firstLocked = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        pauseCancellation(firstLocked, releaseFirst);
+        String secondKey = sameKey ? KEY : "another-key";
+
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            try {
+                Future<OrderCancellationResult> first = executor.submit(() ->
+                        service.cancel(CUSTOMER_ID, KEY, order.getOrderNumber()));
+                assertThat(firstLocked.await(5, TimeUnit.SECONDS)).isTrue();
+                Future<?> second = executor.submit(() -> assertOrderError(
+                        () -> service.cancel(CUSTOMER_ID, secondKey, order.getOrderNumber()),
+                        sameKey ? OrderErrorCode.ORDER_REQUEST_IN_PROGRESS : OrderErrorCode.INVALID_ORDER_STATUS));
+
+                if (sameKey) {
+                    second.get(5, TimeUnit.SECONDS);
+                } else {
+                    awaitOrderLock(second);
+                }
+                releaseFirst.countDown();
+                OrderCancellationResult success = first.get(5, TimeUnit.SECONDS);
+                second.get(5, TimeUnit.SECONDS);
+
+                assertThat(success.httpStatus()).isEqualTo(200);
+                OrderCancellationResult replay = service.cancel(CUSTOMER_ID, KEY, order.getOrderNumber());
+                assertThat(jsonCodec.encodeResponse(replay.responseBody()))
+                        .isEqualTo(jsonCodec.encodeResponse(success.responseBody()));
+            } finally {
+                releaseFirst.countDown();
+            }
+        }
+
+        Order canceled = restored(order);
+        assertThat(canceled.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(canceled.getCanceledAt()).isNotNull();
+        assertThat(canceled.getItems()).extracting(OrderItem::getStatus).containsOnly(OrderItemStatus.CANCELED);
+        assertThat(jdbcTemplate.queryForList("select status from p_order_command_requests", String.class))
+                .containsExactlyInAnyOrderElementsOf(sameKey ? List.of("SUCCEEDED") : List.of("SUCCEEDED", "FAILED"));
+        verify(paymentPort).cancel(eq(order.getId()), any(), any());
+        verify(stockPort).restore(eq(order.getId()), anyList(), eq(StockPort.RestoreReason.ORDER_CANCEL));
+        verifyNoInteractions(couponUsagePort);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("전체 취소와 배송 준비가 경쟁하면 먼저 잠근 요청만 반영한다")
+    void when_cancellation_races_preparing_only_lock_winner_changes_order(boolean cancelFirst) throws Exception {
+        Order order = savedPaidOrder();
+        OrderItem target = order.getItems().getFirst();
+        CountDownLatch firstLocked = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        if (cancelFirst) {
+            pauseCancellation(firstLocked, releaseFirst);
+        }
+
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            try {
+                Future<?> first = executor.submit(() -> {
+                    if (cancelFirst) {
+                        assertThat(service.cancel(CUSTOMER_ID, KEY, order.getOrderNumber()).httpStatus()).isEqualTo(200);
+                    } else {
+                        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                            itemStatusService.update(target.getCreatorId(), target.getId(), OrderItemStatus.PREPARING);
+                            firstLocked.countDown();
+                            await(releaseFirst);
+                        });
+                    }
+                });
+                assertThat(firstLocked.await(5, TimeUnit.SECONDS)).isTrue();
+                Future<?> second = executor.submit(() -> {
+                    if (cancelFirst) {
+                        assertOrderError(() -> itemStatusService.update(
+                                target.getCreatorId(), target.getId(), OrderItemStatus.PREPARING),
+                                OrderErrorCode.INVALID_ORDER_STATUS);
+                    } else {
+                        assertOrderError(() -> service.cancel(CUSTOMER_ID, KEY, order.getOrderNumber()),
+                                OrderErrorCode.CANNOT_CANCEL_ORDER_IN_PROGRESS);
+                    }
+                });
+                awaitOrderLock(second);
+                releaseFirst.countDown();
+                first.get(5, TimeUnit.SECONDS);
+                second.get(5, TimeUnit.SECONDS);
+            } finally {
+                releaseFirst.countDown();
+            }
+        }
+
+        Order result = restored(order);
+        if (cancelFirst) {
+            assertThat(result.getStatus()).isEqualTo(OrderStatus.CANCELED);
+            assertThat(result.getCanceledAt()).isNotNull();
+            assertThat(result.getItems()).extracting(OrderItem::getStatus).containsOnly(OrderItemStatus.CANCELED);
+            assertThat(commandStatus(KEY)).isEqualTo("SUCCEEDED");
+            verify(paymentPort).cancel(eq(order.getId()), any(), any());
+            verify(stockPort).restore(eq(order.getId()), anyList(), eq(StockPort.RestoreReason.ORDER_CANCEL));
+        } else {
+            assertThat(result.getStatus()).isEqualTo(OrderStatus.PROCESSING);
+            assertThat(result.getCanceledAt()).isNull();
+            assertThat(result.getItems()).filteredOn(item -> item.getId().equals(target.getId()))
+                    .extracting(OrderItem::getStatus).containsExactly(OrderItemStatus.PREPARING);
+            assertThat(result.getItems()).filteredOn(item -> !item.getId().equals(target.getId()))
+                    .extracting(OrderItem::getStatus).containsOnly(OrderItemStatus.ORDERED);
+            assertThat(commandStatus(KEY)).isEqualTo("FAILED");
+            verifyNoInteractions(paymentPort, stockPort);
+        }
+        verifyNoInteractions(couponUsagePort);
+    }
+
+    private void pauseCancellation(CountDownLatch locked, CountDownLatch release) {
+        doAnswer(invocation -> {
+            locked.countDown();
+            await(release);
+            return null;
+        }).when(paymentPort).cancel(any(), any(), any());
+    }
+
+    private void awaitOrderLock(Future<?> contender) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            boolean waiting = jdbcTemplate.queryForObject("""
+                    select exists (
+                        select 1 from pg_stat_activity
+                        where datname = current_database()
+                          and wait_event_type = 'Lock'
+                          and query like '%p_orders%'
+                    )
+                    """, Boolean.class);
+            if (waiting) {
+                assertThat(contender.isDone()).isFalse();
+                return;
+            }
+            if (contender.isDone()) {
+                contender.get(5, TimeUnit.SECONDS);
+                throw new AssertionError("경쟁 요청이 주문 잠금을 기다리지 않고 종료되었습니다.");
+            }
+            Thread.sleep(10);
+        }
+        throw new AssertionError("PostgreSQL의 주문 잠금 대기를 확인하지 못했습니다.");
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("취소 경쟁 테스트 대기 시간이 초과되었습니다.");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("취소 경쟁 테스트가 중단되었습니다.", exception);
+        }
     }
 
     private MockHttpServletRequestBuilder cancelRequest(UUID customerId, Order order) {
