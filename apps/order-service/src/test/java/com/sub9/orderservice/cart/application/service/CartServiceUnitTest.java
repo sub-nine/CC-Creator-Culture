@@ -8,13 +8,14 @@ import static org.mockito.Mockito.*;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.orderservice.cart.application.dto.AddCartItemCommand;
+import com.sub9.orderservice.cart.application.dto.UpdateCartItemCommand;
 import com.sub9.orderservice.cart.application.port.CartProductPort;
 import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import com.sub9.orderservice.cart.domain.repository.CartRepository;
 import com.sub9.orderservice.cart.infrastructure.feign.exception.CartProductClientErrorCode;
-import java.util.UUID;
+
 import java.util.Optional;
-import com.sub9.orderservice.cart.application.dto.UpdateCartItemCommand;
+import java.util.UUID;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -54,7 +55,7 @@ class CartServiceUnitTest {
     }
 
     @Test
-    @DisplayName("중복된 상품이 있으면 CART_ITEM_ALREADY_EXISTS 예외가 발생해야한다.")
+    @DisplayName("이미 등록된 SKU의 제약 위반은 중복 등록 오류로 변환한다.")
     void addCartItem_fails_when_cart_item_already_exists() {
       // given
       given(cartRepository.saveAndFlush(any()))
