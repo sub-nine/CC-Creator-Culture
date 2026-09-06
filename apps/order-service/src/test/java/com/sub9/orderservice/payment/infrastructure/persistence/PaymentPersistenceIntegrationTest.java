@@ -19,12 +19,14 @@ import com.sub9.orderservice.payment.domain.model.Payment;
 import com.sub9.orderservice.payment.domain.model.PaymentCancellation;
 import com.sub9.orderservice.payment.domain.model.PaymentMethod;
 import com.sub9.orderservice.payment.domain.model.PaymentStatus;
+import com.sub9.orderservice.payment.domain.repository.PaymentRepository;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -67,6 +69,9 @@ class PaymentPersistenceIntegrationTest {
             .withDatabaseName("payment_test").withUsername("test").withPassword("test");
 
     private final UuidV7Generator uuidGenerator = new UuidV7Generator();
+
+    @Autowired
+    private PaymentRepository paymentRepository;
 
     @Autowired
     private EntityManager entityManager;
@@ -144,6 +149,57 @@ class PaymentPersistenceIntegrationTest {
         });
     }
 
+    @Test
+    @DisplayName("없는 주문 ID와 결제 ID는 빈 결과를 반환한다")
+    void when_payment_does_not_exist_queries_return_empty() {
+        assertThat(paymentRepository.findByOrderId(uuidGenerator.generate())).isEmpty();
+        assertThat(paymentRepository.findById(uuidGenerator.generate())).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("주문 ID와 결제 ID로 취소 전 결제를 조회한다")
+    void when_uncanceled_payment_is_queried_payment_without_cancellation_is_returned(boolean byOrderId) {
+        Payment original = savePayment(PaymentStatus.SUCCESS, 34_200);
+
+        Payment restored = (byOrderId ? paymentRepository.findByOrderId(original.getOrderId())
+                : paymentRepository.findById(original.getId())).orElseThrow();
+
+        assertThat(restored.getId()).isEqualTo(original.getId());
+        assertThat(restored.getOrderId()).isEqualTo(original.getOrderId());
+        assertThat(restored.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(restored.getCancellation()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("트랜잭션 밖에서 추가한 취소를 재저장해도 한 건만 남고 두 조회에서 함께 복원한다")
+    void when_detached_cancellation_is_saved_twice_both_queries_restore_one_cancellation(boolean byOrderId) {
+        Payment original = savePayment(PaymentStatus.SUCCESS, 34_200);
+        UUID commandId = saveCommand();
+        UUID cancellationId = uuidGenerator.generate();
+        original.cancel(cancellationId, commandId, CANCELED_AT);
+        transaction().executeWithoutResult(ignored -> paymentRepository.save(original));
+        transaction().executeWithoutResult(ignored -> paymentRepository.save(original));
+
+        Payment restored = (byOrderId ? paymentRepository.findByOrderId(original.getOrderId())
+                : paymentRepository.findById(original.getId())).orElseThrow();
+
+        assertThat(restored.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(restored.getAmount()).isEqualTo(original.getAmount());
+        assertThat(restored.getMethod()).isEqualTo(PaymentMethod.MOCK);
+        assertThat(restored.getFailureCode()).isNull();
+        assertThat(restored.getProcessedAt()).isEqualTo(PROCESSED_AT);
+        assertThat(restored.getCancellation().getId()).isEqualTo(cancellationId);
+        assertThat(restored.getCancellation().getPaymentId()).isEqualTo(original.getId());
+        assertThat(restored.getCancellation().getCommandRequestId()).isEqualTo(commandId);
+        assertThat(restored.getCancellation().getAmount()).isEqualTo(original.getAmount());
+        assertThat(restored.getCancellation().getReasonCode()).isEqualTo("CUSTOMER_REQUEST");
+        assertThat(restored.getCancellation().getCanceledAt()).isEqualTo(CANCELED_AT);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from public.p_payments", Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from public.p_payment_cancellations", Integer.class)).isEqualTo(1);
+    }
+
     private Payment savePayment(PaymentStatus status, long amount) {
         return transaction().execute(ignored -> {
             OrderItem item = OrderItem.create(uuidGenerator.generate(), uuidGenerator.generate(),
@@ -155,8 +211,7 @@ class PaymentPersistenceIntegrationTest {
             entityManager.persist(order);
             Payment payment = Payment.create(uuidGenerator.generate(), order.getId(),
                     order.getPaymentAmount(), status, PROCESSED_AT);
-            entityManager.persist(payment);
-            return payment;
+            return paymentRepository.save(payment);
         });
     }
 
