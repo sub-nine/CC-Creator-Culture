@@ -5,6 +5,7 @@ import com.sub9.orderservice.common.persistence.InstantTimestampConverter;
 import com.sub9.orderservice.order.domain.model.Money;
 import com.sub9.orderservice.order.domain.model.OrderCommandRequest;
 import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Embedded;
@@ -15,6 +16,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -24,7 +26,14 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "p_payment_cancellations", schema = "public")
+@Table(
+        name = "p_payment_cancellations", schema = "public",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_payment_cancellations_command_request_id", columnNames = "command_request_id"),
+        check = {
+                @CheckConstraint(name = "ck_payment_cancellations_amount", constraint = "amount >= 0"),
+                @CheckConstraint(name = "ck_payment_cancellations_reason_code", constraint = "reason_code = 'CUSTOMER_REQUEST'")
+        })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PaymentCancellation extends BaseEntity {
 

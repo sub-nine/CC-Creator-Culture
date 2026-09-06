@@ -8,6 +8,7 @@ import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.payment.domain.exception.PaymentErrorCode;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Embedded;
@@ -20,6 +21,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -29,7 +31,17 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "p_payments", schema = "public")
+@Table(
+        name = "p_payments", schema = "public",
+        uniqueConstraints = @UniqueConstraint(name = "uk_payments_order_id", columnNames = "order_id"),
+        check = {
+                @CheckConstraint(name = "ck_payments_method", constraint = "method = 'MOCK'"),
+                @CheckConstraint(name = "ck_payments_amount", constraint = "amount >= 0"),
+                @CheckConstraint(name = "ck_payments_status", constraint = "status in ('SUCCESS', 'FAILED')"),
+                @CheckConstraint(name = "ck_payments_failure_code",
+                        constraint = "(status = 'SUCCESS' and failure_code is null)"
+                                + " or (status = 'FAILED' and failure_code is not null and failure_code = 'MOCK_PAYMENT_FAILED')")
+        })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Payment extends BaseEntity {
 

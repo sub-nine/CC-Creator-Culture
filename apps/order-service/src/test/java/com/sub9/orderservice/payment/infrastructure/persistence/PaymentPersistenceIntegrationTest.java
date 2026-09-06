@@ -1,6 +1,7 @@
 package com.sub9.orderservice.payment.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
@@ -21,6 +22,7 @@ import com.sub9.orderservice.payment.domain.model.PaymentMethod;
 import com.sub9.orderservice.payment.domain.model.PaymentStatus;
 import com.sub9.orderservice.payment.domain.repository.PaymentRepository;
 import jakarta.persistence.EntityManager;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -32,6 +34,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -198,6 +201,117 @@ class PaymentPersistenceIntegrationTest {
         assertThat(restored.getCancellation().getCanceledAt()).isEqualTo(CANCELED_AT);
         assertThat(jdbcTemplate.queryForObject("select count(*) from public.p_payments", Integer.class)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("select count(*) from public.p_payment_cancellations", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("같은 주문에 결제를 중복으로 저장할 수 없다")
+    void when_order_has_payment_duplicate_payment_is_rejected() {
+        Payment original = savePayment(PaymentStatus.SUCCESS, 34_200);
+        Payment duplicate = Payment.create(uuidGenerator.generate(), original.getOrderId(),
+                original.getAmount(), PaymentStatus.SUCCESS, PROCESSED_AT);
+
+        assertSqlState(() -> transaction().executeWithoutResult(ignored -> paymentRepository.save(duplicate)), "23505");
+
+        assertThat(paymentRepository.findByOrderId(original.getOrderId()).orElseThrow().getId()).isEqualTo(original.getId());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from public.p_payments", Integer.class)).isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("같은 결제나 취소 명령으로 취소 기록을 중복 저장할 수 없다")
+    void when_payment_or_command_has_cancellation_duplicate_cancellation_is_rejected(boolean samePayment) {
+        Payment original = saveCanceledPayment();
+        UUID paymentId = samePayment ? original.getId() : savePayment(PaymentStatus.SUCCESS, 34_200).getId();
+        UUID commandId = samePayment ? saveCommand() : original.getCancellation().getCommandRequestId();
+
+        assertSqlState(() -> jdbcTemplate.update("""
+                insert into public.p_payment_cancellations (
+                    id, payment_id, command_request_id, amount, reason_code, canceled_at, created_at, updated_at
+                )
+                select ?, ?, ?, amount, reason_code, canceled_at, created_at, updated_at
+                  from public.p_payment_cancellations where id = ?
+                """, uuidGenerator.generate(), paymentId, commandId, original.getCancellation().getId()), "23505");
+
+        assertThat(jdbcTemplate.queryForObject("select count(*) from public.p_payment_cancellations", Integer.class)).isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"p_payments, order_id", "p_payment_cancellations, payment_id", "p_payment_cancellations, command_request_id"})
+    @DisplayName("존재하지 않는 주문, 결제 또는 취소 명령을 참조할 수 없다")
+    void when_reference_does_not_exist_foreign_key_rejects_write(String table, String column) {
+        Payment payment = saveCanceledPayment();
+        UUID id = table.equals("p_payments") ? payment.getId() : payment.getCancellation().getId();
+
+        assertSqlState(() -> jdbcTemplate.update("update public." + table + " set " + column + " = ? where id = ?",
+                uuidGenerator.generate(), id), "23503");
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 명령으로 취소하면 저장되지 않고 기존 결제가 유지된다")
+    void when_cancellation_command_is_missing_transaction_preserves_uncanceled_payment() {
+        Payment original = savePayment(PaymentStatus.SUCCESS, 34_200);
+        original.cancel(uuidGenerator.generate(), uuidGenerator.generate(), CANCELED_AT);
+
+        assertSqlState(() -> transaction().executeWithoutResult(ignored -> paymentRepository.save(original)), "23503");
+
+        Payment restored = paymentRepository.findById(original.getId()).orElseThrow();
+        assertThat(restored.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(restored.getCancellation()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "amount = -1", "method = 'CARD'", "status = 'PENDING'",
+            "failure_code = 'MOCK_PAYMENT_FAILED'", "failure_code = ''",
+            "status = 'FAILED', failure_code = null", "status = 'FAILED', failure_code = ''",
+            "status = 'FAILED', failure_code = 'OTHER'"
+    })
+    @DisplayName("결제 금액이나 방식이 잘못되거나 상태와 실패 코드가 맞지 않으면 저장할 수 없다")
+    void when_payment_values_are_invalid_check_rejects_write(String assignment) {
+        Payment payment = savePayment(PaymentStatus.SUCCESS, 34_200);
+
+        assertSqlState(() -> jdbcTemplate.update("update public.p_payments set " + assignment + " where id = ?",
+                payment.getId()), "23514");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"amount = -1", "reason_code = 'OTHER'"})
+    @DisplayName("취소 금액이 음수이거나 취소 사유가 올바르지 않으면 저장할 수 없다")
+    void when_cancellation_values_are_invalid_check_rejects_write(String assignment) {
+        Payment payment = saveCanceledPayment();
+
+        assertSqlState(() -> jdbcTemplate.update("update public.p_payment_cancellations set " + assignment + " where id = ?",
+                payment.getCancellation().getId()), "23514");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "p_payments, id", "p_payments, order_id", "p_payments, method", "p_payments, amount",
+            "p_payments, status", "p_payments, processed_at", "p_payments, created_at", "p_payments, updated_at",
+            "p_payment_cancellations, id", "p_payment_cancellations, payment_id",
+            "p_payment_cancellations, command_request_id", "p_payment_cancellations, amount",
+            "p_payment_cancellations, reason_code", "p_payment_cancellations, canceled_at",
+            "p_payment_cancellations, created_at", "p_payment_cancellations, updated_at"
+    })
+    @DisplayName("필수값이 빠진 결제나 취소 기록은 저장할 수 없다")
+    void when_required_value_is_null_not_null_rejects_write(String table, String column) {
+        Payment payment = saveCanceledPayment();
+        UUID id = table.equals("p_payments") ? payment.getId() : payment.getCancellation().getId();
+
+        assertSqlState(() -> jdbcTemplate.update("update public." + table + " set " + column + " = null where id = ?",
+                id), "23502");
+    }
+
+    private static void assertSqlState(Runnable write, String expectedState) {
+        assertThatThrownBy(write::run).isInstanceOf(DataIntegrityViolationException.class)
+                .rootCause().isInstanceOfSatisfying(SQLException.class,
+                        exception -> assertThat(exception.getSQLState()).isEqualTo(expectedState));
+    }
+
+    private Payment saveCanceledPayment() {
+        Payment payment = savePayment(PaymentStatus.SUCCESS, 34_200);
+        payment.cancel(uuidGenerator.generate(), saveCommand(), CANCELED_AT);
+        return transaction().execute(ignored -> paymentRepository.save(payment));
     }
 
     private Payment savePayment(PaymentStatus status, long amount) {
