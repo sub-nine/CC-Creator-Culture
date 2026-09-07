@@ -20,6 +20,19 @@ public interface OrderJpaRepository extends JpaRepository<Order, UUID> {
     @Query("select o from Order o join fetch o.items where o.id = :orderId")
     Optional<Order> findByIdForUpdate(@Param("orderId") UUID orderId);
 
+    @Lock(PESSIMISTIC_WRITE)
+    @Query("""
+            select parent
+              from Order parent
+              join fetch parent.items
+             where parent.id = (
+                    select target.order.id
+                      from OrderItem target
+                     where target.id = :orderItemId
+             )
+            """)
+    Optional<Order> findByOrderItemIdForUpdate(@Param("orderItemId") UUID orderItemId);
+
     @EntityGraph(attributePaths = "items")
     Optional<Order> findByOrderNumber(OrderNumber orderNumber);
 

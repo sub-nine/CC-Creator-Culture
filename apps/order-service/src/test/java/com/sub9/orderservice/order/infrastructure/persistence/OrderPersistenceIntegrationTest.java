@@ -11,6 +11,7 @@ import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.domain.model.Money;
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.model.OrderItem;
+import com.sub9.orderservice.order.domain.model.OrderItemStatus;
 import com.sub9.orderservice.order.domain.model.OrderStatus;
 import com.sub9.orderservice.order.domain.model.ProductSnapshot;
 import com.sub9.orderservice.order.domain.model.ShippingAddress;
@@ -29,6 +30,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -224,6 +226,51 @@ class OrderPersistenceIntegrationTest {
     }
 
     @Test
+    @DisplayName("주문 상품 ID로 상위 주문을 잠그고 전체 주문 상품을 조회한다")
+    void when_order_is_locked_by_item_id_parent_and_all_items_are_returned() {
+        Order order = order(2);
+        saveAndFlush(order);
+        UUID orderItemId = order.getItems().getFirst().getId();
+
+        Order locked = transaction().execute(status ->
+                orderRepository.findByOrderItemIdForUpdate(orderItemId).orElseThrow());
+        boolean missing = transaction().execute(status ->
+                orderRepository.findByOrderItemIdForUpdate(uuid(999)).isEmpty());
+
+        assertThat(locked.getId()).isEqualTo(order.getId());
+        assertThat(locked.getItems())
+                .extracting(OrderItem::getId)
+                .containsExactlyInAnyOrderElementsOf(order.getItems().stream().map(OrderItem::getId).toList());
+        assertThat(missing).isTrue();
+    }
+
+    @Test
+    @DisplayName("잠금 조회한 주문의 상품과 상위 상태 변경을 함께 저장한다")
+    void when_locked_order_is_changed_item_and_parent_status_are_persisted() {
+        Order order = order(2);
+        saveAndFlush(order);
+        changeOrderStatus(order, OrderStatus.PAID);
+        OrderItem target = order.getItems().getFirst();
+
+        transaction().executeWithoutResult(status -> {
+            Order locked = orderRepository.findByOrderItemIdForUpdate(target.getId()).orElseThrow();
+            locked.changeItemStatus(target.getCreatorId(), target.getId(), OrderItemStatus.PREPARING);
+            entityManager.flush();
+        });
+
+        Order restored = orderQueryRepository.findDetailByOrderNumber(order.getOrderNumber()).orElseThrow();
+        assertThat(restored.getStatus()).isEqualTo(OrderStatus.PROCESSING);
+        assertThat(restored.getItems())
+                .filteredOn(item -> item.getId().equals(target.getId()))
+                .extracting(OrderItem::getStatus)
+                .containsExactly(OrderItemStatus.PREPARING);
+        assertThat(restored.getItems())
+                .filteredOn(item -> !item.getId().equals(target.getId()))
+                .extracting(OrderItem::getStatus)
+                .containsOnly(OrderItemStatus.ORDERED);
+    }
+
+    @Test
     @DisplayName("생성 시각이 같으면 ID 내림차순으로 페이지 순서를 고정한다")
     void when_created_at_is_equal_orders_are_sorted_by_id_desc_across_pages() {
         UUID customerId = uuid(60);
@@ -343,12 +390,14 @@ class OrderPersistenceIntegrationTest {
     }
 
     @Test
-    @DisplayName("같은 주문의 두 잠금 조회를 직렬화한다")
-    void when_two_transactions_lock_same_order_second_waits_for_first() throws Exception {
+    @DisplayName("주문 ID와 주문 상품 ID 잠금 조회를 같은 주문에서 직렬화한다")
+    void when_order_and_item_lock_same_parent_second_transaction_waits() throws Exception {
         Order order = order(1);
         saveAndFlush(order);
+        UUID orderItemId = order.getItems().getFirst().getId();
         CountDownLatch firstLocked = new CountDownLatch(1);
         CountDownLatch releaseFirst = new CountDownLatch(1);
+        CountDownLatch secondStarted = new CountDownLatch(1);
 
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
             Future<?> first = executor.submit(() -> transaction().executeWithoutResult(status -> {
@@ -358,11 +407,15 @@ class OrderPersistenceIntegrationTest {
             }));
 
             assertThat(firstLocked.await(5, TimeUnit.SECONDS)).isTrue();
-            Future<OrderStatus> second = executor.submit(() -> transaction().execute(status ->
-                    orderRepository.findByIdForUpdate(order.getId()).orElseThrow().getStatus()));
+            Future<OrderStatus> second = executor.submit(() -> {
+                secondStarted.countDown();
+                return transaction().execute(status ->
+                        orderRepository.findByOrderItemIdForUpdate(orderItemId).orElseThrow().getStatus());
+            });
 
-            Thread.sleep(200);
-            assertThat(second.isDone()).isFalse();
+            assertThat(secondStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> second.get(200, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
             releaseFirst.countDown();
 
             first.get(5, TimeUnit.SECONDS);
