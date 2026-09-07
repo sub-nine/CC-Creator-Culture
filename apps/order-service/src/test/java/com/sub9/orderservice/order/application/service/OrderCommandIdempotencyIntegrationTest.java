@@ -129,7 +129,7 @@ class OrderCommandIdempotencyIntegrationTest {
         assertThat(columnType("response_payload", "udt_name")).isEqualTo("jsonb");
         assertThat(columnType("request_hash", "data_type")).isEqualTo("character");
         assertThat(columnType("completed_at", "data_type"))
-                .isEqualTo("timestamp without time zone");
+                .isEqualTo("timestamp with time zone");
     }
 
     @Test

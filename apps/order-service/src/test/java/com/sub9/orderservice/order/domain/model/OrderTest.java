@@ -64,6 +64,90 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("결제 기한 전에 성공 결과를 반영하면 결제 완료 상태와 처리 시각을 저장한다")
+    void when_payment_succeeds_before_expiration_order_is_marked_paid() {
+        Order order = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+        Instant processedAt = order.getExpiresAt().minusNanos(1);
+
+        order.markPaid(processedAt);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(order.getPaidAt()).isEqualTo(processedAt);
+    }
+
+    @Test
+    @DisplayName("결제 기한 전에 실패 결과를 반영하면 실패 상태로 변경한다")
+    void when_payment_fails_before_expiration_order_is_marked_failed() {
+        Order order = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+
+        order.markPaymentFailed(order.getExpiresAt().minusNanos(1));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
+        assertThat(order.getPaidAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("결제 처리 시각이 기한에 도달하면 성공과 실패 결과를 모두 거부한다")
+    void when_payment_time_reaches_expiration_payment_result_is_rejected() {
+        Order successOrder = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+        Order failureOrder = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+
+        assertOrderError(
+                () -> successOrder.markPaid(successOrder.getExpiresAt()),
+                OrderErrorCode.ORDER_ALREADY_EXPIRED);
+        assertOrderError(
+                () -> failureOrder.markPaymentFailed(failureOrder.getExpiresAt()),
+                OrderErrorCode.ORDER_ALREADY_EXPIRED);
+        assertThat(successOrder.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(failureOrder.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+    }
+
+    @Test
+    @DisplayName("결제 기한에 도달한 결제 대기 주문만 한 번 만료한다")
+    void when_expiration_time_reaches_pending_order_is_expired_once() {
+        Order order = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+
+        assertThat(order.expire(order.getExpiresAt().minusNanos(1))).isFalse();
+        assertThat(order.expire(order.getExpiresAt())).isTrue();
+        assertThat(order.expire(order.getExpiresAt().plusSeconds(1))).isFalse();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.EXPIRED);
+        assertThat(order.getPaidAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("확정된 결제 결과와 만료 상태를 다른 종료 상태로 덮어쓰지 않는다")
+    void when_order_result_is_finalized_another_result_cannot_overwrite_it() {
+        Order paidOrder = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+        Instant paidAt = paidOrder.getExpiresAt().minusSeconds(1);
+        paidOrder.markPaid(paidAt);
+        Order failedOrder = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+        failedOrder.markPaymentFailed(failedOrder.getExpiresAt().minusSeconds(1));
+        Order expiredOrder = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+        expiredOrder.expire(expiredOrder.getExpiresAt());
+
+        assertOrderError(
+                () -> paidOrder.markPaymentFailed(paidAt),
+                OrderErrorCode.INVALID_ORDER_STATUS);
+        assertThat(paidOrder.expire(paidOrder.getExpiresAt())).isFalse();
+        assertThat(paidOrder.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(paidOrder.getPaidAt()).isEqualTo(paidAt);
+
+        assertOrderError(
+                () -> failedOrder.markPaid(failedOrder.getExpiresAt().minusSeconds(1)),
+                OrderErrorCode.INVALID_ORDER_STATUS);
+        assertThat(failedOrder.expire(failedOrder.getExpiresAt())).isFalse();
+        assertThat(failedOrder.getStatus()).isEqualTo(OrderStatus.FAILED);
+
+        assertOrderError(
+                () -> expiredOrder.markPaid(expiredOrder.getExpiresAt().minusSeconds(1)),
+                OrderErrorCode.ORDER_ALREADY_EXPIRED);
+        assertOrderError(
+                () -> expiredOrder.markPaymentFailed(expiredOrder.getExpiresAt().minusSeconds(1)),
+                OrderErrorCode.ORDER_ALREADY_EXPIRED);
+        assertThat(expiredOrder.getStatus()).isEqualTo(OrderStatus.EXPIRED);
+    }
+
+    @Test
     @DisplayName("창작자가 주문 상품을 순서대로 변경하면 상위 주문 상태를 함께 변경한다")
     void when_creator_changes_item_status_in_order_parent_status_is_recalculated() {
         OrderItem item = item(uuidGenerator.generate(), 10_000, 1, 0);
@@ -191,7 +275,7 @@ class OrderTest {
 
     private Order paidOrder(List<OrderItem> items) {
         Order order = order(items);
-        ReflectionTestUtils.setField(order, "status", OrderStatus.PAID);
+        order.markPaid(order.getExpiresAt().minusSeconds(1));
         return order;
     }
 
