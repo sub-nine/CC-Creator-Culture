@@ -14,11 +14,11 @@ import org.springframework.web.bind.annotation.*;
 @Creator
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/stock")
+@RequestMapping("/api/v1/skus")
 public class StockCommandController {
   private final StockCommandService stockCommandService;
 
-  @PostMapping("/{skuId}/adjustments")
+  @PostMapping("/{skuId}/stock/adjustments")
   public ApiResponse<Void> adjustStock(
       @AuthenticationPrincipal AuthUser authUser,
       @PathVariable UUID skuId,
