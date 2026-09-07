@@ -7,6 +7,7 @@ import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.cart.application.service.CartQueryService;
 import com.sub9.orderservice.coupon.domain.model.Coupon;
 import com.sub9.orderservice.coupon.domain.model.UserCoupon;
+import com.sub9.orderservice.coupon.domain.model.UserCouponStatus;
 import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
 import com.sub9.orderservice.coupon.domain.repository.UserCouponRepository;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
@@ -137,6 +138,63 @@ class CouponPersistenceIntegrationTest {
     }
 
     @Test
+    @DisplayName("내 쿠폰 목록은 다른 사용자를 제외하고 발급 시각 순서로 페이징한다")
+    void when_user_coupons_are_queried_only_owner_coupons_are_paged() {
+        Coupon earlierCoupon = coupon("먼저 발급된 사용자 쿠폰", STARTED_AT);
+        Coupon laterCoupon = coupon("나중에 발급된 사용자 쿠폰", STARTED_AT);
+        Coupon otherCoupon = coupon("다른 사용자 쿠폰", STARTED_AT);
+        UUID ownerId = uuidGenerator.generate();
+        UUID otherUserId = uuidGenerator.generate();
+        UserCoupon earlier = UserCoupon.issue(
+                uuidGenerator.generate(), earlierCoupon, ownerId, STARTED_AT);
+        UserCoupon later = UserCoupon.issue(
+                uuidGenerator.generate(), laterCoupon, ownerId, STARTED_AT.plusSeconds(1));
+        UserCoupon other = UserCoupon.issue(
+                uuidGenerator.generate(), otherCoupon, otherUserId, STARTED_AT.plusSeconds(2));
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(earlierCoupon);
+            couponRepository.save(laterCoupon);
+            couponRepository.save(otherCoupon);
+            userCouponRepository.save(earlier);
+            userCouponRepository.save(later);
+            userCouponRepository.save(other);
+        });
+
+        var result = userCouponRepository.findAllByUserId(
+                ownerId, null,
+                PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "issuedAt")));
+
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getContent()).extracting(UserCoupon::getId)
+                .containsExactly(later.getId());
+    }
+
+    @Test
+    @DisplayName("내 쿠폰 목록은 요청한 사용 상태만 조회한다")
+    void when_user_coupon_status_is_given_only_matching_status_is_returned() {
+        Coupon issuedCoupon = coupon("발급 상태 사용자 쿠폰", STARTED_AT);
+        Coupon usedCoupon = coupon("사용 상태 사용자 쿠폰", STARTED_AT);
+        UUID userId = uuidGenerator.generate();
+        UserCoupon issued = UserCoupon.issue(
+                uuidGenerator.generate(), issuedCoupon, userId, STARTED_AT);
+        UserCoupon used = UserCoupon.issue(
+                uuidGenerator.generate(), usedCoupon, userId, STARTED_AT.plusSeconds(1));
+        used.use(userId, uuidGenerator.generate(), STARTED_AT.plusSeconds(2));
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(issuedCoupon);
+            couponRepository.save(usedCoupon);
+            userCouponRepository.save(issued);
+            userCouponRepository.save(used);
+        });
+
+        var result = userCouponRepository.findAllByUserId(
+                userId, UserCouponStatus.USED, PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).extracting(UserCoupon::getId)
+                .containsExactly(used.getId());
+    }
+
+    @Test
     @DisplayName("발급 가능한 쿠폰만 조건부로 수량과 수정 감사를 갱신한다")
     void when_coupon_is_issuable_conditional_update_changes_quantity_and_audit() {
         Coupon coupon = coupon(1);
@@ -155,6 +213,84 @@ class CouponPersistenceIntegrationTest {
         assertThat(updated.getUpdatedBy()).isEqualTo(userId);
         assertThat(updated.getUpdatedAt()).isEqualTo(issuedAt);
         assertThat(soldOutRows).isZero();
+    }
+
+    @Test
+    @DisplayName("미발급 쿠폰만 조건부로 내용과 수정 감사를 갱신한다")
+    void when_coupon_is_unissued_conditional_update_changes_values_and_audit() {
+        Coupon coupon = coupon(10);
+        UUID updaterId = uuidGenerator.generate();
+        Instant updatedAt = STARTED_AT.minusSeconds(1);
+        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+
+        Integer affectedRows = transaction().execute(status ->
+                couponRepository.updateIfUnissued(
+                        coupon.getId(), "수정된 쿠폰", 20, 30,
+                        STARTED_AT.plusSeconds(1), EXPIRED_AT.plusSeconds(1),
+                        updaterId, updatedAt));
+        Coupon updated = couponRepository.findActiveById(coupon.getId()).orElseThrow();
+
+        assertThat(affectedRows).isEqualTo(1);
+        assertThat(updated.getCouponName()).isEqualTo("수정된 쿠폰");
+        assertThat(updated.getDiscountRate()).isEqualTo(20);
+        assertThat(updated.getTotalQuantity()).isEqualTo(30);
+        assertThat(updated.getStartedAt()).isEqualTo(STARTED_AT.plusSeconds(1));
+        assertThat(updated.getExpiredAt()).isEqualTo(EXPIRED_AT.plusSeconds(1));
+        assertThat(updated.getUpdatedBy()).isEqualTo(updaterId);
+        assertThat(updated.getUpdatedAt()).isEqualTo(updatedAt);
+    }
+
+    @Test
+    @DisplayName("발급 이력이 있는 쿠폰은 조건부 수정에서 제외한다")
+    void when_coupon_has_been_issued_conditional_update_changes_nothing() {
+        Coupon coupon = coupon(10);
+        coupon.issue(uuidGenerator.generate(), STARTED_AT);
+        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+        Integer affectedRows = transaction().execute(status -> couponRepository.updateIfUnissued(
+                coupon.getId(), "수정 시도 쿠폰", 20, 30,
+                STARTED_AT, EXPIRED_AT,
+                uuidGenerator.generate(), STARTED_AT.plusSeconds(1)));
+
+        assertThat(affectedRows).isZero();
+        assertThat(couponRepository.findActiveById(coupon.getId()).orElseThrow().getCouponName())
+                .isEqualTo("영속성 테스트 쿠폰");
+    }
+
+    @Test
+    @DisplayName("미발급 쿠폰만 조건부로 Soft Delete하고 삭제 감사를 저장한다")
+    void when_coupon_is_unissued_conditional_delete_sets_deletion_audit() {
+        Coupon coupon = coupon(10);
+        UUID deleterId = uuidGenerator.generate();
+        Instant deletedAt = STARTED_AT.minusSeconds(1);
+        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+
+        Integer affectedRows = transaction().execute(status ->
+                couponRepository.deleteIfUnissued(coupon.getId(), deleterId, deletedAt));
+
+        assertThat(affectedRows).isEqualTo(1);
+        assertThat(couponRepository.findActiveById(coupon.getId())).isEmpty();
+        assertThat(jdbcTemplate.queryForMap(
+                "select deleted_at, deleted_by, updated_at, updated_by from p_coupons where id = ?",
+                coupon.getId()))
+                .containsEntry("deleted_by", deleterId)
+                .containsEntry("updated_by", deleterId);
+        assertThat(jdbcTemplate.queryForObject(
+                "select deleted_at = updated_at from p_coupons where id = ?",
+                Boolean.class, coupon.getId())).isTrue();
+    }
+
+    @Test
+    @DisplayName("발급 이력이 있는 쿠폰은 조건부 삭제에서 제외한다")
+    void when_coupon_has_been_issued_conditional_delete_changes_nothing() {
+        Coupon coupon = coupon(10);
+        coupon.issue(uuidGenerator.generate(), STARTED_AT);
+        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+
+        Integer affectedRows = transaction().execute(status -> couponRepository.deleteIfUnissued(
+                coupon.getId(), uuidGenerator.generate(), STARTED_AT.plusSeconds(1)));
+
+        assertThat(affectedRows).isZero();
+        assertThat(couponRepository.findActiveById(coupon.getId())).isPresent();
     }
 
     @Test
