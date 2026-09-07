@@ -4,11 +4,3 @@ spring:
 
   config:
     import: ${CONFIG_SERVER_IMPORT:optional:configserver:http://localhost:8888}
-
-  cloud:
-    openfeign:
-      client:
-        config:
-          default:
-            connect-timeout: 3000
-            read-timeout: 5000

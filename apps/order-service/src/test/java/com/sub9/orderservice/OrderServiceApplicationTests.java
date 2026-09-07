@@ -1,6 +1,6 @@
 package com.sub9.orderservice;
 
-import com.sub9.orderservice.cart.application.service.CartService;
+import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
@@ -15,7 +15,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
         "management.tracing.export.enabled=false"
 })
 @MockitoBean(types = {
-        CartService.class,
+        CartSnapshotPort.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
         StockPort.class
