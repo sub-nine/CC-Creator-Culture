@@ -2,7 +2,6 @@ package com.sub9.orderservice.payment.domain.model;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.orderservice.common.entity.BaseEntity;
-import com.sub9.orderservice.common.persistence.InstantTimestampConverter;
 import com.sub9.orderservice.order.domain.model.Money;
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.payment.domain.exception.PaymentErrorCode;
@@ -10,7 +9,6 @@ import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -70,8 +68,7 @@ public class Payment extends BaseEntity {
     @Column(name = "failure_code", updatable = false, length = 50)
     private String failureCode;
 
-    @Convert(converter = InstantTimestampConverter.class)
-    @Column(name = "processed_at", nullable = false, updatable = false, columnDefinition = "timestamp")
+    @Column(name = "processed_at", nullable = false, updatable = false, columnDefinition = "timestamp with time zone")
     private Instant processedAt;
 
     @OneToOne(mappedBy = "payment", fetch = FetchType.LAZY,

@@ -1,13 +1,11 @@
 package com.sub9.orderservice.payment.domain.model;
 
 import com.sub9.orderservice.common.entity.BaseEntity;
-import com.sub9.orderservice.common.persistence.InstantTimestampConverter;
 import com.sub9.orderservice.order.domain.model.Money;
 import com.sub9.orderservice.order.domain.model.OrderCommandRequest;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -60,8 +58,7 @@ public class PaymentCancellation extends BaseEntity {
     @Column(name = "reason_code", nullable = false, updatable = false, length = 50)
     private String reasonCode = "CUSTOMER_REQUEST";
 
-    @Convert(converter = InstantTimestampConverter.class)
-    @Column(name = "canceled_at", nullable = false, updatable = false, columnDefinition = "timestamp")
+    @Column(name = "canceled_at", nullable = false, updatable = false, columnDefinition = "timestamp with time zone")
     private Instant canceledAt;
 
     PaymentCancellation(UUID id, Payment payment, UUID commandRequestId, Money amount, Instant canceledAt) {

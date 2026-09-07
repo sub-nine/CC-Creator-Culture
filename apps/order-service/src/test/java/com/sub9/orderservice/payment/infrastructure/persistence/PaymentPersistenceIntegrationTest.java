@@ -7,6 +7,7 @@ import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.domain.model.IdempotencyKey;
 import com.sub9.orderservice.order.domain.model.Money;
@@ -59,7 +60,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @MockitoBean(types = {
-        CartSnapshotPort.class, CouponApplicationPort.class, CouponUsagePort.class, StockPort.class
+        CartSnapshotPort.class, CouponApplicationPort.class, CouponUsagePort.class, StockPort.class,
+        PaymentCancellationPort.class
 })
 @DisplayName("PostgreSQL 결제 저장과 조회")
 class PaymentPersistenceIntegrationTest {
@@ -150,6 +152,16 @@ class PaymentPersistenceIntegrationTest {
             assertThat(cancellation.getCreatedAt()).isNotNull();
             assertThat(cancellation.getUpdatedAt()).isNotNull();
         });
+    }
+
+    @ParameterizedTest
+    @CsvSource({"p_payments, processed_at", "p_payment_cancellations, canceled_at"})
+    @DisplayName("결제 처리와 취소 시각은 시간대가 있는 컬럼으로 저장된다")
+    void when_schema_is_created_payment_times_use_timestamp_with_time_zone(String table, String column) {
+        assertThat(jdbcTemplate.queryForObject("""
+                select data_type from information_schema.columns
+                 where table_schema = 'public' and table_name = ? and column_name = ?
+                """, String.class, table, column)).isEqualTo("timestamp with time zone");
     }
 
     @Test

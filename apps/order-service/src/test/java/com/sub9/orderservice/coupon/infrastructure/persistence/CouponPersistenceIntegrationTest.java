@@ -9,6 +9,10 @@ import com.sub9.orderservice.coupon.domain.model.Coupon;
 import com.sub9.orderservice.coupon.domain.model.UserCoupon;
 import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
 import com.sub9.orderservice.coupon.domain.repository.UserCouponRepository;
+<<<<<<< HEAD
+=======
+import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
+>>>>>>> 6afb720 (fix: 결제 영속성 CI 오류 수정)
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
@@ -29,8 +33,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+<<<<<<< HEAD
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+=======
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+>>>>>>> 6afb720 (fix: 결제 영속성 CI 오류 수정)
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
@@ -48,6 +56,10 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
     "management.tracing.export.enabled=false"
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@MockitoBean(types = {
+        CartSnapshotPort.class, CouponApplicationPort.class, CouponUsagePort.class, StockPort.class,
+        PaymentCancellationPort.class
+})
 @DisplayName("쿠폰 도메인 PostgreSQL 영속성")
 class CouponPersistenceIntegrationTest {
 
