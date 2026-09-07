@@ -5,6 +5,7 @@ import com.sub9.orderservice.coupon.application.dto.IssueDispatchResult;
 import com.sub9.orderservice.coupon.application.service.CouponCommandService;
 import com.sub9.orderservice.coupon.application.service.CouponIssueService;
 import com.sub9.orderservice.coupon.presentation.request.CreateCouponRequest;
+import com.sub9.orderservice.coupon.presentation.request.UpdateCouponRequest;
 import com.sub9.orderservice.coupon.presentation.response.CouponIssueResponse;
 import com.sub9.orderservice.coupon.presentation.response.CouponResponse;
 import jakarta.validation.Valid;
@@ -14,6 +15,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -52,5 +55,25 @@ public class CouponCommandController {
         log.info("[쿠폰 발급][동기][API 응답 완료] couponId={} userCouponId={}",
                 couponId, completed.userCouponId());
         return ApiResponse.success("쿠폰이 발급되었습니다.", CouponIssueResponse.from(completed));
+    }
+
+    @PatchMapping("/{couponId}")
+    public ApiResponse<CouponResponse> update(
+            @PathVariable UUID couponId,
+            @RequestHeader("X-User-Id") UUID userId,
+            @Valid @RequestBody UpdateCouponRequest request) {
+        CouponResponse response = couponCommandService.update(
+                couponId, request.toCommand(), userId);
+        log.info("[쿠폰 관리][수정][완료] couponId={}", couponId);
+        return ApiResponse.success("쿠폰이 수정되었습니다.", response);
+    }
+
+    @DeleteMapping("/{couponId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(
+            @PathVariable UUID couponId,
+            @RequestHeader("X-User-Id") UUID userId) {
+        couponCommandService.delete(couponId, userId);
+        log.info("[쿠폰 관리][삭제][완료] couponId={}", couponId);
     }
 }

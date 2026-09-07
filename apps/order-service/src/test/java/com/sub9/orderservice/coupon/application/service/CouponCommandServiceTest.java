@@ -132,8 +132,9 @@ class CouponCommandServiceTest {
         when(couponRepository.findActiveById(COUPON_ID)).thenReturn(java.util.Optional.of(coupon));
 
         assertThatThrownBy(() -> couponCommandService.update(COUPON_ID, command, CREATOR_ID))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("쿠폰 시작 시각은 만료 시각보다 빨라야 합니다.");
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(CouponErrorCode.INVALID_COUPON_UPDATE));
     }
 
     @Test

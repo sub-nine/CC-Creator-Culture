@@ -96,18 +96,18 @@ public class CouponCommandService {
             Instant expiredAt) {
         Objects.requireNonNull(couponName, "쿠폰 이름은 필수입니다.");
         if (couponName.isBlank() || couponName.length() > 100) {
-            throw new IllegalArgumentException("쿠폰 이름은 1자 이상 100자 이하여야 합니다.");
+            throw new BusinessException(CouponErrorCode.INVALID_COUPON_UPDATE);
         }
         if (discountRate < 1 || discountRate > 100) {
-            throw new IllegalArgumentException("할인율은 1 이상 100 이하여야 합니다.");
+            throw new BusinessException(CouponErrorCode.INVALID_COUPON_UPDATE);
         }
         if (totalQuantity < 1) {
-            throw new IllegalArgumentException("총 발급 수량은 1 이상이어야 합니다.");
+            throw new BusinessException(CouponErrorCode.INVALID_COUPON_UPDATE);
         }
         Objects.requireNonNull(startedAt, "쿠폰 시작 시각은 필수입니다.");
         Objects.requireNonNull(expiredAt, "쿠폰 만료 시각은 필수입니다.");
         if (!startedAt.isBefore(expiredAt)) {
-            throw new IllegalArgumentException("쿠폰 시작 시각은 만료 시각보다 빨라야 합니다.");
+            throw new BusinessException(CouponErrorCode.INVALID_COUPON_UPDATE);
         }
     }
 }

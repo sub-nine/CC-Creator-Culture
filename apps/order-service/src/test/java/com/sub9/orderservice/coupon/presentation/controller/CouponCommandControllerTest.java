@@ -4,6 +4,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -137,6 +139,116 @@ class CouponCommandControllerTest {
                         .header("X-User-Id", USER_ID))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.errorCode").value("COMMON_0009"));
+    }
+
+    @Test
+    @DisplayName("변경할 필드와 사용자 헤더로 쿠폰을 수정하면 200을 반환한다")
+    void when_valid_update_request_is_sent_ok_response_is_returned() throws Exception {
+        CouponResponse updated = new CouponResponse(
+                COUPON_ID, "수정된 쿠폰", 15, 200, 0,
+                Instant.parse("2026-09-06T00:00:00Z"),
+                Instant.parse("2026-09-07T00:00:00Z"));
+        when(couponCommandService.update(eq(COUPON_ID), any(), eq(USER_ID)))
+                .thenReturn(updated);
+
+        mockMvc.perform(patch("/api/v1/coupons/{couponId}", COUPON_ID)
+                        .header("X-User-Id", USER_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"couponName":"수정된 쿠폰","totalQuantity":200}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("쿠폰이 수정되었습니다."))
+                .andExpect(jsonPath("$.data.couponName").value("수정된 쿠폰"))
+                .andExpect(jsonPath("$.data.totalQuantity").value(200));
+    }
+
+    @Test
+    @DisplayName("수정할 필드가 없으면 검증 오류 400을 반환한다")
+    void when_update_request_has_no_fields_validation_error_is_returned() throws Exception {
+        mockMvc.perform(patch("/api/v1/coupons/{couponId}", COUPON_ID)
+                        .header("X-User-Id", USER_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("COMMON_0003"));
+    }
+
+    @Test
+    @DisplayName("부분 수정 결과가 쿠폰 규칙을 위반하면 쿠폰 수정 오류 400을 반환한다")
+    void when_update_result_is_invalid_bad_request_is_returned() throws Exception {
+        when(couponCommandService.update(eq(COUPON_ID), any(), eq(USER_ID)))
+                .thenThrow(new BusinessException(CouponErrorCode.INVALID_COUPON_UPDATE));
+
+        mockMvc.perform(patch("/api/v1/coupons/{couponId}", COUPON_ID)
+                        .header("X-User-Id", USER_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"startedAt":"2026-09-08T00:00:00Z"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("COUPON_0007"));
+    }
+
+    @Test
+    @DisplayName("발급된 쿠폰을 수정하면 변경 불가 오류 409를 반환한다")
+    void when_issued_coupon_is_updated_conflict_is_returned() throws Exception {
+        when(couponCommandService.update(eq(COUPON_ID), any(), eq(USER_ID)))
+                .thenThrow(new BusinessException(CouponErrorCode.COUPON_NOT_MODIFIABLE));
+
+        mockMvc.perform(patch("/api/v1/coupons/{couponId}", COUPON_ID)
+                        .header("X-User-Id", USER_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"discountRate\":20}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("COUPON_0005"));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 쿠폰을 수정하면 조회 오류 404를 반환한다")
+    void when_missing_coupon_is_updated_not_found_is_returned() throws Exception {
+        when(couponCommandService.update(eq(COUPON_ID), any(), eq(USER_ID)))
+                .thenThrow(new BusinessException(CouponErrorCode.COUPON_NOT_FOUND));
+
+        mockMvc.perform(patch("/api/v1/coupons/{couponId}", COUPON_ID)
+                        .header("X-User-Id", USER_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"discountRate\":20}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("COUPON_0001"));
+    }
+
+    @Test
+    @DisplayName("미발급 쿠폰을 삭제하면 204를 반환한다")
+    void when_unissued_coupon_is_deleted_no_content_is_returned() throws Exception {
+        mockMvc.perform(delete("/api/v1/coupons/{couponId}", COUPON_ID)
+                        .header("X-User-Id", USER_ID))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("발급된 쿠폰을 삭제하면 삭제 불가 오류 409를 반환한다")
+    void when_issued_coupon_is_deleted_conflict_is_returned() throws Exception {
+        org.mockito.Mockito.doThrow(
+                        new BusinessException(CouponErrorCode.COUPON_NOT_DELETABLE))
+                .when(couponCommandService).delete(COUPON_ID, USER_ID);
+
+        mockMvc.perform(delete("/api/v1/coupons/{couponId}", COUPON_ID)
+                        .header("X-User-Id", USER_ID))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("COUPON_0006"));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 쿠폰을 삭제하면 조회 오류 404를 반환한다")
+    void when_missing_coupon_is_deleted_not_found_is_returned() throws Exception {
+        org.mockito.Mockito.doThrow(new BusinessException(CouponErrorCode.COUPON_NOT_FOUND))
+                .when(couponCommandService).delete(COUPON_ID, USER_ID);
+
+        mockMvc.perform(delete("/api/v1/coupons/{couponId}", COUPON_ID)
+                        .header("X-User-Id", USER_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("COUPON_0001"));
     }
 
     private void assertIssueError(
