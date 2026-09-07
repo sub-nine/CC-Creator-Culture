@@ -9,12 +9,12 @@ import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import com.sub9.productservice.product.application.query.repository.ProductQueryRepository;
-import com.sub9.productservice.product.domain.model.Product;
-import com.sub9.productservice.product.domain.model.ProductStatus;
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
 import com.sub9.productservice.product.application.query.dto.SkuInfo;
+import com.sub9.productservice.product.application.query.repository.ProductQueryRepository;
+import com.sub9.productservice.product.domain.model.Product;
+import com.sub9.productservice.product.domain.model.ProductStatus;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -91,8 +91,7 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
             .limit(pageable.getPageSize())
             .fetch();
 
-    List<ProductInfo> content =
-        productIds.isEmpty() ? List.of() : findProductsByIds(productIds);
+    List<ProductInfo> content = productIds.isEmpty() ? List.of() : findProductsByIds(productIds);
 
     JPAQuery<Long> countQuery =
         queryFactory
@@ -109,6 +108,22 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
           Long total = countQuery.fetchOne();
           return total != null ? total : 0L;
         });
+  }
+
+  @Override
+  public boolean existsSkuOwnedByCreatorId(UUID creatorId, UUID skuId) {
+    return queryFactory
+            .selectOne()
+            .from(sku)
+            .join(product)
+            .on(sku.productId.eq(product.id))
+            .where(
+                sku.id.eq(skuId),
+                product.creatorId.eq(creatorId),
+                sku.deletedAt.isNull(),
+                product.deletedAt.isNull())
+            .fetchFirst()
+        != null;
   }
 
   private Product findProductById(UUID productId) {

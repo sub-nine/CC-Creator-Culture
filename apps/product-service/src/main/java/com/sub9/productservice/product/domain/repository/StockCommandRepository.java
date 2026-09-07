@@ -1,7 +1,6 @@
 package com.sub9.productservice.product.domain.repository;
 
 import com.sub9.productservice.product.domain.model.Stock;
-
 import java.util.Optional;
 import java.util.UUID;
 
@@ -10,9 +9,9 @@ public interface StockCommandRepository {
 
   Optional<Stock> findById(UUID uuid);
 
-  boolean existsById(UUID uuid);
-
-  boolean increaseStock(UUID uuid, int quantity);
+  boolean increaseStock(UUID skuId, int quantity);
 
   boolean decreaseStock(UUID skuId, int quantity);
+
+  boolean adjustStock(UUID uuid, int quantity);
 }

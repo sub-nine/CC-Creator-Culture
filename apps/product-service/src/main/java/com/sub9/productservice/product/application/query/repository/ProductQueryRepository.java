@@ -15,4 +15,6 @@ public interface ProductQueryRepository {
   List<SkuInfo> findAllSkuInfoByIds(List<UUID> skuIds);
 
   Page<ProductInfo> searchProducts(String keyword, Pageable pageable);
+
+  boolean existsSkuOwnedByCreatorId(UUID craatorId, UUID skuId);
 }
