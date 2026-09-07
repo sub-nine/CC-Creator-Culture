@@ -1,4 +1,4 @@
-package com.sub9.productservice.leaderboard.infrastructure.persistence.repository.jpa;
+package com.sub9.productservice.leaderboard.infrastructure.persistence.repository;
 
 import com.sub9.productservice.leaderboard.application.port.out.LeaderboardSnapshotRepository;
 import com.sub9.productservice.leaderboard.domain.entity.LeaderboardSnapshot;

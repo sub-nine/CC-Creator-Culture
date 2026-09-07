@@ -5,5 +5,5 @@ import java.util.Map;
 import java.util.UUID;
 
 public interface RecordProductViewScoreUseCase {
-    void recordProductViewScore(LocalDate localDate, Map<UUID, Long> productViewCounts);
+    void recordProductViewScore(UUID eventId, LocalDate localDate, Map<UUID, Long> productViewCounts);
 }

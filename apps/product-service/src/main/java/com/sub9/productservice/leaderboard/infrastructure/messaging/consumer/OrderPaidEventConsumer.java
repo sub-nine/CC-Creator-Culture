@@ -18,7 +18,7 @@ public class OrderPaidEventConsumer {
     @KafkaListener(topics = KafkaTopics.ORDER_PAID, groupId = "${kafka.leaderboard-group-id}")
     public void consume(OrderPaidEvent event, Acknowledgment ack) {
         try {
-            // TODO : 동일 orderId 재처리 시 점수 중복 반영 방지(멱등 처리) 필요
+            log.info("[KAFKA] 주문 결제 이벤트 수신 - orderId: {}, productId: {}", event.orderId(), event.productId());
             recordOrderScoreUseCase.recordOrderScore(event.orderId(), event.productId());
             ack.acknowledge();
         } catch (Exception e) {

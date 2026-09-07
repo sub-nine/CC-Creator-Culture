@@ -22,14 +22,15 @@ public class ProductSyncViewsEventConsumer {
     @KafkaListener(topics = KafkaTopics.PRODUCT_VIEW_COUNT_SYNC, groupId = "${kafka.leaderboard-group-id}")
     public void consume(ProductViewSyncEvent event, Acknowledgment ack) {
         try {
-            // TODO : event.eventId() 기준 중복 처리 방지(멱등 처리) 필요
+            log.info("[KAFKA] 조회수 동기화 이벤트 수신 - eventId: {}", event.eventId());
+
             Map<UUID, Long> productViewCounts = event.productViewCounts().stream()
                     .collect(Collectors.toMap(
                             ProductViewSyncEvent.ProductViewCount::productId,
                             ProductViewSyncEvent.ProductViewCount::viewCount
                     ));
 
-            recordProductViewScoreUseCase.recordProductViewScore(event.viewDate(), productViewCounts);
+            recordProductViewScoreUseCase.recordProductViewScore(event.eventId(), event.viewDate(), productViewCounts);
             ack.acknowledge();
         } catch (Exception e) {
             log.error("[ERROR] 조회수 리더보드 점수 반영 실패 {}", e);
