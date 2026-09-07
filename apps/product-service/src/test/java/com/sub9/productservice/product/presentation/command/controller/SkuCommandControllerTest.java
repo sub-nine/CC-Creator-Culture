@@ -11,8 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
-import com.sub9.productservice.product.application.command.dto.DeleteSkuCommand;
-import com.sub9.productservice.product.application.command.dto.UpdateSkuCommand;
+import com.sub9.productservice.product.application.command.dto.sku.DeleteSkuCommand;
+import com.sub9.productservice.product.application.command.dto.sku.UpdateSkuCommand;
 import com.sub9.productservice.product.application.command.service.SkuCommandService;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.UUID;

@@ -5,7 +5,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
 import com.sub9.common.kafka.event.ProductViewSyncEvent;
-import com.sub9.productservice.product.application.command.dto.IncrementDailyViewCountsCommand;
+import com.sub9.productservice.product.application.command.dto.product.IncrementDailyViewCountsCommand;
 import com.sub9.productservice.product.application.port.ProductViewCountPublisher;
 import com.sub9.productservice.product.application.port.ProductViewRepository;
 import com.sub9.productservice.product.application.query.dto.ProductViewCount;
