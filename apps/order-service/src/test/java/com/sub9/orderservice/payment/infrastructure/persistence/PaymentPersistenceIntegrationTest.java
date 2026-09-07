@@ -314,6 +314,24 @@ class PaymentPersistenceIntegrationTest {
                 id), "23502");
     }
 
+    @Test
+    void when_database_timezone_changes_payment_instants_are_preserved() {
+        Payment payment = saveCanceledPayment();
+        assertThat(jdbcTemplate.queryForList("""
+                select data_type from information_schema.columns
+                where table_schema = 'public'
+                  and (table_name = 'p_payments' and column_name = 'processed_at'
+                    or table_name = 'p_payment_cancellations' and column_name = 'canceled_at')
+                """, String.class)).containsExactlyInAnyOrder(
+                        "timestamp with time zone", "timestamp with time zone");
+        transaction().executeWithoutResult(ignored -> {
+            jdbcTemplate.execute("SET LOCAL TIME ZONE 'Asia/Seoul'");
+            Payment restored = paymentRepository.findById(payment.getId()).orElseThrow();
+            assertThat(restored.getProcessedAt()).isEqualTo(PROCESSED_AT);
+            assertThat(restored.getCancellation().getCanceledAt()).isEqualTo(CANCELED_AT);
+        });
+    }
+
     private static void assertSqlState(Runnable write, String expectedState) {
         assertThatThrownBy(write::run).isInstanceOf(DataIntegrityViolationException.class)
                 .rootCause().isInstanceOfSatisfying(SQLException.class,
