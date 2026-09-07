@@ -3,6 +3,7 @@ package com.sub9.orderservice.coupon.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.coupon.domain.model.Coupon;
 import com.sub9.orderservice.coupon.domain.model.UserCoupon;
