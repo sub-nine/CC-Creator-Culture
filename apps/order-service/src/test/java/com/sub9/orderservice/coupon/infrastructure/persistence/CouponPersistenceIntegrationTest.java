@@ -8,6 +8,10 @@ import com.sub9.orderservice.coupon.domain.model.Coupon;
 import com.sub9.orderservice.coupon.domain.model.UserCoupon;
 import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
 import com.sub9.orderservice.coupon.domain.repository.UserCouponRepository;
+import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
+import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
+import com.sub9.orderservice.order.application.port.output.StockPort;
 import jakarta.persistence.EntityManager;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -24,6 +28,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
@@ -32,13 +37,13 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
-        "spring.cloud.config.enabled=false",
-        "eureka.client.enabled=false",
-        "spring.jpa.open-in-view=false",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.jpa.properties.hibernate.jdbc.time_zone=UTC",
-        "spring.datasource.hikari.connection-init-sql=SET TIME ZONE 'UTC'",
-        "management.tracing.export.enabled=false"
+    "spring.cloud.config.enabled=false",
+    "eureka.client.enabled=false",
+    "spring.jpa.open-in-view=false",
+    "spring.jpa.hibernate.ddl-auto=create-drop",
+    "spring.jpa.properties.hibernate.jdbc.time_zone=UTC",
+    "spring.datasource.hikari.connection-init-sql=SET TIME ZONE 'UTC'",
+    "management.tracing.export.enabled=false"
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @DisplayName("쿠폰 도메인 PostgreSQL 영속성")
@@ -50,9 +55,9 @@ class CouponPersistenceIntegrationTest {
 
     @Container
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine")
-            .withDatabaseName("order_service_test")
-            .withUsername("test")
-            .withPassword("test");
+        .withDatabaseName("order_service_test")
+        .withUsername("test")
+        .withPassword("test");
 
     private final UuidV7Generator uuidGenerator = new UuidV7Generator();
 
@@ -61,6 +66,14 @@ class CouponPersistenceIntegrationTest {
     @Autowired private EntityManager entityManager;
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private PlatformTransactionManager transactionManager;
+
+    @MockitoBean PaymentCancellationPort paymentCancellationPort;
+
+    @MockitoBean StockPort stockPort;
+
+    @MockitoBean CouponApplicationPort couponApplicationPort;
+
+    @MockitoBean CouponUsagePort couponUsagePort;
 
     @DynamicPropertySource
     static void registerDataSourceProperties(DynamicPropertyRegistry registry) {
@@ -90,9 +103,9 @@ class CouponPersistenceIntegrationTest {
 
         assertThat(couponRepository.findActiveById(coupon.getId())).isPresent();
         assertThat(userCouponRepository.findById(userCoupon.getId()))
-                .get()
-                .extracting(UserCoupon::getCouponId, UserCoupon::getUserId)
-                .containsExactly(coupon.getId(), userId);
+            .get()
+            .extracting(UserCoupon::getCouponId, UserCoupon::getUserId)
+            .containsExactly(coupon.getId(), userId);
         assertThat(userCouponRepository.existsByCouponIdAndUserId(coupon.getId(), userId)).isTrue();
     }
 
@@ -105,10 +118,10 @@ class CouponPersistenceIntegrationTest {
         transaction().executeWithoutResult(status -> couponRepository.save(coupon));
 
         Integer affectedRows = transaction().execute(status ->
-                couponRepository.increaseIssuedQuantityIfIssuable(coupon.getId(), userId, issuedAt));
+            couponRepository.increaseIssuedQuantityIfIssuable(coupon.getId(), userId, issuedAt));
         Coupon updated = couponRepository.findActiveById(coupon.getId()).orElseThrow();
         Integer soldOutRows = transaction().execute(status ->
-                couponRepository.increaseIssuedQuantityIfIssuable(coupon.getId(), userId, issuedAt));
+            couponRepository.increaseIssuedQuantityIfIssuable(coupon.getId(), userId, issuedAt));
 
         assertThat(affectedRows).isEqualTo(1);
         assertThat(updated.getIssuedQuantity()).isEqualTo(1);
@@ -124,11 +137,11 @@ class CouponPersistenceIntegrationTest {
         transaction().executeWithoutResult(status -> couponRepository.save(coupon));
 
         Integer beforeStart = transaction().execute(status -> couponRepository
-                .increaseIssuedQuantityIfIssuable(coupon.getId(), uuidGenerator.generate(), STARTED_AT.minusSeconds(1)));
+            .increaseIssuedQuantityIfIssuable(coupon.getId(), uuidGenerator.generate(), STARTED_AT.minusSeconds(1)));
         coupon.delete(uuidGenerator.generate(), STARTED_AT.plusSeconds(1));
         transaction().executeWithoutResult(status -> couponRepository.save(coupon));
         Integer deleted = transaction().execute(status -> couponRepository
-                .increaseIssuedQuantityIfIssuable(coupon.getId(), uuidGenerator.generate(), STARTED_AT.plusSeconds(2)));
+            .increaseIssuedQuantityIfIssuable(coupon.getId(), uuidGenerator.generate(), STARTED_AT.plusSeconds(2)));
 
         assertThat(beforeStart).isZero();
         assertThat(deleted).isZero();
@@ -151,13 +164,13 @@ class CouponPersistenceIntegrationTest {
                 """, String.class));
 
         assertThat(constraints).contains(
-                "chk_coupon_discount_rate", "chk_coupon_total_quantity",
-                "chk_coupon_quantity", "chk_coupon_period",
-                "uk_user_coupon_user_coupon", "chk_user_coupon_status",
-                "chk_user_coupon_usage", "fk_user_coupons_coupon");
+            "chk_coupon_discount_rate", "chk_coupon_total_quantity",
+            "chk_coupon_quantity", "chk_coupon_period",
+            "uk_user_coupon_user_coupon", "chk_user_coupon_status",
+            "chk_user_coupon_usage", "fk_user_coupons_coupon");
         assertThat(indexes).contains(
-                "idx_coupon_period", "idx_coupon_deleted_at",
-                "idx_user_coupon_user_status", "idx_user_coupon_coupon");
+            "idx_coupon_period", "idx_coupon_deleted_at",
+            "idx_user_coupon_user_status", "idx_user_coupon_coupon");
         assertThat(jdbcTemplate.queryForObject("""
                 select count(*)
                   from information_schema.columns
@@ -199,16 +212,16 @@ class CouponPersistenceIntegrationTest {
                     created_at, created_by, updated_at
                 ) values (?, ?, ?, 'ISSUED', ?, ?, ?, ?, ?, ?)
                 """,
-                uuidGenerator.generate(), coupon.getId(), uuidGenerator.generate(), Timestamp.from(STARTED_AT),
-                Timestamp.from(STARTED_AT.plusSeconds(1)), uuidGenerator.generate(),
-                Timestamp.from(CREATED_AT), uuidGenerator.generate(), Timestamp.from(CREATED_AT)))
-                .isInstanceOf(DataIntegrityViolationException.class);
+            uuidGenerator.generate(), coupon.getId(), uuidGenerator.generate(), Timestamp.from(STARTED_AT),
+            Timestamp.from(STARTED_AT.plusSeconds(1)), uuidGenerator.generate(),
+            Timestamp.from(CREATED_AT), uuidGenerator.generate(), Timestamp.from(CREATED_AT)))
+            .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     private Coupon coupon(int totalQuantity) {
         return Coupon.create(
-                uuidGenerator.generate(), "영속성 테스트 쿠폰", 10, totalQuantity,
-                STARTED_AT, EXPIRED_AT, uuidGenerator.generate(), CREATED_AT);
+            uuidGenerator.generate(), "영속성 테스트 쿠폰", 10, totalQuantity,
+            STARTED_AT, EXPIRED_AT, uuidGenerator.generate(), CREATED_AT);
     }
 
     private TransactionTemplate transaction() {

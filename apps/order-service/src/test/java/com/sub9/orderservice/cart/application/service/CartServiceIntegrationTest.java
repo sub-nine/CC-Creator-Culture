@@ -1,8 +1,5 @@
 package com.sub9.orderservice.cart.application.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.verify;
-
 import com.sub9.orderservice.cart.application.dto.AddCartItemCommand;
 import com.sub9.orderservice.cart.application.dto.DeleteCartItemCommand;
 import com.sub9.orderservice.cart.application.dto.UpdateCartItemCommand;
@@ -11,18 +8,26 @@ import com.sub9.orderservice.cart.domain.model.Cart;
 import com.sub9.orderservice.cart.infrastructure.persistence.CartJpaRepository;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.support.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
-import java.util.List;
-import java.util.UUID;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 
 @Transactional
 @SpringBootTest
@@ -35,6 +40,7 @@ class CartServiceIntegrationTest extends AbstractIntegrationTest {
   @MockitoBean private CouponApplicationPort couponApplicationPort;
   @MockitoBean private CouponUsagePort couponUsagePort;
   @MockitoBean private StockPort stockPort;
+  @MockitoBean PaymentCancellationPort paymentCancellationPort;
 
   private UUID userId;
   private UUID skuId;
