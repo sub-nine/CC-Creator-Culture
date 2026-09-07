@@ -5,9 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
-import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
+import com.sub9.orderservice.cart.application.service.CartCommandService;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import com.sub9.orderservice.order.domain.model.Money;
@@ -57,10 +58,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @MockitoBean(types = {
-        CartSnapshotPort.class,
+        CartCommandService.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
-        StockPort.class
+        StockPort.class,
+        PaymentCancellationPort.class
 })
 @DisplayName("주문 명령 멱등 처리 PostgreSQL 연동")
 class OrderCommandIdempotencyIntegrationTest {
@@ -129,7 +131,7 @@ class OrderCommandIdempotencyIntegrationTest {
         assertThat(columnType("response_payload", "udt_name")).isEqualTo("jsonb");
         assertThat(columnType("request_hash", "data_type")).isEqualTo("character");
         assertThat(columnType("completed_at", "data_type"))
-                .isEqualTo("timestamp without time zone");
+                .isEqualTo("timestamp with time zone");
     }
 
     @Test

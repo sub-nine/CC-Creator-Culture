@@ -4,19 +4,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sub9.common.identifier.UuidV7Generator;
-import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
+import com.sub9.orderservice.cart.application.service.CartCommandService;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.domain.model.Money;
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.model.OrderItem;
+import com.sub9.orderservice.order.domain.model.OrderItemStatus;
+import com.sub9.orderservice.order.domain.model.OrderNumber;
 import com.sub9.orderservice.order.domain.model.OrderStatus;
 import com.sub9.orderservice.order.domain.model.ProductSnapshot;
 import com.sub9.orderservice.order.domain.model.ShippingAddress;
 import com.sub9.orderservice.order.domain.repository.OrderQueryRepository;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
 import jakarta.persistence.EntityManager;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -25,15 +29,20 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -61,10 +70,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @MockitoBean(types = {
-        CartSnapshotPort.class,
+        CartCommandService.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
-        StockPort.class
+        StockPort.class,
+        PaymentCancellationPort.class
 })
 @DisplayName("주문 도메인 PostgreSQL 영속성")
 class OrderPersistenceIntegrationTest {
@@ -224,6 +234,51 @@ class OrderPersistenceIntegrationTest {
     }
 
     @Test
+    @DisplayName("주문 상품 ID로 상위 주문을 잠그고 전체 주문 상품을 조회한다")
+    void when_order_is_locked_by_item_id_parent_and_all_items_are_returned() {
+        Order order = order(2);
+        saveAndFlush(order);
+        UUID orderItemId = order.getItems().getFirst().getId();
+
+        Order locked = transaction().execute(status ->
+                orderRepository.findByOrderItemIdForUpdate(orderItemId).orElseThrow());
+        boolean missing = transaction().execute(status ->
+                orderRepository.findByOrderItemIdForUpdate(uuid(999)).isEmpty());
+
+        assertThat(locked.getId()).isEqualTo(order.getId());
+        assertThat(locked.getItems())
+                .extracting(OrderItem::getId)
+                .containsExactlyInAnyOrderElementsOf(order.getItems().stream().map(OrderItem::getId).toList());
+        assertThat(missing).isTrue();
+    }
+
+    @Test
+    @DisplayName("잠금 조회한 주문의 상품과 상위 상태 변경을 함께 저장한다")
+    void when_locked_order_is_changed_item_and_parent_status_are_persisted() {
+        Order order = order(2);
+        saveAndFlush(order);
+        changeOrderStatus(order, OrderStatus.PAID);
+        OrderItem target = order.getItems().getFirst();
+
+        transaction().executeWithoutResult(status -> {
+            Order locked = orderRepository.findByOrderItemIdForUpdate(target.getId()).orElseThrow();
+            locked.changeItemStatus(target.getCreatorId(), target.getId(), OrderItemStatus.PREPARING);
+            entityManager.flush();
+        });
+
+        Order restored = orderQueryRepository.findDetailByOrderNumber(order.getOrderNumber()).orElseThrow();
+        assertThat(restored.getStatus()).isEqualTo(OrderStatus.PROCESSING);
+        assertThat(restored.getItems())
+                .filteredOn(item -> item.getId().equals(target.getId()))
+                .extracting(OrderItem::getStatus)
+                .containsExactly(OrderItemStatus.PREPARING);
+        assertThat(restored.getItems())
+                .filteredOn(item -> !item.getId().equals(target.getId()))
+                .extracting(OrderItem::getStatus)
+                .containsOnly(OrderItemStatus.ORDERED);
+    }
+
+    @Test
     @DisplayName("생성 시각이 같으면 ID 내림차순으로 페이지 순서를 고정한다")
     void when_created_at_is_equal_orders_are_sorted_by_id_desc_across_pages() {
         UUID customerId = uuid(60);
@@ -290,7 +345,7 @@ class OrderPersistenceIntegrationTest {
                  where table_schema = 'public'
                    and table_name in ('p_orders', 'p_order_items')
                    and column_name in ('created_at', 'updated_at', 'expires_at', 'paid_at', 'canceled_at')
-                   and data_type = 'timestamp without time zone'
+                   and data_type = 'timestamp with time zone'
                 """, Integer.class)).isEqualTo(7);
         assertThat(jdbcTemplate.queryForObject("""
                 select count(*)
@@ -342,33 +397,125 @@ class OrderPersistenceIntegrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
-    @Test
-    @DisplayName("같은 주문의 두 잠금 조회를 직렬화한다")
-    void when_two_transactions_lock_same_order_second_waits_for_first() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("주문 ID 또는 주문번호 잠금과 주문 상품 ID 잠금을 같은 주문에서 직렬화한다")
+    void when_order_and_item_lock_same_parent_second_transaction_waits(boolean byOrderNumber) throws Exception {
         Order order = order(1);
         saveAndFlush(order);
+        UUID orderItemId = order.getItems().getFirst().getId();
         CountDownLatch firstLocked = new CountDownLatch(1);
         CountDownLatch releaseFirst = new CountDownLatch(1);
+        CountDownLatch secondStarted = new CountDownLatch(1);
 
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
             Future<?> first = executor.submit(() -> transaction().executeWithoutResult(status -> {
-                orderRepository.findByIdForUpdate(order.getId()).orElseThrow();
+                if (byOrderNumber) {
+                    orderRepository.findByOrderNumberForUpdate(order.getOrderNumber()).orElseThrow();
+                } else {
+                    orderRepository.findByIdForUpdate(order.getId()).orElseThrow();
+                }
                 firstLocked.countDown();
                 await(releaseFirst);
             }));
 
             assertThat(firstLocked.await(5, TimeUnit.SECONDS)).isTrue();
-            Future<OrderStatus> second = executor.submit(() -> transaction().execute(status ->
-                    orderRepository.findByIdForUpdate(order.getId()).orElseThrow().getStatus()));
+            Future<OrderStatus> second = executor.submit(() -> {
+                secondStarted.countDown();
+                return transaction().execute(status ->
+                        orderRepository.findByOrderItemIdForUpdate(orderItemId).orElseThrow().getStatus());
+            });
 
-            Thread.sleep(200);
-            assertThat(second.isDone()).isFalse();
+            assertThat(secondStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> second.get(200, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
             releaseFirst.countDown();
 
             first.get(5, TimeUnit.SECONDS);
             assertThat(second.get(5, TimeUnit.SECONDS)).isEqualTo(OrderStatus.PENDING_PAYMENT);
         } finally {
             releaseFirst.countDown();
+        }
+    }
+
+    @Test
+    @DisplayName("주문번호로 잠근 주문 전체 취소와 취소 시각을 저장한다")
+    void when_order_is_canceled_under_number_lock_all_changes_are_persisted() {
+        Order order = order(2);
+        Instant paidAt = CREATED_AT.plusSeconds(60);
+        Instant canceledAt = CREATED_AT.plusSeconds(120);
+        order.markPaid(paidAt);
+        saveAndFlush(order);
+
+        transaction().executeWithoutResult(status -> {
+            Order locked = orderRepository.findByOrderNumberForUpdate(order.getOrderNumber()).orElseThrow();
+            assertThat(locked.getItems()).hasSize(2);
+            locked.cancel(order.getCustomerId(), canceledAt);
+            entityManager.flush();
+        });
+
+        Order restored = orderQueryRepository.findDetailByOrderNumber(order.getOrderNumber()).orElseThrow();
+        assertThat(restored.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(restored.getCanceledAt()).isEqualTo(canceledAt);
+        assertThat(restored.getPaidAt()).isEqualTo(paidAt);
+        assertThat(restored.getItems()).extracting(OrderItem::getStatus).containsOnly(OrderItemStatus.CANCELED);
+        boolean missing = transaction().execute(status -> orderRepository.findByOrderNumberForUpdate(
+                OrderNumber.issue(uuid(999))).isEmpty());
+        assertThat(missing).isTrue();
+    }
+
+    @Test
+    @DisplayName("취소 상태와 취소 시각이 맞지 않으면 데이터베이스가 거부한다")
+    void when_cancellation_time_does_not_match_status_database_rejects_update() {
+        Order order = order(1);
+        order.markPaid(CREATED_AT.plusSeconds(60));
+        saveAndFlush(order);
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "update p_orders set status = 'CANCELED' where id = ?", order.getId()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "update p_orders set canceled_at = ? where id = ?",
+                LocalDateTime.ofInstant(CREATED_AT.plusSeconds(120), ZoneOffset.UTC), order.getId()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("주문번호로 잠근 주문을 조회하고 없는 주문번호에는 빈 결과를 반환한다")
+    void when_order_number_is_queried_matching_order_or_empty_is_returned() {
+        Order order = order(1);
+        saveAndFlush(order);
+
+        transaction().executeWithoutResult(status -> {
+            Order locked = orderRepository.findByOrderNumberForUpdate(order.getOrderNumber()).orElseThrow();
+            assertThat(locked.getId()).isEqualTo(order.getId());
+            assertThat(locked.getCustomerId()).isEqualTo(order.getCustomerId());
+            assertThat(locked.getItems()).hasSize(1);
+            assertThat(orderRepository.findByOrderNumberForUpdate(OrderNumber.issue(uuidGenerator.generate())))
+                    .isEmpty();
+        });
+    }
+
+    @Test
+    @DisplayName("주문번호로 잠근 주문은 다른 트랜잭션의 주문 ID 잠금 조회를 차단한다")
+    void when_order_number_holds_lock_other_order_id_query_times_out() {
+        Order order = order(1);
+        saveAndFlush(order);
+
+        try (ExecutorService executor = Executors.newSingleThreadExecutor()) {
+            transaction().executeWithoutResult(status -> {
+                orderRepository.findByOrderNumberForUpdate(order.getOrderNumber()).orElseThrow();
+                Future<?> competing = executor.submit(() -> transaction().execute(otherStatus -> {
+                    jdbcTemplate.execute("SET LOCAL lock_timeout = '200ms'");
+                    return orderRepository.findByIdForUpdate(order.getId());
+                }));
+
+                assertThatThrownBy(() -> competing.get(5, TimeUnit.SECONDS))
+                        .isInstanceOf(ExecutionException.class)
+                        .satisfies(exception -> assertThat(NestedExceptionUtils.getMostSpecificCause(exception))
+                                .isInstanceOfSatisfying(SQLException.class,
+                                        cause -> assertThat(cause.getSQLState()).isEqualTo("55P03")));
+            });
         }
     }
 

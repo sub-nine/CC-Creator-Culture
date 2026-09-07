@@ -28,7 +28,7 @@ public class HashtagQueryRepositoryImpl implements HashtagQueryRepository {
     public Page<HashtagResponse> searchHashtags(String keyword, Pageable pageable) {
         List<HashtagResponse> content = queryFactory
                 .select(Projections.constructor(HashtagResponse.class,
-                        hashtag.id, hashtag.name))
+                        hashtag.id, hashtag.name, hashtag.usageCount))
                 .from(hashtag)
                 .where(
                         hashtag.deletedAt.isNull(),

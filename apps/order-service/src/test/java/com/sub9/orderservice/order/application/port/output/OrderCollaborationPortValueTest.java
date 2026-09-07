@@ -7,8 +7,11 @@ import com.sub9.common.exception.BusinessException;
 import com.sub9.orderservice.order.application.port.output.CartSnapshotPort.CartItemSnapshot;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort.AppliedCoupon;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort.CouponApplicationRequest;
+import com.sub9.orderservice.order.application.port.output.StockPort.RestoreReason;
 import com.sub9.orderservice.order.application.port.output.StockPort.StockItem;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -110,6 +113,21 @@ class OrderCollaborationPortValueTest {
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(OrderErrorCode.INVALID_ORDER_ITEMS));
+    }
+
+    @Test
+    @DisplayName("재고 복구 명령은 생성 시점의 상품 목록을 변경할 수 없게 보존한다")
+    void when_stock_restore_command_is_created_items_are_immutable() {
+        StockItem stockItem = new StockItem(UUID.randomUUID(), 1);
+        List<StockItem> source = new ArrayList<>(List.of(stockItem));
+
+        StockRestoreCommand command = new StockRestoreCommand(
+                UUID.randomUUID(), source, RestoreReason.PAYMENT_FAILED);
+        source.clear();
+
+        assertThat(command.items()).containsExactly(stockItem);
+        assertThatThrownBy(() -> command.items().clear())
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test

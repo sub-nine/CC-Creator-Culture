@@ -3,8 +3,6 @@ package com.sub9.userservice.shared.domain.model;
 import jakarta.persistence.Column;
 import jakarta.persistence.MappedSuperclass;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -17,22 +15,23 @@ import org.hibernate.annotations.ColumnDefault;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public abstract class BaseAuditEntity {
 
+    // INSERT 시 생성 시각이 전달되지 않으면 데이터베이스의 현재 시각을 기본값으로 사용한다.
     @ColumnDefault("CURRENT_TIMESTAMP")
-    @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamp")
-    private LocalDateTime createdAt;
+    @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamp with time zone")
+    private Instant createdAt;
 
     @Column(name = "created_by")
     private UUID createdBy;
 
     @ColumnDefault("CURRENT_TIMESTAMP")
-    @Column(name = "updated_at", nullable = false, columnDefinition = "timestamp")
-    private LocalDateTime updatedAt;
+    @Column(name = "updated_at", nullable = false, columnDefinition = "timestamp with time zone")
+    private Instant updatedAt;
 
     @Column(name = "updated_by", nullable = false)
     private UUID updatedBy;
 
-    @Column(name = "deleted_at", columnDefinition = "timestamp")
-    private LocalDateTime deletedAt;
+    @Column(name = "deleted_at", columnDefinition = "timestamp with time zone")
+    private Instant deletedAt;
 
     @Column(name = "deleted_by")
     private UUID deletedBy;
@@ -40,7 +39,7 @@ public abstract class BaseAuditEntity {
     protected final void initializeAudit(UUID createdBy, UUID updatedBy, Instant now) {
         this.createdBy = createdBy;
         this.updatedBy = Objects.requireNonNull(updatedBy, "updatedBy must not be null");
-        this.createdAt = toUtc(now);
+        this.createdAt = Objects.requireNonNull(now, "now must not be null");
         this.updatedAt = createdAt;
     }
 
@@ -50,7 +49,7 @@ public abstract class BaseAuditEntity {
             return;
         }
 
-        LocalDateTime deletedTime = toUtc(now);
+        Instant deletedTime = Objects.requireNonNull(now, "now must not be null");
         this.deletedAt = deletedTime;
         this.deletedBy = actorId;
         this.updatedAt = deletedTime;
@@ -59,11 +58,5 @@ public abstract class BaseAuditEntity {
 
     public final boolean isDeleted() {
         return deletedAt != null;
-    }
-
-    protected static LocalDateTime toUtc(Instant instant) {
-        // 시간대 정보가 없는 timestamp 컬럼에는 UTC 기준의 날짜와 시각을 저장한다.
-        return LocalDateTime.ofInstant(Objects.requireNonNull(instant, "instant must not be null"),
-                ZoneOffset.UTC);
     }
 }

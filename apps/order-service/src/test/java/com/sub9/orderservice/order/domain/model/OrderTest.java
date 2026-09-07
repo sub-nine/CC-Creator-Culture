@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @DisplayName("주문 애그리거트")
 class OrderTest {
@@ -60,6 +63,315 @@ class OrderTest {
                 .hasMessage("식별자는 UUID v7 형식이어야 합니다.");
     }
 
+    @Test
+    @DisplayName("결제 기한 전에 성공 결과를 반영하면 결제 완료 상태와 처리 시각을 저장한다")
+    void when_payment_succeeds_before_expiration_order_is_marked_paid() {
+        Order order = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+        Instant processedAt = order.getExpiresAt().minusNanos(1);
+
+        order.markPaid(processedAt);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(order.getPaidAt()).isEqualTo(processedAt);
+    }
+
+    @Test
+    @DisplayName("결제 기한 전에 실패 결과를 반영하면 실패 상태로 변경한다")
+    void when_payment_fails_before_expiration_order_is_marked_failed() {
+        Order order = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+
+        order.markPaymentFailed(order.getExpiresAt().minusNanos(1));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
+        assertThat(order.getPaidAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("결제 처리 시각이 기한에 도달하면 성공과 실패 결과를 모두 거부한다")
+    void when_payment_time_reaches_expiration_payment_result_is_rejected() {
+        Order successOrder = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+        Order failureOrder = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+
+        assertOrderError(
+                () -> successOrder.markPaid(successOrder.getExpiresAt()),
+                OrderErrorCode.ORDER_ALREADY_EXPIRED);
+        assertOrderError(
+                () -> failureOrder.markPaymentFailed(failureOrder.getExpiresAt()),
+                OrderErrorCode.ORDER_ALREADY_EXPIRED);
+        assertThat(successOrder.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(failureOrder.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+    }
+
+    @Test
+    @DisplayName("결제 기한에 도달한 결제 대기 주문만 한 번 만료한다")
+    void when_expiration_time_reaches_pending_order_is_expired_once() {
+        Order order = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+
+        assertThat(order.expire(order.getExpiresAt().minusNanos(1))).isFalse();
+        assertThat(order.expire(order.getExpiresAt())).isTrue();
+        assertThat(order.expire(order.getExpiresAt().plusSeconds(1))).isFalse();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.EXPIRED);
+        assertThat(order.getPaidAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("확정된 결제 결과와 만료 상태를 다른 종료 상태로 덮어쓰지 않는다")
+    void when_order_result_is_finalized_another_result_cannot_overwrite_it() {
+        Order paidOrder = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+        Instant paidAt = paidOrder.getExpiresAt().minusSeconds(1);
+        paidOrder.markPaid(paidAt);
+        Order failedOrder = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+        failedOrder.markPaymentFailed(failedOrder.getExpiresAt().minusSeconds(1));
+        Order expiredOrder = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+        expiredOrder.expire(expiredOrder.getExpiresAt());
+
+        assertOrderError(
+                () -> paidOrder.markPaymentFailed(paidAt),
+                OrderErrorCode.INVALID_ORDER_STATUS);
+        assertThat(paidOrder.expire(paidOrder.getExpiresAt())).isFalse();
+        assertThat(paidOrder.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(paidOrder.getPaidAt()).isEqualTo(paidAt);
+
+        assertOrderError(
+                () -> failedOrder.markPaid(failedOrder.getExpiresAt().minusSeconds(1)),
+                OrderErrorCode.INVALID_ORDER_STATUS);
+        assertThat(failedOrder.expire(failedOrder.getExpiresAt())).isFalse();
+        assertThat(failedOrder.getStatus()).isEqualTo(OrderStatus.FAILED);
+
+        assertOrderError(
+                () -> expiredOrder.markPaid(expiredOrder.getExpiresAt().minusSeconds(1)),
+                OrderErrorCode.ORDER_ALREADY_EXPIRED);
+        assertOrderError(
+                () -> expiredOrder.markPaymentFailed(expiredOrder.getExpiresAt().minusSeconds(1)),
+                OrderErrorCode.ORDER_ALREADY_EXPIRED);
+        assertThat(expiredOrder.getStatus()).isEqualTo(OrderStatus.EXPIRED);
+    }
+
+    @Test
+    @DisplayName("창작자가 주문 상품을 순서대로 변경하면 상위 주문 상태를 함께 변경한다")
+    void when_creator_changes_item_status_in_order_parent_status_is_recalculated() {
+        OrderItem item = item(uuidGenerator.generate(), 10_000, 1, 0);
+        Order order = paidOrder(List.of(item));
+
+        assertThat(order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.PREPARING))
+                .isSameAs(item);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PROCESSING);
+
+        order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.SHIPPED);
+        order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.DELIVERED);
+        order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.COMPLETED);
+
+        assertThat(item.getStatus()).isEqualTo(OrderItemStatus.COMPLETED);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("모든 주문 상품이 완료될 때까지 상위 주문은 처리 중 상태를 유지한다")
+    void when_only_some_items_are_completed_parent_order_remains_processing() {
+        OrderItem first = item(uuidGenerator.generate(), 10_000, 1, 0);
+        OrderItem second = item(uuidGenerator.generate(), 5_000, 1, 0);
+        Order order = paidOrder(List.of(first, second));
+
+        complete(order, first);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PROCESSING);
+
+        complete(order, second);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("완료된 주문 상품에 같은 상태를 요청하면 현재 결과를 반환한다")
+    void when_same_completed_status_is_requested_current_result_is_returned() {
+        OrderItem item = item(uuidGenerator.generate(), 10_000, 1, 0);
+        Order order = paidOrder(List.of(item));
+        complete(order, item);
+
+        assertThat(order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.COMPLETED))
+                .isSameAs(item);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("순서를 건너뛰거나 창작자가 지정할 수 없는 상태를 거부한다")
+    void when_invalid_item_status_is_requested_transition_is_rejected() {
+        OrderItem item = item(uuidGenerator.generate(), 10_000, 1, 0);
+        Order order = paidOrder(List.of(item));
+
+        assertOrderError(
+                () -> order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.SHIPPED),
+                OrderErrorCode.INVALID_ORDER_ITEM_STATUS_TRANSITION);
+        assertOrderError(
+                () -> order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.ORDERED),
+                OrderErrorCode.INVALID_ORDER_ITEM_STATUS_TRANSITION);
+        assertOrderError(
+                () -> order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.CANCELED),
+                OrderErrorCode.INVALID_ORDER_ITEM_STATUS_TRANSITION);
+        assertThat(item.getStatus()).isEqualTo(OrderItemStatus.ORDERED);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
+    @DisplayName("주문 상품 상태의 역방향 변경을 거부한다")
+    void when_previous_item_status_is_requested_transition_is_rejected() {
+        OrderItem item = item(uuidGenerator.generate(), 10_000, 1, 0);
+        Order order = paidOrder(List.of(item));
+        order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.PREPARING);
+        order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.SHIPPED);
+
+        assertOrderError(
+                () -> order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.PREPARING),
+                OrderErrorCode.INVALID_ORDER_ITEM_STATUS_TRANSITION);
+        assertThat(item.getStatus()).isEqualTo(OrderItemStatus.SHIPPED);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PROCESSING);
+    }
+
+    @Test
+    @DisplayName("다른 창작자에게 배정된 주문 상품 변경을 거부한다")
+    void when_another_creator_changes_item_access_is_denied() {
+        OrderItem item = item(uuidGenerator.generate(), 10_000, 1, 0);
+        Order order = paidOrder(List.of(item));
+        order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.PREPARING);
+
+        assertOrderError(
+                () -> order.changeItemStatus(
+                        uuidGenerator.generate(), item.getId(), item.getStatus()),
+                OrderErrorCode.ORDER_ACCESS_DENIED);
+    }
+
+    @Test
+    @DisplayName("주문에 포함되지 않은 상품 변경을 거부한다")
+    void when_item_is_not_in_order_not_found_is_returned() {
+        Order order = paidOrder(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+
+        assertOrderError(
+                () -> order.changeItemStatus(
+                        uuidGenerator.generate(), uuidGenerator.generate(), OrderItemStatus.PREPARING),
+                OrderErrorCode.ORDER_NOT_FOUND);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = OrderStatus.class, names = {"PENDING_PAYMENT", "COMPLETED", "EXPIRED", "FAILED", "CANCELED"})
+    @DisplayName("결제 완료 또는 처리 중이 아닌 주문의 상품 상태 변경을 거부한다")
+    void when_parent_status_is_not_changeable_item_status_change_is_rejected(OrderStatus status) {
+        OrderItem item = item(uuidGenerator.generate(), 10_000, 1, 0);
+        Order order = order(List.of(item));
+        ReflectionTestUtils.setField(order, "status", status);
+
+        assertOrderError(
+                () -> order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.PREPARING),
+                OrderErrorCode.INVALID_ORDER_STATUS);
+    }
+
+    @Test
+    @DisplayName("소유자가 배송 전 주문을 전체 취소하면 모든 상품과 취소 시각을 함께 변경한다")
+    void when_owner_cancels_paid_order_all_items_are_canceled() {
+        Order order = paidOrder(List.of(
+                item(uuidGenerator.generate(), 10_000, 2, 1_000),
+                item(uuidGenerator.generate(), 5_000, 1, 5_000)));
+        Instant canceledAt = NOW.plusSeconds(700);
+        Instant paidAt = order.getPaidAt();
+        Money paymentAmount = order.getPaymentAmount();
+
+        order.cancel(order.getCustomerId(), canceledAt);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(order.getItems()).extracting(OrderItem::getStatus).containsOnly(OrderItemStatus.CANCELED);
+        assertThat(order.getCanceledAt()).isEqualTo(canceledAt);
+        assertThat(order.getPaidAt()).isEqualTo(paidAt);
+        assertThat(order.getPaymentAmount()).isEqualTo(paymentAmount);
+        assertOrderError(() -> order.cancel(order.getCustomerId(), canceledAt.plusSeconds(1)),
+                OrderErrorCode.INVALID_ORDER_STATUS);
+        assertThat(order.getCanceledAt()).isEqualTo(canceledAt);
+    }
+
+    @Test
+    @DisplayName("다른 사용자와 취소 시각이 없는 요청은 주문을 변경하지 않는다")
+    void when_customer_or_time_is_invalid_cancellation_does_not_change_order() {
+        Order order = paidOrder(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+
+        assertOrderError(() -> order.cancel(uuidGenerator.generate(), NOW.plusSeconds(700)),
+                OrderErrorCode.ORDER_ACCESS_DENIED);
+        assertOrderError(() -> order.cancel(null, NOW.plusSeconds(700)),
+                OrderErrorCode.ORDER_ACCESS_DENIED);
+        assertThatThrownBy(() -> order.cancel(order.getCustomerId(), null))
+                .isInstanceOf(NullPointerException.class);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(order.getItems()).extracting(OrderItem::getStatus).containsOnly(OrderItemStatus.ORDERED);
+        assertThat(order.getCanceledAt()).isNull();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = OrderStatus.class, names = {"PENDING_PAYMENT", "FAILED", "EXPIRED"})
+    @DisplayName("결제되지 않은 주문의 취소를 변경 없이 거부한다")
+    void when_order_is_not_paid_cancellation_is_rejected(OrderStatus status) {
+        Order order = order(List.of(item(uuidGenerator.generate(), 10_000, 1, 0)));
+        if (status == OrderStatus.FAILED) {
+            order.markPaymentFailed(NOW.plusSeconds(60));
+        } else if (status == OrderStatus.EXPIRED) {
+            order.expire(order.getExpiresAt());
+        }
+
+        assertOrderError(() -> order.cancel(order.getCustomerId(), NOW.plusSeconds(700)),
+                OrderErrorCode.INVALID_ORDER_STATUS);
+
+        assertThat(order.getStatus()).isEqualTo(status);
+        assertThat(order.getItems()).extracting(OrderItem::getStatus).containsOnly(OrderItemStatus.ORDERED);
+        assertThat(order.getCanceledAt()).isNull();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = OrderItemStatus.class, names = {"PREPARING", "SHIPPED", "DELIVERED", "COMPLETED"})
+    @DisplayName("뒤쪽 상품의 배송이 시작되었으면 앞쪽 상품도 취소하지 않는다")
+    void when_any_item_has_started_shipping_no_items_are_canceled(OrderItemStatus target) {
+        OrderItem first = item(uuidGenerator.generate(), 10_000, 1, 0);
+        OrderItem second = item(uuidGenerator.generate(), 5_000, 1, 0);
+        Order order = paidOrder(List.of(first, second));
+        for (OrderItemStatus next : List.of(OrderItemStatus.PREPARING, OrderItemStatus.SHIPPED,
+                OrderItemStatus.DELIVERED, OrderItemStatus.COMPLETED)) {
+            order.changeItemStatus(second.getCreatorId(), second.getId(), next);
+            if (next == target) {
+                break;
+            }
+        }
+
+        assertOrderError(() -> order.cancel(order.getCustomerId(), NOW.plusSeconds(700)),
+                OrderErrorCode.CANNOT_CANCEL_ORDER_IN_PROGRESS);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PROCESSING);
+        assertThat(first.getStatus()).isEqualTo(OrderItemStatus.ORDERED);
+        assertThat(second.getStatus()).isEqualTo(target);
+        assertThat(order.getCanceledAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("전체 배송 완료 주문은 취소할 수 없다")
+    void when_order_is_completed_cancellation_is_rejected() {
+        OrderItem item = item(uuidGenerator.generate(), 10_000, 1, 0);
+        Order order = paidOrder(List.of(item));
+        complete(order, item);
+
+        assertOrderError(() -> order.cancel(order.getCustomerId(), NOW.plusSeconds(700)),
+                OrderErrorCode.CANNOT_CANCEL_ORDER_IN_PROGRESS);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED);
+        assertThat(item.getStatus()).isEqualTo(OrderItemStatus.COMPLETED);
+        assertThat(order.getCanceledAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("쿠폰으로 결제액이 0원인 주문도 취소할 수 있다")
+    void when_payment_amount_is_zero_order_can_be_canceled() {
+        Order order = paidOrder(List.of(item(uuidGenerator.generate(), 10_000, 1, 10_000)));
+
+        order.cancel(order.getCustomerId(), NOW.plusSeconds(700));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(order.getPaymentAmount()).isEqualTo(Money.won(0));
+    }
+
     private Order order(List<OrderItem> items) {
         return Order.create(
                 uuidGenerator.generate(),
@@ -67,6 +379,19 @@ class OrderTest {
                 shippingAddress(),
                 items,
                 NOW);
+    }
+
+    private Order paidOrder(List<OrderItem> items) {
+        Order order = order(items);
+        order.markPaid(order.getExpiresAt().minusSeconds(1));
+        return order;
+    }
+
+    private static void complete(Order order, OrderItem item) {
+        order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.PREPARING);
+        order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.SHIPPED);
+        order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.DELIVERED);
+        order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.COMPLETED);
     }
 
     private OrderItem item(UUID skuId, long unitPrice, int quantity, long discount) {

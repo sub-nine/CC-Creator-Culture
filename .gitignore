@@ -320,3 +320,4 @@ terraform.rc
 docs/
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,intellij+all,eclipse,macos,windows,gradle,java
+/skills-lock.json

@@ -1,0 +1,65 @@
+package com.sub9.orderservice.order.application.service;
+
+import static com.sub9.orderservice.order.application.port.output.StockPort.RestoreReason.PAYMENT_FAILED;
+
+import com.sub9.common.exception.BusinessException;
+import com.sub9.orderservice.order.application.port.input.PaymentResultUseCase;
+import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.StockPort.StockItem;
+import com.sub9.orderservice.order.application.port.output.StockRestoreCommand;
+import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
+import com.sub9.orderservice.order.domain.model.Order;
+import com.sub9.orderservice.order.domain.repository.OrderRepository;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class OrderPaymentResultService implements PaymentResultUseCase {
+
+    private final OrderRepository orderRepository;
+    private final CouponUsagePort couponUsagePort;
+
+    @Override
+    @Transactional
+    public void markPaid(UUID orderId, Instant processedAt) {
+        findForUpdate(orderId).markPaid(processedAt);
+    }
+
+    @Override
+    @Transactional
+    public StockRestoreCommand markPaymentFailed(UUID orderId, Instant processedAt) {
+        Order order = findForUpdate(orderId);
+        order.markPaymentFailed(processedAt);
+        restoreCoupons(order);
+        return new StockRestoreCommand(orderId, stockItems(order), PAYMENT_FAILED);
+    }
+
+    private Order findForUpdate(UUID orderId) {
+        return orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+    }
+
+    private void restoreCoupons(Order order) {
+        List<UUID> userCouponIds = order.getItems().stream()
+                .map(item -> item.getUserCouponId())
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+        if (!userCouponIds.isEmpty()) {
+            couponUsagePort.restore(order.getId(), userCouponIds);
+        }
+    }
+
+    private static List<StockItem> stockItems(Order order) {
+        return order.getItems().stream()
+                .map(item -> new StockItem(
+                        item.getSkuId(),
+                        item.getProductSnapshot().getQuantity()))
+                .toList();
+    }
+}

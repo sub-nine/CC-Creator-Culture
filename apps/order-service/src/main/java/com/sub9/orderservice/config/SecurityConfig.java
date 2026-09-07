@@ -53,7 +53,9 @@ public class SecurityConfig {
                 new GatewayHeaderAuthenticationFilter(orderAuthenticationEntryPoint),
                 UsernamePasswordAuthenticationFilter.class);
         http.authorizeHttpRequests(authorize -> authorize
-                .requestMatchers(HttpMethod.POST, "/api/v1/orders")
+                .requestMatchers(HttpMethod.POST, "/api/v1/orders", "/api/v1/orders/{orderNumber}/cancel")
+                .hasRole(GatewayAuthenticationPrincipal.Role.CUSTOMER.name())
+                .requestMatchers(HttpMethod.POST, "/api/v1/orders/{orderNumber}/payments")
                 .hasRole(GatewayAuthenticationPrincipal.Role.CUSTOMER.name())
                 .requestMatchers(HttpMethod.GET, "/api/v1/orders", "/api/v1/orders/{orderNumber}")
                 .hasRole(GatewayAuthenticationPrincipal.Role.CUSTOMER.name())
@@ -61,6 +63,10 @@ public class SecurityConfig {
                         HttpMethod.GET,
                         "/api/v1/creator/order-items",
                         "/api/v1/creator/order-items/{orderItemId}")
+                .hasRole(GatewayAuthenticationPrincipal.Role.CREATOR.name())
+                .requestMatchers(
+                        HttpMethod.PATCH,
+                        "/api/v1/creator/order-items/{orderItemId}/status")
                 .hasRole(GatewayAuthenticationPrincipal.Role.CREATOR.name())
                 .requestMatchers(
                         HttpMethod.GET,
