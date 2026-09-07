@@ -3,12 +3,12 @@ package com.sub9.orderservice.coupon.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.coupon.domain.model.Coupon;
 import com.sub9.orderservice.coupon.domain.model.UserCoupon;
 import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
 import com.sub9.orderservice.coupon.domain.repository.UserCouponRepository;
+import com.sub9.orderservice.cart.application.service.CartService;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
@@ -31,6 +31,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
@@ -68,6 +69,8 @@ class CouponPersistenceIntegrationTest {
     @Autowired private EntityManager entityManager;
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private PlatformTransactionManager transactionManager;
+
+    @MockitoBean CartService cartService;
 
     @MockitoBean PaymentCancellationPort paymentCancellationPort;
 

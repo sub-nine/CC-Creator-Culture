@@ -7,6 +7,10 @@ import static org.mockito.Mockito.when;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.cart.application.service.CartQueryService;
+import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
+import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.StockPort;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.coupon.application.dto.IssueDispatchResult;
 import com.sub9.orderservice.coupon.application.service.CouponIssueService;
 import com.sub9.orderservice.coupon.domain.exception.CouponErrorCode;
@@ -56,6 +60,10 @@ import org.testcontainers.utility.DockerImageName;
     PaymentCancellationPort.class
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@MockitoBean(types = {
+        CartService.class, CouponApplicationPort.class, CouponUsagePort.class, StockPort.class,
+        PaymentCancellationPort.class
+})
 @DisplayName("쿠폰 Redis 선점과 동기 DB 발급 전체 흐름")
 class CouponIssueFlowIntegrationTest {
 
