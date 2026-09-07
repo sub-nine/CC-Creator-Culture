@@ -2,7 +2,7 @@ package com.sub9.userservice.notification.infrastructure.presentation.controller
 
 import com.sub9.userservice.notification.application.dto.AuthenticatedUser;
 import com.sub9.userservice.notification.application.service.NotificationQueryService;
-import com.sub9.userservice.notification.infrastructure.presentation.response.ApiResponse;
+import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.userservice.notification.infrastructure.presentation.response.NotificationPageResponse;
 import com.sub9.userservice.notification.infrastructure.presentation.response.NotificationResponse;
 import com.sub9.userservice.notification.infrastructure.presentation.response.ReadAllResponse;
