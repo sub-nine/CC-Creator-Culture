@@ -3,6 +3,8 @@ package com.sub9.orderservice.payment.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -17,6 +19,7 @@ import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import com.sub9.orderservice.order.domain.model.Money;
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.model.OrderItem;
+import com.sub9.orderservice.order.domain.model.OrderItemStatus;
 import com.sub9.orderservice.order.domain.model.OrderStatus;
 import com.sub9.orderservice.order.domain.model.ProductSnapshot;
 import com.sub9.orderservice.order.domain.model.ShippingAddress;
@@ -72,6 +75,10 @@ class MockPaymentTransactionServiceTest {
 
         var processed = service.process(order.getCustomerId(), order.getOrderNumber(), status);
 
+        var calls = inOrder(orders, clock);
+        calls.verify(orders).findByOrderNumberForUpdate(order.getOrderNumber());
+        calls.verify(clock).instant();
+        calls.verify(orders).findByIdForUpdate(order.getId());
         assertThat(processed.result().paymentId()).isNotNull();
         assertThat(processed.result().orderNumber()).isEqualTo(order.getOrderNumber().toString());
         assertThat(processed.result().method()).isEqualTo(PaymentMethod.MOCK);
@@ -124,7 +131,8 @@ class MockPaymentTransactionServiceTest {
 
         assertError(order, OrderErrorCode.ORDER_ALREADY_EXPIRED);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
-        verifyNoInteractions(payments, coupons);
+        verify(payments, never()).save(any());
+        verifyNoInteractions(coupons);
     }
 
     @ParameterizedTest
@@ -139,7 +147,68 @@ class MockPaymentTransactionServiceTest {
 
         assertError(order, status == OrderStatus.EXPIRED
                 ? OrderErrorCode.ORDER_ALREADY_EXPIRED : OrderErrorCode.INVALID_ORDER_STATUS);
-        verifyNoInteractions(payments, coupons);
+        verify(payments, never()).save(any());
+        verifyNoInteractions(coupons);
+    }
+
+    @ParameterizedTest
+    @EnumSource(PaymentStatus.class)
+    @DisplayName("같은 결제 요청은 현재 주문 상태와 관계없이 저장된 결과를 반환한다")
+    void when_same_result_is_requested_stored_payment_is_returned(PaymentStatus status) {
+        Order order = order(34200);
+        Payment original = Payment.create(ids.generate(), order.getId(), order.getPaymentAmount(),
+                status, CREATED_AT.plusSeconds(1));
+        if (status == PaymentStatus.SUCCESS) {
+            order.markPaid(original.getProcessedAt());
+            OrderItem item = order.getItems().getFirst();
+            order.changeItemStatus(item.getCreatorId(), item.getId(), OrderItemStatus.PREPARING);
+        } else {
+            order.markPaymentFailed(original.getProcessedAt());
+        }
+        when(orders.findByOrderNumberForUpdate(order.getOrderNumber())).thenReturn(Optional.of(order));
+        when(payments.findByOrderId(order.getId())).thenReturn(Optional.of(original));
+
+        var repeated = service.process(order.getCustomerId(), order.getOrderNumber(), status);
+
+        assertThat(repeated.result()).isEqualTo(MockPaymentResult.from(original, order.getOrderNumber()));
+        assertThat(repeated.stockRestore()).isNull();
+        verify(payments, never()).save(any());
+        verify(orders, never()).findByIdForUpdate(any());
+        verifyNoInteractions(coupons, clock);
+    }
+
+    @ParameterizedTest
+    @EnumSource(PaymentStatus.class)
+    @DisplayName("저장된 결제와 반대 결과를 요청하면 기존 기록을 유지하고 거부한다")
+    void when_opposite_result_is_requested_existing_payment_is_unchanged(PaymentStatus status) {
+        Order order = order(34200);
+        Payment original = Payment.create(ids.generate(), order.getId(), order.getPaymentAmount(),
+                status, CREATED_AT.plusSeconds(1));
+        when(orders.findByOrderNumberForUpdate(order.getOrderNumber())).thenReturn(Optional.of(order));
+        when(payments.findByOrderId(order.getId())).thenReturn(Optional.of(original));
+        PaymentStatus opposite = status == PaymentStatus.SUCCESS ? PaymentStatus.FAILED : PaymentStatus.SUCCESS;
+
+        assertThatThrownBy(() -> service.process(order.getCustomerId(), order.getOrderNumber(), opposite))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(OrderErrorCode.INVALID_ORDER_STATUS));
+
+        assertThat(original.getStatus()).isEqualTo(status);
+        verify(payments, never()).save(any());
+        verify(orders, never()).findByIdForUpdate(any());
+        verifyNoInteractions(coupons, clock);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"customerId", "orderNumber", "result"})
+    @DisplayName("필수 입력이 없으면 주문과 결제를 조회하지 않는다")
+    void when_required_input_is_missing_payment_is_not_processed(String missing) {
+        Order order = order(100);
+        assertThatThrownBy(() -> service.process(
+                missing.equals("customerId") ? null : order.getCustomerId(),
+                missing.equals("orderNumber") ? null : order.getOrderNumber(),
+                missing.equals("result") ? null : PaymentStatus.SUCCESS))
+                .isInstanceOf(NullPointerException.class);
+        verifyNoInteractions(orders, payments, coupons, clock);
     }
 
     private void givenNewOrder(Order order, Instant processedAt) {

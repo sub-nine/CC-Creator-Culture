@@ -42,6 +42,14 @@ public class MockPaymentTransactionService {
             throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
         }
 
+        Payment existing = paymentRepository.findByOrderId(order.getId()).orElse(null);
+        if (existing != null) {
+            if (existing.getStatus() != result) {
+                throw new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS);
+            }
+            return new ProcessedPayment(MockPaymentResult.from(existing, orderNumber), null);
+        }
+
         // 잠금 대기 시간을 반영하고 PostgreSQL 저장 후에도 같은 처리 시각을 반환합니다.
         Instant processedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
         StockRestoreCommand stockRestore = null;
