@@ -2,10 +2,10 @@ package com.sub9.productservice.leaderboard.application.service;
 
 import com.sub9.productservice.category.presentation.query.dto.CategoryResponse;
 import com.sub9.productservice.category.presentation.query.dto.HashtagResponse;
-import com.sub9.productservice.leaderboard.application.port.CategoryQueryPort;
-import com.sub9.productservice.leaderboard.application.port.HashtagQueryPort;
-import com.sub9.productservice.leaderboard.application.repository.LeaderboardSnapshotRepository;
-import com.sub9.productservice.leaderboard.application.repository.RedisRepository;
+import com.sub9.productservice.leaderboard.application.port.out.CategoryQueryPort;
+import com.sub9.productservice.leaderboard.application.port.out.HashtagQueryPort;
+import com.sub9.productservice.leaderboard.application.port.out.LeaderboardSnapshotRepository;
+import com.sub9.productservice.leaderboard.application.port.out.RedisRepository;
 import com.sub9.productservice.leaderboard.domain.entity.LeaderboardSnapshot;
 import com.sub9.productservice.leaderboard.domain.model.LeaderboardPeriod;
 import com.sub9.productservice.leaderboard.domain.model.LeaderboardType;
@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class LeaderboardQueryService {
+public class LeaderboardService {
     private final CategoryQueryPort categoryQueryPort;
     private final HashtagQueryPort hashtagQueryPort;
     private final LeaderboardSnapshotRepository leaderboardSnapshotRepository;

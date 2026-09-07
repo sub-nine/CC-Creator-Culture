@@ -2,7 +2,7 @@ package com.sub9.productservice.category.application.query.adapter;
 
 import com.sub9.productservice.category.application.query.port.out.HashtagQueryRepository;
 import com.sub9.productservice.category.presentation.query.dto.HashtagResponse;
-import com.sub9.productservice.leaderboard.application.port.HashtagQueryPort;
+import com.sub9.productservice.leaderboard.application.port.out.HashtagQueryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

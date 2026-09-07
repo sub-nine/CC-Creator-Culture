@@ -1,6 +1,6 @@
 package com.sub9.productservice.leaderboard.infrastructure.persistence.repository.jpa;
 
-import com.sub9.productservice.leaderboard.application.repository.LeaderboardSnapshotRepository;
+import com.sub9.productservice.leaderboard.application.port.out.LeaderboardSnapshotRepository;
 import com.sub9.productservice.leaderboard.domain.entity.LeaderboardSnapshot;
 import com.sub9.productservice.leaderboard.domain.model.LeaderboardType;
 import lombok.RequiredArgsConstructor;

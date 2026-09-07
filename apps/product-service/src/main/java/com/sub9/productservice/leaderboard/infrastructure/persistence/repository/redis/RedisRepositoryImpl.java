@@ -1,6 +1,6 @@
 package com.sub9.productservice.leaderboard.infrastructure.persistence.repository.redis;
 
-import com.sub9.productservice.leaderboard.application.repository.RedisRepository;
+import com.sub9.productservice.leaderboard.application.port.out.RedisRepository;
 import com.sub9.productservice.leaderboard.domain.model.LeaderboardType;
 import com.sub9.productservice.leaderboard.domain.model.RankedMember;
 import lombok.RequiredArgsConstructor;

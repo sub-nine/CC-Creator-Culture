@@ -1,4 +1,4 @@
-package com.sub9.productservice.leaderboard.application.port;
+package com.sub9.productservice.leaderboard.application.port.out;
 
 import com.sub9.productservice.category.presentation.query.dto.HashtagResponse;
 

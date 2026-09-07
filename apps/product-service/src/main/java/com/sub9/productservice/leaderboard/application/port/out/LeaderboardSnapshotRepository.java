@@ -1,4 +1,4 @@
-package com.sub9.productservice.leaderboard.application.repository;
+package com.sub9.productservice.leaderboard.application.port.out;
 
 import com.sub9.productservice.leaderboard.domain.entity.LeaderboardSnapshot;
 import com.sub9.productservice.leaderboard.domain.model.LeaderboardType;

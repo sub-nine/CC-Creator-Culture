@@ -2,7 +2,7 @@ package com.sub9.productservice.category.application.query.adapter;
 
 import com.sub9.productservice.category.application.query.port.out.CategoryQueryRepository;
 import com.sub9.productservice.category.presentation.query.dto.CategoryResponse;
-import com.sub9.productservice.leaderboard.application.port.CategoryQueryPort;
+import com.sub9.productservice.leaderboard.application.port.out.CategoryQueryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
