@@ -12,9 +12,10 @@ import static org.mockito.Mockito.when;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
-import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
+import com.sub9.orderservice.cart.application.service.CartService;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.application.port.output.StockPort.RestoreReason;
 import com.sub9.orderservice.order.application.port.output.StockPort.StockItem;
@@ -72,7 +73,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         "spring.datasource.hikari.connection-init-sql=SET TIME ZONE 'UTC'",
         "management.tracing.export.enabled=false"
 })
-@MockitoBean(types = {CartSnapshotPort.class, CouponApplicationPort.class})
+@MockitoBean(types = {CartService.class, CouponApplicationPort.class, PaymentCancellationPort.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @DisplayName("PostgreSQL 모의 결제 처리")
 class MockPaymentIntegrationTest {
