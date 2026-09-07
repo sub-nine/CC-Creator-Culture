@@ -5,8 +5,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
+import com.sub9.common.kafka.event.ProductCreatedEvent;
 import com.sub9.common.kafka.topic.KafkaTopics;
-import com.sub9.productservice.product.application.event.ProductCreatedEvent;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;

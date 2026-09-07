@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.infrastructure.command.sku;
+package com.sub9.productservice.product.infrastructure.persistence.command.sku;
 
 import com.sub9.productservice.product.domain.model.Sku;
 import com.sub9.productservice.product.domain.repository.SkuCommandRepository;
@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @Repository
 @RequiredArgsConstructor
-public class SkuCommandRepositoryAdapter implements SkuCommandRepository {
+public class SkuCommandRepositoryImpl implements SkuCommandRepository {
   private final SkuCommandJpaRepository skuCommandJpaRepository;
 
   @Override

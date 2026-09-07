@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.presentation.command;
+package com.sub9.productservice.product.presentation.command.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -14,7 +14,6 @@ import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.product.application.command.dto.DeleteSkuCommand;
 import com.sub9.productservice.product.application.command.dto.UpdateSkuCommand;
 import com.sub9.productservice.product.application.command.service.SkuCommandService;
-import com.sub9.productservice.product.presentation.command.controller.SkuCommandController;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -46,7 +45,7 @@ class SkuCommandControllerTest extends AbstractControllerTest {
   @DisplayName("SKU 수정 테스트")
   class UpdateSkuTests {
     @Test
-    @DisplayName("유효한 요청이면 SKU를 수정하고 200을 반환한다")
+    @DisplayName("SKU를 수정하고 200을 반환한다")
     void updateSku_success() throws Exception {
       // given
       UpdateSkuCommand command =
@@ -106,7 +105,7 @@ class SkuCommandControllerTest extends AbstractControllerTest {
   @DisplayName("SKU 삭제 테스트")
   class DeleteSkuTests {
     @Test
-    @DisplayName("유효한 요청이면 SKU를 삭제하고 200를 반환한다")
+    @DisplayName("SKU를 삭제하고 200를 반환한다")
     void deleteSku_success() throws Exception {
       // given
       DeleteSkuCommand command = new DeleteSkuCommand(authUser.id(), productId, skuId);

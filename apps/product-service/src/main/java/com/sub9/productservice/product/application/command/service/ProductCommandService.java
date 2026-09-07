@@ -1,11 +1,11 @@
 package com.sub9.productservice.product.application.command.service;
 
 import com.sub9.common.exception.BusinessException;
+import com.sub9.common.kafka.event.ProductCreatedEvent;
 import com.sub9.productservice.product.application.command.dto.CreateProductCommand;
 import com.sub9.productservice.product.application.command.dto.CreateSkuCommand;
 import com.sub9.productservice.product.application.command.dto.UpdateProductCommand;
 import com.sub9.productservice.product.application.command.dto.UpdateProductStatusCommand;
-import com.sub9.productservice.product.application.event.ProductCreatedEvent;
 import com.sub9.productservice.product.application.validation.SkuValidator;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Product;

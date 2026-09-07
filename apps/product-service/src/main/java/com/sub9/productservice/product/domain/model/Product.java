@@ -75,4 +75,9 @@ public class Product extends BaseEntity {
     this.name = name;
     this.content = content;
   }
+
+  public void incrementViewCount(long count) {
+    this.viewCount += count;
+  }
+
 }
