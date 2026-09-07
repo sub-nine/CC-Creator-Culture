@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.application.command.dto;
+package com.sub9.productservice.product.application.command.dto.sku;
 
 import java.util.UUID;
 

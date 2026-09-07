@@ -1,4 +1,6 @@
-package com.sub9.productservice.product.application.command.dto;
+package com.sub9.productservice.product.application.command.dto.product;
+
+import com.sub9.productservice.product.application.command.dto.sku.CreateSkuCommand;
 
 import java.util.List;
 import java.util.UUID;

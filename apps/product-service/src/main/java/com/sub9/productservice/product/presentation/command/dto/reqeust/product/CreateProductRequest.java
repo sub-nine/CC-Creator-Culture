@@ -1,7 +1,8 @@
-package com.sub9.productservice.product.presentation.command.dto.reqeust;
+package com.sub9.productservice.product.presentation.command.dto.reqeust.product;
 
-import com.sub9.productservice.product.application.command.dto.CreateProductCommand;
-import com.sub9.productservice.product.application.command.dto.CreateSkuCommand;
+import com.sub9.productservice.product.application.command.dto.product.CreateProductCommand;
+import com.sub9.productservice.product.application.command.dto.sku.CreateSkuCommand;
+import com.sub9.productservice.product.presentation.command.dto.reqeust.sku.CreateSkuRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 

@@ -2,7 +2,7 @@ package com.sub9.productservice.product.application.command.service;
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import com.sub9.common.kafka.event.ProductViewSyncEvent;
-import com.sub9.productservice.product.application.command.dto.IncrementDailyViewCountsCommand;
+import com.sub9.productservice.product.application.command.dto.product.IncrementDailyViewCountsCommand;
 import com.sub9.productservice.product.application.port.ProductViewCountPublisher;
 import com.sub9.productservice.product.application.port.ProductViewRepository;
 import com.sub9.productservice.product.application.query.dto.ProductViewCount;

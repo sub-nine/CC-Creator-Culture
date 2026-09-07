@@ -1,8 +1,8 @@
 package com.sub9.productservice.product.application.command.service;
 
 import com.sub9.common.exception.BusinessException;
-import com.sub9.productservice.product.application.command.dto.DeleteSkuCommand;
-import com.sub9.productservice.product.application.command.dto.UpdateSkuCommand;
+import com.sub9.productservice.product.application.command.dto.sku.DeleteSkuCommand;
+import com.sub9.productservice.product.application.command.dto.sku.UpdateSkuCommand;
 import com.sub9.productservice.product.application.validation.SkuValidator;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Product;

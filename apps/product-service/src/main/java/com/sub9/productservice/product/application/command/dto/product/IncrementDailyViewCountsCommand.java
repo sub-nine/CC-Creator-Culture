@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.application.command.dto;
+package com.sub9.productservice.product.application.command.dto.product;
 
 import java.time.LocalDate;
 import java.util.List;

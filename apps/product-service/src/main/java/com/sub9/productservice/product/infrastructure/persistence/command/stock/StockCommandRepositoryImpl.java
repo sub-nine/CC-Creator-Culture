@@ -2,11 +2,10 @@ package com.sub9.productservice.product.infrastructure.persistence.command.stock
 
 import com.sub9.productservice.product.domain.model.Stock;
 import com.sub9.productservice.product.domain.repository.StockCommandRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Repository;
-
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Repository;
 
 @Repository
 @RequiredArgsConstructor
@@ -24,17 +23,17 @@ public class StockCommandRepositoryImpl implements StockCommandRepository {
   }
 
   @Override
-  public boolean existsById(UUID skuId) {
-    return stockCommandJpaRepository.existsById(skuId);
-  }
-
-  @Override
   public boolean increaseStock(UUID skuId, int quantity) {
-    return stockCommandJpaRepository.increaseStock(skuId, quantity);
+    return stockCommandJpaRepository.increaseStock(skuId, quantity) > 0;
   }
 
   @Override
   public boolean decreaseStock(UUID skuId, int quantity) {
-    return stockCommandJpaRepository.decreaseStock(skuId, quantity);
+    return stockCommandJpaRepository.decreaseStock(skuId, quantity) > 0;
+  }
+
+  @Override
+  public boolean adjustStock(UUID skuId, int quantity) {
+    return stockCommandJpaRepository.adjustStock(skuId, quantity) > 0;
   }
 }
