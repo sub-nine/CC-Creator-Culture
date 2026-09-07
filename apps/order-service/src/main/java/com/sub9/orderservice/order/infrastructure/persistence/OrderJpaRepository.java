@@ -24,6 +24,11 @@ public interface OrderJpaRepository extends JpaRepository<Order, UUID> {
     Optional<Order> findByIdForUpdate(@Param("orderId") UUID orderId);
 
     @Lock(PESSIMISTIC_WRITE)
+    // 상품은 주문 잠금을 얻은 뒤 조회해야 대기 중 커밋된 배송 상태를 읽을 수 있습니다.
+    @Query("select o from Order o where o.orderNumber = :orderNumber")
+    Optional<Order> findByOrderNumberForUpdate(@Param("orderNumber") OrderNumber orderNumber);
+
+    @Lock(PESSIMISTIC_WRITE)
     @Query("""
             select parent
               from Order parent

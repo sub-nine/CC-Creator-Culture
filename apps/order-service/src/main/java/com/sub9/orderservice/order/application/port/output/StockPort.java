@@ -29,6 +29,7 @@ public interface StockPort {
     enum RestoreReason {
         ORDER_CREATION_FAILED,
         PAYMENT_FAILED,
-        ORDER_EXPIRED
+        ORDER_EXPIRED,
+        ORDER_CANCEL
     }
 }

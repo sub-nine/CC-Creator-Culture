@@ -7,11 +7,13 @@ import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.domain.model.Money;
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.model.OrderItem;
 import com.sub9.orderservice.order.domain.model.OrderItemStatus;
+import com.sub9.orderservice.order.domain.model.OrderNumber;
 import com.sub9.orderservice.order.domain.model.OrderStatus;
 import com.sub9.orderservice.order.domain.model.ProductSnapshot;
 import com.sub9.orderservice.order.domain.model.ShippingAddress;
@@ -34,6 +36,8 @@ import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -66,7 +70,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         CartSnapshotPort.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
-        StockPort.class
+        StockPort.class,
+        PaymentCancellationPort.class
 })
 @DisplayName("주문 도메인 PostgreSQL 영속성")
 class OrderPersistenceIntegrationTest {
@@ -389,9 +394,10 @@ class OrderPersistenceIntegrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
-    @Test
-    @DisplayName("주문 ID와 주문 상품 ID 잠금 조회를 같은 주문에서 직렬화한다")
-    void when_order_and_item_lock_same_parent_second_transaction_waits() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("주문 ID 또는 주문번호 잠금과 주문 상품 ID 잠금을 같은 주문에서 직렬화한다")
+    void when_order_and_item_lock_same_parent_second_transaction_waits(boolean byOrderNumber) throws Exception {
         Order order = order(1);
         saveAndFlush(order);
         UUID orderItemId = order.getItems().getFirst().getId();
@@ -401,7 +407,11 @@ class OrderPersistenceIntegrationTest {
 
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
             Future<?> first = executor.submit(() -> transaction().executeWithoutResult(status -> {
-                orderRepository.findByIdForUpdate(order.getId()).orElseThrow();
+                if (byOrderNumber) {
+                    orderRepository.findByOrderNumberForUpdate(order.getOrderNumber()).orElseThrow();
+                } else {
+                    orderRepository.findByIdForUpdate(order.getId()).orElseThrow();
+                }
                 firstLocked.countDown();
                 await(releaseFirst);
             }));
@@ -423,6 +433,48 @@ class OrderPersistenceIntegrationTest {
         } finally {
             releaseFirst.countDown();
         }
+    }
+
+    @Test
+    @DisplayName("주문번호로 잠근 주문 전체 취소와 취소 시각을 저장한다")
+    void when_order_is_canceled_under_number_lock_all_changes_are_persisted() {
+        Order order = order(2);
+        Instant paidAt = CREATED_AT.plusSeconds(60);
+        Instant canceledAt = CREATED_AT.plusSeconds(120);
+        order.markPaid(paidAt);
+        saveAndFlush(order);
+
+        transaction().executeWithoutResult(status -> {
+            Order locked = orderRepository.findByOrderNumberForUpdate(order.getOrderNumber()).orElseThrow();
+            assertThat(locked.getItems()).hasSize(2);
+            locked.cancel(order.getCustomerId(), canceledAt);
+            entityManager.flush();
+        });
+
+        Order restored = orderQueryRepository.findDetailByOrderNumber(order.getOrderNumber()).orElseThrow();
+        assertThat(restored.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(restored.getCanceledAt()).isEqualTo(canceledAt);
+        assertThat(restored.getPaidAt()).isEqualTo(paidAt);
+        assertThat(restored.getItems()).extracting(OrderItem::getStatus).containsOnly(OrderItemStatus.CANCELED);
+        boolean missing = transaction().execute(status -> orderRepository.findByOrderNumberForUpdate(
+                OrderNumber.issue(uuid(999))).isEmpty());
+        assertThat(missing).isTrue();
+    }
+
+    @Test
+    @DisplayName("취소 상태와 취소 시각이 맞지 않으면 데이터베이스가 거부한다")
+    void when_cancellation_time_does_not_match_status_database_rejects_update() {
+        Order order = order(1);
+        order.markPaid(CREATED_AT.plusSeconds(60));
+        saveAndFlush(order);
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "update p_orders set status = 'CANCELED' where id = ?", order.getId()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "update p_orders set canceled_at = ? where id = ?",
+                LocalDateTime.ofInstant(CREATED_AT.plusSeconds(120), ZoneOffset.UTC), order.getId()))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     private void saveAndFlush(Order order) {
