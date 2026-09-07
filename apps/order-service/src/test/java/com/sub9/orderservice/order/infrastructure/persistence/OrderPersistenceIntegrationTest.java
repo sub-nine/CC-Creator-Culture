@@ -40,6 +40,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -475,6 +476,45 @@ class OrderPersistenceIntegrationTest {
                 "update p_orders set canceled_at = ? where id = ?",
                 LocalDateTime.ofInstant(CREATED_AT.plusSeconds(120), ZoneOffset.UTC), order.getId()))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("주문번호로 잠근 주문을 조회하고 없는 주문번호에는 빈 결과를 반환한다")
+    void when_order_number_is_queried_matching_order_or_empty_is_returned() {
+        Order order = order(1);
+        saveAndFlush(order);
+
+        transaction().executeWithoutResult(status -> {
+            Order locked = orderRepository.findByOrderNumberForUpdate(order.getOrderNumber()).orElseThrow();
+            assertThat(locked.getId()).isEqualTo(order.getId());
+            assertThat(locked.getCustomerId()).isEqualTo(order.getCustomerId());
+            assertThat(locked.getItems()).hasSize(1);
+            assertThat(orderRepository.findByOrderNumberForUpdate(OrderNumber.issue(uuidGenerator.generate())))
+                    .isEmpty();
+        });
+    }
+
+    @Test
+    @DisplayName("주문번호로 잠근 주문은 다른 트랜잭션의 주문 ID 잠금 조회를 차단한다")
+    void when_order_number_holds_lock_other_order_id_query_times_out() {
+        Order order = order(1);
+        saveAndFlush(order);
+
+        try (ExecutorService executor = Executors.newSingleThreadExecutor()) {
+            transaction().executeWithoutResult(status -> {
+                orderRepository.findByOrderNumberForUpdate(order.getOrderNumber()).orElseThrow();
+                Future<?> competing = executor.submit(() -> transaction().execute(otherStatus -> {
+                    jdbcTemplate.execute("SET LOCAL lock_timeout = '200ms'");
+                    return orderRepository.findByIdForUpdate(order.getId());
+                }));
+
+                assertThatThrownBy(() -> competing.get(5, TimeUnit.SECONDS))
+                        .isInstanceOf(ExecutionException.class)
+                        .satisfies(exception -> assertThat(NestedExceptionUtils.getMostSpecificCause(exception))
+                                .isInstanceOfSatisfying(SQLException.class,
+                                        cause -> assertThat(cause.getSQLState()).isEqualTo("55P03")));
+            });
+        }
     }
 
     private void saveAndFlush(Order order) {
