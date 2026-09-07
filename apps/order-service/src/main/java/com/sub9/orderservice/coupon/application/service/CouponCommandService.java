@@ -4,6 +4,7 @@ import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.orderservice.coupon.application.dto.CouponUpdateCommand;
 import com.sub9.orderservice.coupon.application.event.CouponCreatedEvent;
+import com.sub9.orderservice.coupon.application.event.CouponDeletedEvent;
 import com.sub9.orderservice.coupon.application.event.CouponUpdatedEvent;
 import com.sub9.orderservice.coupon.domain.exception.CouponErrorCode;
 import com.sub9.orderservice.coupon.domain.model.Coupon;
@@ -71,6 +72,20 @@ public class CouponCommandService {
         eventPublisher.publishEvent(new CouponUpdatedEvent(couponId, totalQuantity));
         return new CouponResponse(
                 couponId, couponName, discountRate, totalQuantity, 0, startedAt, expiredAt);
+    }
+
+    @Transactional
+    public void delete(UUID couponId, UUID deleterId) {
+        couponRepository.findActiveById(couponId)
+                .orElseThrow(() -> new BusinessException(CouponErrorCode.COUPON_NOT_FOUND));
+        Instant deletedAt = clock.instant();
+
+        int affectedRows = couponRepository.deleteIfUnissued(couponId, deleterId, deletedAt);
+        if (affectedRows == 0) {
+            throw new BusinessException(CouponErrorCode.COUPON_NOT_DELETABLE);
+        }
+
+        eventPublisher.publishEvent(new CouponDeletedEvent(couponId));
     }
 
     private void validateUpdateValues(

@@ -10,6 +10,7 @@ import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.orderservice.coupon.application.dto.CouponUpdateCommand;
 import com.sub9.orderservice.coupon.application.event.CouponCreatedEvent;
+import com.sub9.orderservice.coupon.application.event.CouponDeletedEvent;
 import com.sub9.orderservice.coupon.application.event.CouponUpdatedEvent;
 import com.sub9.orderservice.coupon.domain.exception.CouponErrorCode;
 import com.sub9.orderservice.coupon.domain.model.Coupon;
@@ -133,6 +134,32 @@ class CouponCommandServiceTest {
         assertThatThrownBy(() -> couponCommandService.update(COUPON_ID, command, CREATOR_ID))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("쿠폰 시작 시각은 만료 시각보다 빨라야 합니다.");
+    }
+
+    @Test
+    @DisplayName("미발급 쿠폰을 조건부 삭제하고 Redis 정리 이벤트를 발행한다")
+    void when_coupon_is_unissued_coupon_is_deleted_and_event_is_published() {
+        Coupon coupon = coupon();
+        when(couponRepository.findActiveById(COUPON_ID)).thenReturn(java.util.Optional.of(coupon));
+        when(couponRepository.deleteIfUnissued(COUPON_ID, CREATOR_ID, NOW)).thenReturn(1);
+
+        couponCommandService.delete(COUPON_ID, CREATOR_ID);
+
+        verify(couponRepository).deleteIfUnissued(COUPON_ID, CREATOR_ID, NOW);
+        verify(eventPublisher).publishEvent(new CouponDeletedEvent(COUPON_ID));
+    }
+
+    @Test
+    @DisplayName("조건부 삭제 결과가 0행이면 발급된 쿠폰 삭제 오류를 반환한다")
+    void when_conditional_delete_changes_nothing_not_deletable_error_is_thrown() {
+        Coupon coupon = coupon();
+        when(couponRepository.findActiveById(COUPON_ID)).thenReturn(java.util.Optional.of(coupon));
+        when(couponRepository.deleteIfUnissued(COUPON_ID, CREATOR_ID, NOW)).thenReturn(0);
+
+        assertThatThrownBy(() -> couponCommandService.delete(COUPON_ID, CREATOR_ID))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(CouponErrorCode.COUPON_NOT_DELETABLE));
     }
 
     private Coupon coupon() {

@@ -1,6 +1,7 @@
 package com.sub9.orderservice.coupon.infrastructure.redis;
 
 import com.sub9.orderservice.coupon.application.event.CouponCreatedEvent;
+import com.sub9.orderservice.coupon.application.event.CouponDeletedEvent;
 import com.sub9.orderservice.coupon.application.event.CouponUpdatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,15 @@ public class RedisCouponRemainingQuantityInitializer {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void update(CouponUpdatedEvent event) {
         store(event.couponId(), event.totalQuantity(), "갱신");
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void delete(CouponDeletedEvent event) {
+        try {
+            redisTemplate.delete(CouponRedisKey.remaining(event.couponId()));
+        } catch (DataAccessException exception) {
+            log.warn("[쿠폰 관리][Redis 수량 삭제 실패] couponId={}", event.couponId());
+        }
     }
 
     private void store(java.util.UUID couponId, int totalQuantity, String operation) {

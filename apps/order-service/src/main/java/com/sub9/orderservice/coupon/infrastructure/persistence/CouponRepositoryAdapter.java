@@ -50,4 +50,9 @@ public class CouponRepositoryAdapter implements CouponRepository {
                 couponId, couponName, discountRate, totalQuantity,
                 startedAt, expiredAt, updaterId, updatedAt);
     }
+
+    @Override
+    public int deleteIfUnissued(UUID couponId, UUID deleterId, Instant deletedAt) {
+        return couponJpaRepository.deleteIfUnissued(couponId, deleterId, deletedAt);
+    }
 }

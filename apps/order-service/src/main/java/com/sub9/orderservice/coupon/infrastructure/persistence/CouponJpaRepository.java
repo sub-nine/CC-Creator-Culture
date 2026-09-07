@@ -57,4 +57,20 @@ public interface CouponJpaRepository extends JpaRepository<Coupon, UUID> {
             @Param("expiredAt") Instant expiredAt,
             @Param("updaterId") UUID updaterId,
             @Param("updatedAt") Instant updatedAt);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Coupon c
+               set c.deletedAt = :deletedAt,
+                   c.deletedBy = :deleterId,
+                   c.updatedAt = :deletedAt,
+                   c.updatedBy = :deleterId
+             where c.id = :couponId
+               and c.deletedAt is null
+               and c.issuedQuantity = 0
+            """)
+    int deleteIfUnissued(
+            @Param("couponId") UUID couponId,
+            @Param("deleterId") UUID deleterId,
+            @Param("deletedAt") Instant deletedAt);
 }

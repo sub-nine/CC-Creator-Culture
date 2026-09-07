@@ -3,6 +3,7 @@ package com.sub9.orderservice.coupon.infrastructure.redis;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sub9.orderservice.coupon.application.event.CouponCreatedEvent;
+import com.sub9.orderservice.coupon.application.event.CouponDeletedEvent;
 import com.sub9.orderservice.coupon.application.event.CouponUpdatedEvent;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
@@ -60,5 +61,16 @@ class RedisCouponRemainingQuantityInitializerIntegrationTest {
         initializer.update(new CouponUpdatedEvent(COUPON_ID, 80));
         assertThat(redisTemplate.opsForValue().get(key)).isEqualTo("80");
         assertThat(redisTemplate.getExpire(key)).isEqualTo(-1);
+    }
+
+    @Test
+    @DisplayName("삭제된 쿠폰의 Redis 잔여 수량 키를 실제로 제거한다")
+    void deletes_remaining_quantity_key() {
+        String key = CouponRedisKey.remaining(COUPON_ID);
+        initializer.initialize(new CouponCreatedEvent(COUPON_ID, 100));
+
+        initializer.delete(new CouponDeletedEvent(COUPON_ID));
+
+        assertThat(redisTemplate.hasKey(key)).isFalse();
     }
 }

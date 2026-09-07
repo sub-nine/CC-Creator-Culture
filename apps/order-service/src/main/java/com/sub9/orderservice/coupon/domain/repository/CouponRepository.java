@@ -26,4 +26,6 @@ public interface CouponRepository {
             Instant expiredAt,
             UUID updaterId,
             Instant updatedAt);
+
+    int deleteIfUnissued(UUID couponId, UUID deleterId, Instant deletedAt);
 }
