@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -17,5 +18,11 @@ public class CategoryQueryAdapter implements CategoryQueryPort {
     @Override
     public List<CategoryResponse> getCategoriesByIds(List<UUID> ids) {
         return categoryQueryRepository.searchCategoriesByIds(ids);
+    }
+
+    @Override
+    public Map<UUID, UUID> getCategoryIdsByProductIds(List<UUID> productIds) {
+        // TODO: CategoryProduct 리포지토리 연결 후 productId -> categoryId 매핑 구현
+        return Map.of();
     }
 }

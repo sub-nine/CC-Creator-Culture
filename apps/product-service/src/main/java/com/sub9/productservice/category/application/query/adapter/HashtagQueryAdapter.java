@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -17,5 +18,11 @@ public class HashtagQueryAdapter implements HashtagQueryPort {
     @Override
     public List<HashtagResponse> getHashtagByIds(List<UUID> ids) {
         return hashtagQueryRepository.searchHashtagsByIds(ids);
+    }
+
+    @Override
+    public Map<UUID, List<UUID>> getHashtagIdsByProductIds(List<UUID> productIds) {
+        // TODO: HashtagProduct 리포지토리 연결 후 productId -> hashtagIds 매핑 구현
+        return Map.of();
     }
 }
