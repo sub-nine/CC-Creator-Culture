@@ -2,7 +2,7 @@ package com.sub9.orderservice.order.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.sub9.orderservice.cart.application.service.CartService;
+import com.sub9.orderservice.cart.application.service.CartCommandService;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
@@ -45,7 +45,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         "management.tracing.export.enabled=false"
 })
 @MockitoBean(types = {
-        CartService.class,
+        CartCommandService.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
         StockPort.class,

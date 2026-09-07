@@ -33,7 +33,7 @@ import static org.mockito.Mockito.verify;
 @SpringBootTest
 @DisplayName("CartService - 통합 테스트")
 class CartServiceIntegrationTest extends AbstractIntegrationTest {
-  @Autowired private CartService cartService;
+  @Autowired private CartCommandService cartCommandService;
   @Autowired private CartJpaRepository cartRepository;
   @Autowired private EntityManager entityManager;
   @MockitoBean private CartProductPort cartProductPort;
@@ -61,7 +61,7 @@ class CartServiceIntegrationTest extends AbstractIntegrationTest {
       AddCartItemCommand command = new AddCartItemCommand(userId, skuId, 2);
 
       // when
-      cartService.addCartItem(command);
+      cartCommandService.addCartItem(command);
       entityManager.flush();
       entityManager.clear();
 
@@ -93,7 +93,8 @@ class CartServiceIntegrationTest extends AbstractIntegrationTest {
       entityManager.clear();
 
       // when
-      cartService.updateCartItem(new UpdateCartItemCommand(userId, target.getId(), quantity));
+      cartCommandService.updateCartItem(
+          new UpdateCartItemCommand(userId, target.getId(), quantity));
       entityManager.flush();
       entityManager.clear();
 
@@ -125,7 +126,7 @@ class CartServiceIntegrationTest extends AbstractIntegrationTest {
       entityManager.clear();
 
       // when
-      cartService.removeCartItem(command);
+      cartCommandService.removeCartItem(command);
       entityManager.flush();
       entityManager.clear();
 
