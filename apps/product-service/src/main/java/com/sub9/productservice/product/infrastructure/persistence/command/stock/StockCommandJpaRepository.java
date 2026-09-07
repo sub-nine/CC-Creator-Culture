@@ -12,7 +12,8 @@ public interface StockCommandJpaRepository extends JpaRepository<Stock, UUID> {
   @Query(
       """
        UPDATE Stock s
-       SET s.quantity = s.quantity + :quantity
+       SET s.quantity = s.quantity + :quantity,
+           s.updatedAt = instant
        WHERE s.skuId = :skuId
        """)
   int increaseStock(UUID skuId, int quantity);
@@ -21,7 +22,8 @@ public interface StockCommandJpaRepository extends JpaRepository<Stock, UUID> {
   @Query(
       """
       UPDATE Stock s
-      SET s.quantity = s.quantity - :quantity
+      SET s.quantity = s.quantity - :quantity,
+          s.updatedAt = instant
       WHERE s.skuId = :skuId
       AND s.quantity >= :quantity
        """)
@@ -31,7 +33,8 @@ public interface StockCommandJpaRepository extends JpaRepository<Stock, UUID> {
   @Query(
       """
       UPDATE Stock s
-      SET s.quantity = s.quantity + :quantity
+      SET s.quantity = s.quantity + :quantity,
+          s.updatedAt = instant
       WHERE s.skuId = :skuId
       AND s.quantity + :quantity >= 0
       """)

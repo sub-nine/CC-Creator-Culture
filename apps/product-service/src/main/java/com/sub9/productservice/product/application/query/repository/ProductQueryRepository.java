@@ -16,5 +16,5 @@ public interface ProductQueryRepository {
 
   Page<ProductInfo> searchProducts(String keyword, Pageable pageable);
 
-  boolean existsSkuOwnedByCreatorId(UUID craatorId, UUID skuId);
+  boolean existsSkuOwnedByCreatorId(UUID creatorId, UUID skuId);
 }

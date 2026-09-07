@@ -4,7 +4,7 @@ import com.sub9.productservice.product.application.command.dto.stock.AdjustStock
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
-public record AdjustStockRequest(@NotNull int quantity) {
+public record AdjustStockRequest(int quantity) {
   public AdjustStockCommand toCommand(UUID userId, UUID skuId) {
     return new AdjustStockCommand(userId, skuId, quantity);
   }
