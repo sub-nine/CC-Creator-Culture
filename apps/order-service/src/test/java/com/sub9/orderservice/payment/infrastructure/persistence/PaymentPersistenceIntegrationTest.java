@@ -61,7 +61,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @MockitoBean(types = {
         CartSnapshotPort.class, CouponApplicationPort.class, CouponUsagePort.class, StockPort.class
 })
-@DisplayName("결제 애그리거트 PostgreSQL 영속성")
+@DisplayName("PostgreSQL 결제 저장과 조회")
 class PaymentPersistenceIntegrationTest {
 
     private static final Instant PROCESSED_AT = Instant.parse("2026-09-07T00:00:00.123456Z");
@@ -103,7 +103,7 @@ class PaymentPersistenceIntegrationTest {
 
     @ParameterizedTest
     @CsvSource({"SUCCESS, 34200,", "FAILED, 34200, MOCK_PAYMENT_FAILED", "SUCCESS, 0,", "FAILED, 0, MOCK_PAYMENT_FAILED"})
-    @DisplayName("성공과 실패 결제의 금액, 결과와 UTC 처리 시각을 복원한다")
+    @DisplayName("저장한 결제의 금액과 결과, UTC 기준 처리 시각이 그대로 조회된다")
     void when_payment_is_saved_original_result_is_restored(PaymentStatus status, long amount, String failureCode) {
         Payment original = savePayment(status, amount);
 
@@ -123,7 +123,7 @@ class PaymentPersistenceIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(longs = {34_200, 0})
-    @DisplayName("저장된 결제에 전체 취소를 추가하고 원래 결제 결과와 함께 복원한다")
+    @DisplayName("저장한 결제를 전액 취소하면 결제 당시의 기록과 취소 내역이 함께 조회된다")
     void when_persisted_payment_is_canceled_original_result_and_cancellation_are_restored(long amount) {
         Payment original = savePayment(PaymentStatus.SUCCESS, amount);
         UUID commandId = saveCommand();
@@ -153,7 +153,7 @@ class PaymentPersistenceIntegrationTest {
     }
 
     @Test
-    @DisplayName("없는 주문 ID와 결제 ID는 빈 결과를 반환한다")
+    @DisplayName("해당 주문이나 결제의 기록이 없으면 조회 결과가 비어 있다")
     void when_payment_does_not_exist_queries_return_empty() {
         assertThat(paymentRepository.findByOrderId(uuidGenerator.generate())).isEmpty();
         assertThat(paymentRepository.findById(uuidGenerator.generate())).isEmpty();
@@ -161,7 +161,7 @@ class PaymentPersistenceIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    @DisplayName("주문 ID와 결제 ID로 취소 전 결제를 조회한다")
+    @DisplayName("주문 ID와 결제 ID로 아직 취소하지 않은 결제를 조회할 수 있다")
     void when_uncanceled_payment_is_queried_payment_without_cancellation_is_returned(boolean byOrderId) {
         Payment original = savePayment(PaymentStatus.SUCCESS, 34_200);
 
@@ -176,7 +176,7 @@ class PaymentPersistenceIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    @DisplayName("트랜잭션 밖에서 추가한 취소를 재저장해도 한 건만 남고 두 조회에서 함께 복원한다")
+    @DisplayName("취소 내역을 여러 번 저장해도 중복 없이 결제와 함께 조회된다")
     void when_detached_cancellation_is_saved_twice_both_queries_restore_one_cancellation(boolean byOrderId) {
         Payment original = savePayment(PaymentStatus.SUCCESS, 34_200);
         UUID commandId = saveCommand();
@@ -247,7 +247,7 @@ class PaymentPersistenceIntegrationTest {
     }
 
     @Test
-    @DisplayName("존재하지 않는 명령으로 취소하면 저장되지 않고 기존 결제가 유지된다")
+    @DisplayName("저장되지 않은 명령으로 결제를 취소하면 취소 내역이 저장되지 않는다")
     void when_cancellation_command_is_missing_transaction_preserves_uncanceled_payment() {
         Payment original = savePayment(PaymentStatus.SUCCESS, 34_200);
         original.cancel(uuidGenerator.generate(), uuidGenerator.generate(), CANCELED_AT);
