@@ -1,7 +1,22 @@
 package com.sub9.orderservice.payment.application.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
+import com.sub9.orderservice.common.security.GatewayHeaderAuthenticationFilter;
+import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
 import com.sub9.orderservice.cart.application.service.CartQueryService;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
@@ -28,13 +43,17 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.dao.DataAccessException;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -48,12 +67,10 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @Testcontainers
+@AutoConfigureMockMvc
 @SpringBootTest(properties = {
         "spring.cloud.config.enabled=false",
         "eureka.client.enabled=false",
@@ -78,6 +95,7 @@ class MockPaymentIntegrationTest {
     private final UuidV7Generator ids = new UuidV7Generator();
 
     @Autowired private MockPaymentService service;
+    @Autowired private MockMvc mockMvc;
     @Autowired private OrderRepository orders;
     @Autowired private OrderQueryRepository queries;
     @Autowired private JdbcTemplate jdbc;
@@ -276,6 +294,60 @@ class MockPaymentIntegrationTest {
                 process(order, PaymentStatus.FAILED))).isInstanceOf(IllegalTransactionStateException.class);
         assertNoPayment(order);
         verifyNoInteractions(coupons);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"SUCCESS, 34200", "FAILED, 34200", "SUCCESS, 0", "FAILED, 0"})
+    @DisplayName("HTTP 응답 이후 결제와 주문이 저장되고 같은 요청에도 결제는 한 건이다")
+    void when_payment_api_is_repeated_committed_result_is_preserved(PaymentStatus result, long amount)
+            throws Exception {
+        Order order = saveOrder(amount, true);
+        int expectedStatus = result == PaymentStatus.SUCCESS ? 200 : 400;
+        String first = mockMvc.perform(paymentRequest(order, result))
+                .andExpect(status().is(expectedStatus)).andReturn().getResponse().getContentAsString();
+
+        Payment saved = payments.findByOrderId(order.getId()).orElseThrow();
+        assertThat(saved.getStatus()).isEqualTo(result);
+        assertThat(saved.getAmount()).isEqualTo(Money.won(amount));
+        assertThat(orderStatus(order)).isEqualTo(result == PaymentStatus.SUCCESS ? "PAID" : "FAILED");
+        when(clock.instant()).thenReturn(order.getExpiresAt().plusSeconds(60));
+
+        var repeated = mockMvc.perform(paymentRequest(order, result)).andExpect(status().is(expectedStatus));
+        if (result == PaymentStatus.SUCCESS) {
+            repeated.andExpect(jsonPath("$.data.paymentId").value(saved.getId().toString()))
+                    .andExpect(jsonPath("$.data.amount").value(amount))
+                    .andExpect(jsonPath("$.data.processedAt").value(saved.getProcessedAt().toString()));
+            assertThat(queries.findDetailByOrderNumber(order.getOrderNumber()).orElseThrow().getPaidAt())
+                    .isEqualTo(saved.getProcessedAt());
+            verifyNoInteractions(coupons, stock);
+        } else {
+            repeated.andExpect(jsonPath("$.errorCode").value("PAYMENT_0001"));
+            assertThat(saved.getFailureCode()).isEqualTo("MOCK_PAYMENT_FAILED");
+            verify(coupons).restore(order.getId(), List.of(order.getItems().getFirst().getUserCouponId()));
+            verify(stock).restore(order.getId(), stockItems(order), RestoreReason.PAYMENT_FAILED);
+            verifyNoMoreInteractions(coupons, stock);
+        }
+        assertThat(repeated.andReturn().getResponse().getContentAsString()).isEqualTo(first);
+        assertThat(paymentCount()).isEqualTo(1);
+
+        PaymentStatus opposite = result == PaymentStatus.SUCCESS ? PaymentStatus.FAILED : PaymentStatus.SUCCESS;
+        mockMvc.perform(paymentRequest(order, opposite))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("ORDER_0003"));
+        assertThat(paymentCount()).isEqualTo(1);
+        assertThat(orderStatus(order)).isEqualTo(result == PaymentStatus.SUCCESS ? "PAID" : "FAILED");
+        assertThat(payments.findByOrderId(order.getId()).orElseThrow().getStatus()).isEqualTo(result);
+        verifyNoMoreInteractions(coupons, stock);
+    }
+
+    private MockHttpServletRequestBuilder paymentRequest(Order order, PaymentStatus result) {
+        return post("/api/v1/orders/{orderNumber}/payments", order.getOrderNumber())
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(GatewayHeaderAuthenticationFilter.USER_ID_HEADER, order.getCustomerId())
+                .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, "CUSTOMER")
+                .header(GatewayHeaderAuthenticationFilter.TOKEN_ID_HEADER, order.getId())
+                .header(GatewayHeaderAuthenticationFilter.TOKEN_EXPIRES_AT_HEADER, 1_800_000_000L)
+                .content("{\"result\":\"" + result + "\"}");
     }
 
     private MockPaymentResult process(Order order, PaymentStatus status) {
