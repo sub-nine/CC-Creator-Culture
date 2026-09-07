@@ -1,6 +1,6 @@
-package com.sub9.productservice.product.presentation.command.dto.reqeust;
+package com.sub9.productservice.product.presentation.command.dto.reqeust.product;
 
-import com.sub9.productservice.product.application.command.dto.UpdateProductStatusCommand;
+import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 

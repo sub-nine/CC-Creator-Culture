@@ -1,6 +1,6 @@
-package com.sub9.productservice.product.presentation.command.dto.reqeust;
+package com.sub9.productservice.product.presentation.command.dto.reqeust.sku;
 
-import com.sub9.productservice.product.application.command.dto.UpdateSkuCommand;
+import com.sub9.productservice.product.application.command.dto.sku.UpdateSkuCommand;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
