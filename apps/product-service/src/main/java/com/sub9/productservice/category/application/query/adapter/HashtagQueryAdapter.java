@@ -1,6 +1,6 @@
-package com.sub9.productservice.category.application.query.service;
+package com.sub9.productservice.category.application.query.adapter;
 
-import com.sub9.productservice.category.application.query.repository.HashtagQueryRepository;
+import com.sub9.productservice.category.application.query.port.out.HashtagQueryRepository;
 import com.sub9.productservice.category.presentation.query.dto.HashtagResponse;
 import com.sub9.productservice.leaderboard.application.port.HashtagQueryPort;
 import lombok.RequiredArgsConstructor;

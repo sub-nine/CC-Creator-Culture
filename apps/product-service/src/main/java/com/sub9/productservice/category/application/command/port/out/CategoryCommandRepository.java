@@ -1,4 +1,4 @@
-package com.sub9.productservice.category.application.command.repository;
+package com.sub9.productservice.category.application.command.port.out;
 
 import com.sub9.productservice.category.domain.entity.Category;
 import com.sub9.productservice.category.domain.entity.CategoryHashtag;

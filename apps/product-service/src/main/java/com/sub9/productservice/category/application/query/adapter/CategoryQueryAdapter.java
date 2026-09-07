@@ -1,6 +1,6 @@
-package com.sub9.productservice.category.application.query.service;
+package com.sub9.productservice.category.application.query.adapter;
 
-import com.sub9.productservice.category.application.query.repository.CategoryQueryRepository;
+import com.sub9.productservice.category.application.query.port.out.CategoryQueryRepository;
 import com.sub9.productservice.category.presentation.query.dto.CategoryResponse;
 import com.sub9.productservice.leaderboard.application.port.CategoryQueryPort;
 import lombok.RequiredArgsConstructor;

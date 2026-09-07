@@ -1,9 +1,9 @@
 package com.sub9.productservice.category.application.query.service;
 
 import com.sub9.common.exception.BusinessException;
-import com.sub9.productservice.category.application.query.repository.CategoryHashtagQueryRepository;
-import com.sub9.productservice.category.application.query.repository.CategoryQueryRepository;
-import com.sub9.productservice.category.application.query.repository.HashtagQueryRepository;
+import com.sub9.productservice.category.application.query.port.out.CategoryQueryRepository;
+import com.sub9.productservice.category.application.query.port.out.HashtagQueryRepository;
+import com.sub9.productservice.category.application.query.port.out.MergeRequestQueryRepository;
 import com.sub9.productservice.category.domain.exception.CategoryErrorCode;
 import com.sub9.productservice.category.presentation.query.dto.CategoryDetailResponse;
 import com.sub9.productservice.category.presentation.query.dto.CategoryResponse;
@@ -25,7 +25,7 @@ public class CategoryQueryService {
 
     private final CategoryQueryRepository categoryQueryRepository;
     private final HashtagQueryRepository hashtagQueryRepository;
-    private final CategoryHashtagQueryRepository categoryHashtagQueryRepository;
+    private final MergeRequestQueryRepository mergeRequestQueryRepository;
 
     public Page<CategoryResponse> searchCategories(String keyword, Pageable pageable) {
         return categoryQueryRepository.searchCategories(keyword, pageable);
@@ -35,7 +35,7 @@ public class CategoryQueryService {
         CategoryResponse category = categoryQueryRepository.findById(categoryId)
                 .orElseThrow(() -> new BusinessException(CategoryErrorCode.CATEGORY_NOT_FOUND));
 
-        List<HashtagResponse> hashtags = categoryHashtagQueryRepository.findHashtagsByCategoryId(categoryId);
+        List<HashtagResponse> hashtags = categoryQueryRepository.findHashtagsByCategoryId(categoryId);
 
         return new CategoryDetailResponse(category.id(), category.name(), category.description(), hashtags);
     }
@@ -44,11 +44,11 @@ public class CategoryQueryService {
         categoryQueryRepository.findById(categoryId)
                 .orElseThrow(() -> new BusinessException(CategoryErrorCode.CATEGORY_NOT_FOUND));
 
-        return categoryHashtagQueryRepository.findHashtagsByCategoryId(categoryId, pageable);
+        return categoryQueryRepository.findHashtagsByCategoryId(categoryId, pageable);
     }
 
     public Page<MergeRequestResponse> getMergeRequests(Pageable pageable) {
-        return categoryHashtagQueryRepository.findPendingMergeRequests(pageable);
+        return mergeRequestQueryRepository.findPendingMergeRequests(pageable);
     }
 
     public Page<HashtagResponse> searchHashtags(String keyword, Pageable pageable) {

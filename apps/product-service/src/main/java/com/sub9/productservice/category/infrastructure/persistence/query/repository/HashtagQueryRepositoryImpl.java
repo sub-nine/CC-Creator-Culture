@@ -3,7 +3,7 @@ package com.sub9.productservice.category.infrastructure.persistence.query.reposi
 import com.querydsl.core.types.Projections;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import com.sub9.productservice.category.application.query.repository.HashtagQueryRepository;
+import com.sub9.productservice.category.application.query.port.out.HashtagQueryRepository;
 import com.sub9.productservice.category.domain.entity.QHashtag;
 import com.sub9.productservice.category.infrastructure.persistence.query.support.QuerydslQuerySupport;
 import com.sub9.productservice.category.presentation.query.dto.HashtagResponse;

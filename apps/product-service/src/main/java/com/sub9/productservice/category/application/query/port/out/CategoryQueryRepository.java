@@ -1,6 +1,7 @@
-package com.sub9.productservice.category.application.query.repository;
+package com.sub9.productservice.category.application.query.port.out;
 
 import com.sub9.productservice.category.presentation.query.dto.CategoryResponse;
+import com.sub9.productservice.category.presentation.query.dto.HashtagResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -15,4 +16,8 @@ public interface CategoryQueryRepository {
     Optional<CategoryResponse> findById(UUID categoryId);
 
     List<CategoryResponse> searchCategoriesByIds(List<UUID> ids);
+
+    List<HashtagResponse> findHashtagsByCategoryId(UUID categoryId);
+
+    Page<HashtagResponse> findHashtagsByCategoryId(UUID categoryId, Pageable pageable);
 }

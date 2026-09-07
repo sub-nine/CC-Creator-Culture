@@ -1,8 +1,8 @@
 package com.sub9.productservice.category.application.command.service;
 
 import com.sub9.common.exception.BusinessException;
-import com.sub9.productservice.category.application.command.repository.CategoryCommandRepository;
-import com.sub9.productservice.category.application.command.repository.HashtagCommandRepository;
+import com.sub9.productservice.category.application.command.port.out.CategoryCommandRepository;
+import com.sub9.productservice.category.application.command.port.out.HashtagCommandRepository;
 import com.sub9.productservice.category.domain.entity.Category;
 import com.sub9.productservice.category.domain.entity.CategoryHashtag;
 import com.sub9.productservice.category.domain.entity.Hashtag;

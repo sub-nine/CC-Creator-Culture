@@ -1,4 +1,4 @@
-package com.sub9.productservice.category.application.query.repository;
+package com.sub9.productservice.category.application.query.port.out;
 
 import com.sub9.productservice.category.presentation.query.dto.HashtagResponse;
 import org.springframework.data.domain.Page;
