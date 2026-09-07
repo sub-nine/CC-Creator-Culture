@@ -1,6 +1,5 @@
 package com.sub9.productservice.product.presentation.query.controller;
 
-import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.product.application.query.service.ProductQueryService;
 import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import jakarta.validation.constraints.NotNull;
@@ -20,8 +19,8 @@ public class InternalSkuQueryController {
   private final ProductQueryService productQueryService;
 
   @PostMapping
-  public ApiResponse<List<SkuInfo>> findAllSkuInfoByIds(
+  public List<SkuInfo> findAllSkuInfoByIds(
       @RequestBody @NotNull @Size(max = 70) List<@NotNull UUID> skuIds) {
-    return ApiResponse.success(productQueryService.getSkus(skuIds));
+    return productQueryService.getSkus(skuIds);
   }
 }
