@@ -48,7 +48,7 @@ public class Payment extends BaseEntity {
     @Column(name = "order_id", nullable = false, updatable = false)
     private UUID orderId;
 
-    // 주문 ID로 생성하는 인터페이스를 유지하면서 DB 외래 키를 생성한다.
+    // 주문 ID만으로 결제를 생성할 수 있도록 외래 키 매핑용 연관관계를 따로 둔다.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false, insertable = false, updatable = false,
             foreignKey = @ForeignKey(name = "fk_payments_order"))

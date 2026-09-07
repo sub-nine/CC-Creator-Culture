@@ -46,7 +46,7 @@ public class PaymentCancellation extends BaseEntity {
     @Column(name = "command_request_id", nullable = false, updatable = false)
     private UUID commandRequestId;
 
-    // 명령 ID는 값으로 보관하고 이 연관관계는 DB 외래 키 매핑에만 사용한다.
+    // 명령 ID를 직접 저장하므로 이 연관관계는 외래 키 매핑에만 사용한다.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "command_request_id", nullable = false, insertable = false, updatable = false,
             foreignKey = @ForeignKey(name = "fk_payment_cancellations_command"))
@@ -66,7 +66,7 @@ public class PaymentCancellation extends BaseEntity {
 
     PaymentCancellation(UUID id, Payment payment, UUID commandRequestId, Money amount, Instant canceledAt) {
         super(id);
-        this.payment = Objects.requireNonNull(payment, "원래 결제는 필수입니다.");
+        this.payment = Objects.requireNonNull(payment, "취소할 결제가 필요합니다.");
         this.commandRequestId = Objects.requireNonNull(commandRequestId, "취소 명령 식별자는 필수입니다.");
         this.amount = Objects.requireNonNull(amount, "취소 금액은 필수입니다.");
         this.canceledAt = Objects.requireNonNull(canceledAt, "결제 취소 시각은 필수입니다.");

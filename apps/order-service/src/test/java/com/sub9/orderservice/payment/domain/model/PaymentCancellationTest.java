@@ -25,7 +25,7 @@ class PaymentCancellationTest {
 
     @ParameterizedTest
     @ValueSource(longs = {34_200, 0})
-    @DisplayName("성공 결제를 원래 금액으로 전체 취소하고 결제 결과를 보존한다")
+    @DisplayName("성공한 결제를 전액 취소해도 결제 당시의 기록은 유지된다")
     void when_successful_payment_is_canceled_full_amount_and_original_result_are_preserved(long amount) {
         Payment payment = payment(PaymentStatus.SUCCESS, amount);
         UUID cancellationId = uuidGenerator.generate();
@@ -49,7 +49,7 @@ class PaymentCancellationTest {
     }
 
     @Test
-    @DisplayName("실패 결제의 취소를 거부하고 실패 결과를 보존한다")
+    @DisplayName("실패한 결제는 취소할 수 없고 실패 기록은 유지된다")
     void when_failed_payment_is_canceled_cancellation_is_rejected() {
         Payment payment = payment(PaymentStatus.FAILED, 34_200);
 
@@ -62,7 +62,7 @@ class PaymentCancellationTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    @DisplayName("같거나 다른 명령으로 재취소하면 거부하고 최초 취소 기록을 보존한다")
+    @DisplayName("이미 취소한 결제는 다시 취소할 수 없고 기존 취소 내역은 유지된다")
     void when_cancellation_is_repeated_original_cancellation_is_preserved(boolean sameCommand) {
         Payment payment = payment(PaymentStatus.SUCCESS, 34_200);
         UUID commandRequestId = uuidGenerator.generate();
@@ -78,7 +78,7 @@ class PaymentCancellationTest {
     }
 
     @Test
-    @DisplayName("UUID v7이 아닌 취소 식별자를 거부하고 결제를 취소하지 않는다")
+    @DisplayName("취소 ID가 UUID v7 형식이 아니면 결제를 취소할 수 없다")
     void when_cancellation_id_is_not_uuid_v7_payment_remains_uncanceled() {
         Payment payment = payment(PaymentStatus.SUCCESS, 34_200);
 
@@ -94,7 +94,7 @@ class PaymentCancellationTest {
             "commandRequestId, 취소 명령 식별자는 필수입니다.",
             "canceledAt, 결제 취소 시각은 필수입니다."
     })
-    @DisplayName("취소 필수값 누락 시 결제를 보존하고 이후 정상 취소를 허용한다")
+    @DisplayName("필수값 누락으로 취소에 실패해도 값을 보완하면 취소할 수 있다")
     void when_required_value_is_missing_payment_can_still_be_canceled(String field, String message) {
         Payment payment = payment(PaymentStatus.SUCCESS, 34_200);
 
