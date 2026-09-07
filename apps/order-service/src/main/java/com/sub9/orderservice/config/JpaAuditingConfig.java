@@ -7,10 +7,4 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 @Configuration
 @EnableJpaAuditing
-public class JpaAuditingConfig {
-
-    @Bean
-    Clock utcClock() {
-        return Clock.systemUTC();
-    }
-}
+public class JpaAuditingConfig { }

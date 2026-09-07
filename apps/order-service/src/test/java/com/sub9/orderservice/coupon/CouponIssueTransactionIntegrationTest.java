@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
+import com.sub9.orderservice.cart.application.service.CartService;
 import com.sub9.orderservice.coupon.application.dto.CouponReservation;
 import com.sub9.orderservice.coupon.application.port.CouponIssueProcessor;
 import com.sub9.orderservice.coupon.domain.exception.CouponErrorCode;
@@ -14,6 +15,11 @@ import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
+
+import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
+import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
+import com.sub9.orderservice.order.application.port.output.StockPort;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +36,13 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+@MockitoBean(types = {
+    CartService.class,
+    CouponApplicationPort.class,
+    CouponUsagePort.class,
+    StockPort.class,
+    PaymentCancellationPort.class
+})
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
         "spring.cloud.config.enabled=false", "eureka.client.enabled=false",
