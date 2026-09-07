@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sub9.common.identifier.UuidV7Generator;
-import com.sub9.orderservice.cart.application.service.CartService;
+import com.sub9.orderservice.cart.application.service.CartQueryService;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
@@ -60,7 +60,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @MockitoBean(types = {
-        CartService.class, CouponApplicationPort.class, CouponUsagePort.class, StockPort.class,
+        CartQueryService.class, CouponApplicationPort.class, CouponUsagePort.class, StockPort.class,
         PaymentCancellationPort.class
 })
 @DisplayName("PostgreSQL 결제 저장과 조회")

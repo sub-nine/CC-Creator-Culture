@@ -28,7 +28,7 @@ public class CartCommandService {
     if (cartRepository.countByUserId(command.userId()) >= MAX_CART_ITEM_COUNT) {
       throw new BusinessException(CartErrorCode.CART_ITEM_LIMIT_EXCEEDED);
     }
-
+    // TODO : Product에 아직 미구현
     cartProductPort.validateSkuForCart(command.skuId());
 
     Cart cart = Cart.create(cartId, command.userId(), command.skuId(), command.quantity());
