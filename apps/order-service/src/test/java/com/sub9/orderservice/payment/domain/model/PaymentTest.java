@@ -27,7 +27,7 @@ class PaymentTest {
             "SUCCESS, 0,",
             "FAILED, 0, MOCK_PAYMENT_FAILED"
     })
-    @DisplayName("성공과 실패 결제는 0원을 허용하고 결과에 맞는 실패 코드를 보존한다")
+    @DisplayName("결제 금액은 0원일 수 있고 실패 코드는 결제 결과에 따라 정해진다")
     void when_valid_result_is_given_payment_preserves_result(
             PaymentStatus status, long amount, String failureCode) {
         UUID id = uuidGenerator.generate();
@@ -45,7 +45,7 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("음수 결제액은 기존 Money 검증으로 거부한다")
+    @DisplayName("결제 금액이 음수이면 결제를 생성할 수 없다")
     void when_amount_is_negative_payment_creation_is_rejected() {
         assertThatThrownBy(() -> Payment.create(uuidGenerator.generate(), uuidGenerator.generate(),
                 Money.won(-1), PaymentStatus.SUCCESS, NOW))
@@ -55,7 +55,7 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("UUID v7이 아닌 결제 식별자를 거부한다")
+    @DisplayName("결제 ID가 UUID v7 형식이 아니면 결제를 생성할 수 없다")
     void when_payment_id_is_not_uuid_v7_creation_is_rejected() {
         assertThatThrownBy(() -> Payment.create(UUID.randomUUID(), uuidGenerator.generate(),
                 Money.won(1_000), PaymentStatus.SUCCESS, NOW))
@@ -71,7 +71,7 @@ class PaymentTest {
             "status, 결제 결과는 필수입니다.",
             "processedAt, 결제 처리 시각은 필수입니다."
     })
-    @DisplayName("결제 필수값이 없으면 생성을 거부한다")
+    @DisplayName("필수값이 없으면 결제를 생성할 수 없다")
     void when_required_value_is_missing_creation_is_rejected(String field, String message) {
         assertThatThrownBy(() -> Payment.create(
                 field.equals("id") ? null : uuidGenerator.generate(),
