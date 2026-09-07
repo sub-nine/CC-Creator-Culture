@@ -1,10 +1,8 @@
 package com.sub9.orderservice.order.domain.model;
 
 import com.sub9.orderservice.common.entity.BaseEntity;
-import com.sub9.orderservice.common.persistence.InstantTimestampConverter;
 import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -81,8 +79,7 @@ public class OrderCommandRequest extends BaseEntity {
     @Column(name = "response_payload", columnDefinition = "jsonb")
     private String responsePayload;
 
-    @Convert(converter = InstantTimestampConverter.class)
-    @Column(name = "completed_at", columnDefinition = "timestamp")
+    @Column(name = "completed_at", columnDefinition = "timestamp with time zone")
     private Instant completedAt;
 
     private OrderCommandRequest(UUID id, UUID actorId, OrderCommandType commandType,
