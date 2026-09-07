@@ -17,9 +17,9 @@ import org.springframework.web.bind.annotation.PostMapping;
     configuration = OpenFeignConfig.class)
 public interface CartProductFeignClient {
 
-  @GetMapping("/{skuId}")
+  @GetMapping("/{skuId}/validation")
   void validateSkuForCart(@PathVariable UUID skuId);
 
   @PostMapping
-  List<CartProductInfo> getCartItemProducts(List<UUID> skuIds);
+  List<CartProductInfo> getProductsForCart(List<UUID> skuIds);
 }
