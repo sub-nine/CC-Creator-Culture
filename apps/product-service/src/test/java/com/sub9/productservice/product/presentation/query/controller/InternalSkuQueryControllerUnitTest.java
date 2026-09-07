@@ -7,9 +7,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import com.sub9.productservice.product.application.query.service.ProductQueryService;
 import com.sub9.productservice.product.domain.model.ProductStatus;
-import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.List;
 import java.util.UUID;
@@ -22,7 +22,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @WebMvcTest(InternalSkuQueryController.class)
 @DisplayName("InternalSkuQueryController - 단위 테스트")
-class InternalSkuQueryControllerTest extends AbstractControllerTest {
+class InternalSkuQueryControllerUnitTest extends AbstractControllerTest {
   @MockitoBean ProductQueryService productQueryService;
 
   private final String endPoint = "/internal/v1/skus";
@@ -64,7 +64,8 @@ class InternalSkuQueryControllerTest extends AbstractControllerTest {
         .andExpect(jsonPath("$[0].skuName").value("Ping | M"))
         .andExpect(jsonPath("$[0].productStatus").value("ACTIVE"))
         .andExpect(jsonPath("$[0].price").value(10000))
-        .andExpect(jsonPath("$[0].quantity").value(10));    verify(productQueryService).getCartItemProducts(skuIds);
+        .andExpect(jsonPath("$[0].quantity").value(10));
+    verify(productQueryService).getCartItemProducts(skuIds);
   }
 
   @Test

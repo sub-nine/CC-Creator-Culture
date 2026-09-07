@@ -1,7 +1,11 @@
 package com.sub9.productservice.product.application.query.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
+import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
+import com.sub9.productservice.product.application.query.dto.ProductInfo;
+import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import com.sub9.productservice.product.domain.model.Sku;
@@ -9,9 +13,6 @@ import com.sub9.productservice.product.domain.model.Stock;
 import com.sub9.productservice.product.infrastructure.persistence.command.product.ProductCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.sku.SkuCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.stock.StockCommandJpaRepository;
-import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
-import com.sub9.productservice.product.application.query.dto.ProductInfo;
-import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import com.sub9.productservice.support.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
 import java.util.List;
@@ -91,12 +92,12 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
 
   @Test
   @DisplayName("SKU ID 목록으로 상품, SKU, 재고 정보 조회에 성공한다.")
-  void getSkus_success() {
+  void getCartItemProducts_success() {
     // given
     List<UUID> skuIds = List.of(defaultSku.getId(), normalSku.getId());
 
     // when
-    List<SkuInfo> responses = productQueryService.getSkus(skuIds);
+    List<SkuInfo> responses = productQueryService.getCartItemProducts(skuIds);
 
     // then
     assertThat(responses).hasSize(2);
@@ -144,6 +145,21 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
     assertThat(response.reviewCount()).isZero();
     assertThat(response.price()).isEqualTo(defaultSku.getPrice());
     assertThat(response.quantity()).isEqualTo(10);
+  }
+
+  @Test
+  @DisplayName("판매 중이고 재고가 1개인 SKU는 장바구니 등록 검증을 통과한다.")
+  void validateSkuForCart_success_when_active_product_has_stock() {
+    // given
+    entityManager
+        .createQuery("UPDATE Stock s SET s.quantity = 1 WHERE s.skuId = :skuId")
+        .setParameter("skuId", normalSku.getId())
+        .executeUpdate();
+    entityManager.clear();
+
+    // when & then
+    assertThatCode(() -> productQueryService.validateSkuForCart(normalSku.getId()))
+        .doesNotThrowAnyException();
   }
 
   private SkuInfo findSkuResponse(List<SkuInfo> responses, UUID skuId) {
