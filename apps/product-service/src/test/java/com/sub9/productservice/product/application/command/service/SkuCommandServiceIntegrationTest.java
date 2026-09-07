@@ -2,10 +2,10 @@ package com.sub9.productservice.product.application.command.service;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
-import com.sub9.productservice.product.application.command.dto.CreateProductCommand;
-import com.sub9.productservice.product.application.command.dto.CreateSkuCommand;
-import com.sub9.productservice.product.application.command.dto.DeleteSkuCommand;
-import com.sub9.productservice.product.application.command.dto.UpdateSkuCommand;
+import com.sub9.productservice.product.application.command.dto.product.CreateProductCommand;
+import com.sub9.productservice.product.application.command.dto.sku.CreateSkuCommand;
+import com.sub9.productservice.product.application.command.dto.sku.DeleteSkuCommand;
+import com.sub9.productservice.product.application.command.dto.sku.UpdateSkuCommand;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.Sku;
 import com.sub9.productservice.product.infrastructure.persistence.command.product.ProductCommandJpaRepository;

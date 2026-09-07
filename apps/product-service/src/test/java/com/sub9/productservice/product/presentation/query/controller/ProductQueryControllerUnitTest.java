@@ -26,6 +26,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+@DisplayName("ProductQueryController - 단위 테스트")
 @WebMvcTest(ProductQueryController.class)
 class ProductQueryControllerUnitTest extends AbstractControllerTest {
   @MockitoBean ProductQueryService productQueryService;

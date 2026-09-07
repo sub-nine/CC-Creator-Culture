@@ -9,6 +9,7 @@ import com.sub9.productservice.category.presentation.query.dto.CategoryDetailRes
 import com.sub9.productservice.category.presentation.query.dto.CategoryResponse;
 import com.sub9.productservice.category.presentation.query.dto.HashtagResponse;
 import com.sub9.productservice.category.presentation.query.dto.MergeRequestResponse;
+import com.sub9.productservice.leaderboard.application.port.CategoryQueryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,7 +22,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class CategoryQueryService {
+public class CategoryQueryService implements CategoryQueryPort {
 
     private final CategoryQueryRepository categoryQueryRepository;
     private final HashtagQueryRepository hashtagQueryRepository;
@@ -37,7 +38,7 @@ public class CategoryQueryService {
 
         List<HashtagResponse> hashtags = categoryHashtagQueryRepository.findHashtagsByCategoryId(categoryId);
 
-        return new CategoryDetailResponse(category.categoryId(), category.name(), category.description(), hashtags);
+        return new CategoryDetailResponse(category.id(), category.name(), category.description(), hashtags);
     }
 
     public Page<HashtagResponse> getCategoryHashtags(UUID categoryId, Pageable pageable) {
@@ -53,5 +54,10 @@ public class CategoryQueryService {
 
     public Page<HashtagResponse> searchHashtags(String keyword, Pageable pageable) {
         return hashtagQueryRepository.searchHashtags(keyword, pageable);
+    }
+
+    @Override
+    public List<CategoryResponse> getCategoriesByIds(List<UUID> ids) {
+        return categoryQueryRepository.searchCategoriesByIds(ids);
     }
 }

@@ -6,8 +6,8 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.*;
 
 import com.sub9.common.exception.BusinessException;
-import com.sub9.productservice.product.application.command.dto.DeleteSkuCommand;
-import com.sub9.productservice.product.application.command.dto.UpdateSkuCommand;
+import com.sub9.productservice.product.application.command.dto.sku.DeleteSkuCommand;
+import com.sub9.productservice.product.application.command.dto.sku.UpdateSkuCommand;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.Sku;

@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
-import com.sub9.productservice.product.application.command.dto.UpdateProductStatusCommand;
+import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
 import com.sub9.productservice.product.application.command.service.ProductCommandService;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.Map;
