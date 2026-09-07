@@ -9,6 +9,7 @@ import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.coupon.application.dto.CouponIssueTarget;
 import com.sub9.orderservice.coupon.application.dto.CouponReservation;
 import com.sub9.orderservice.coupon.application.dto.IssueDispatchResult;
+import com.sub9.orderservice.coupon.application.exception.CouponReservationReleaseRequiredException;
 import com.sub9.orderservice.coupon.application.port.CouponIssueDispatcher;
 import com.sub9.orderservice.coupon.application.port.CouponIssueReader;
 import com.sub9.orderservice.coupon.application.port.CouponIssueReserver;
@@ -47,7 +48,7 @@ class CouponIssueServiceTest {
     void when_coupon_is_issuable_issue_reserves_and_dispatches_in_order() {
         UUID couponId = generator.generate();
         UUID userId = generator.generate();
-        CouponIssueTarget target = new CouponIssueTarget(couponId, NOW.plusSeconds(600));
+        CouponIssueTarget target = new CouponIssueTarget(couponId, NOW.plusSeconds(600), 10);
         var completed = new IssueDispatchResult.Completed(generator.generate());
         given(reader.getIssuable(couponId, NOW)).willReturn(target);
         given(dispatcher.dispatch(ArgumentMatchers.any())).willReturn(completed);
@@ -81,12 +82,64 @@ class CouponIssueServiceTest {
     void when_reservation_fails_issue_stops() {
         UUID couponId = generator.generate();
         UUID userId = generator.generate();
-        CouponIssueTarget target = new CouponIssueTarget(couponId, NOW.plusSeconds(600));
+        CouponIssueTarget target = new CouponIssueTarget(couponId, NOW.plusSeconds(600), 10);
         RuntimeException failure = new RuntimeException("선점 실패");
         given(reader.getIssuable(couponId, NOW)).willReturn(target);
         doThrow(failure).when(reserver)
                 .reserve(ArgumentMatchers.eq(target), ArgumentMatchers.any());
         assertThatThrownBy(() -> service.issue(couponId, userId)).isSameAs(failure);
         verify(dispatcher, never()).dispatch(ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("DB 롤백이 확정된 실패는 Redis 선점을 보상하고 원래 예외를 전달한다")
+    void when_dispatch_requires_release_reservation_is_rolled_back() {
+        UUID couponId = generator.generate();
+        UUID userId = generator.generate();
+        CouponIssueTarget target = new CouponIssueTarget(couponId, NOW.plusSeconds(600), 10);
+        RuntimeException original = new RuntimeException("DB 발급 실패");
+        given(reader.getIssuable(couponId, NOW)).willReturn(target);
+        given(dispatcher.dispatch(ArgumentMatchers.any()))
+                .willThrow(new CouponReservationReleaseRequiredException(original));
+
+        assertThatThrownBy(() -> service.issue(couponId, userId)).isSameAs(original);
+
+        ArgumentCaptor<CouponReservation> captor = ArgumentCaptor.forClass(CouponReservation.class);
+        verify(reserver).rollback(captor.capture());
+        assertThat(captor.getValue().couponId()).isEqualTo(couponId);
+        assertThat(captor.getValue().userId()).isEqualTo(userId);
+    }
+
+    @Test
+    @DisplayName("중복 발급이나 결과 불명확 실패는 Redis 선점을 보상하지 않는다")
+    void when_dispatch_failure_does_not_require_release_reservation_is_not_rolled_back() {
+        UUID couponId = generator.generate();
+        UUID userId = generator.generate();
+        CouponIssueTarget target = new CouponIssueTarget(couponId, NOW.plusSeconds(600), 10);
+        RuntimeException failure = new RuntimeException("보상하면 안 되는 실패");
+        given(reader.getIssuable(couponId, NOW)).willReturn(target);
+        given(dispatcher.dispatch(ArgumentMatchers.any())).willThrow(failure);
+
+        assertThatThrownBy(() -> service.issue(couponId, userId)).isSameAs(failure);
+        verify(reserver, never()).rollback(ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("DB 발급 실패 후 Redis 보상도 실패하면 두 실패 원인을 함께 전달한다")
+    void when_release_fails_original_issue_failure_is_suppressed() {
+        UUID couponId = generator.generate();
+        UUID userId = generator.generate();
+        CouponIssueTarget target = new CouponIssueTarget(couponId, NOW.plusSeconds(600), 10);
+        RuntimeException issueFailure = new RuntimeException("DB 발급 실패");
+        RuntimeException releaseFailure = new RuntimeException("Redis 보상 실패");
+        given(reader.getIssuable(couponId, NOW)).willReturn(target);
+        given(dispatcher.dispatch(ArgumentMatchers.any()))
+                .willThrow(new CouponReservationReleaseRequiredException(issueFailure));
+        doThrow(releaseFailure).when(reserver).rollback(ArgumentMatchers.any());
+
+        assertThatThrownBy(() -> service.issue(couponId, userId))
+                .isSameAs(releaseFailure)
+                .satisfies(exception -> assertThat(exception.getSuppressed())
+                        .containsExactly(issueFailure));
     }
 }

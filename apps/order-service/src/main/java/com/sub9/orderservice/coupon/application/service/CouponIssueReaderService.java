@@ -30,6 +30,8 @@ public class CouponIssueReaderService implements CouponIssueReader {
         if (coupon.getIssuedQuantity() >= coupon.getTotalQuantity()) {
             throw new BusinessException(CouponErrorCode.SOLD_OUT);
         }
-        return new CouponIssueTarget(coupon.getId(), coupon.getExpiredAt());
+        return new CouponIssueTarget(
+                coupon.getId(), coupon.getExpiredAt(),
+                coupon.getTotalQuantity() - coupon.getIssuedQuantity());
     }
 }

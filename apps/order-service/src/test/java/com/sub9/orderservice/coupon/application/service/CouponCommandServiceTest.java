@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.sub9.common.identifier.UuidV7Generator;
+    import com.sub9.orderservice.coupon.application.event.CouponCreatedEvent;
 import com.sub9.orderservice.coupon.domain.model.Coupon;
 import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
 import com.sub9.orderservice.coupon.presentation.request.CreateCouponRequest;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("쿠폰 명령 서비스")
@@ -33,12 +35,13 @@ class CouponCommandServiceTest {
 
     @Mock private CouponRepository couponRepository;
     @Mock private UuidV7Generator uuidV7Generator;
+    @Mock private ApplicationEventPublisher eventPublisher;
     private CouponCommandService couponCommandService;
 
     @BeforeEach
     void setUp() {
         couponCommandService = new CouponCommandService(
-                couponRepository, uuidV7Generator, Clock.fixed(NOW, ZoneOffset.UTC));
+                couponRepository, uuidV7Generator, Clock.fixed(NOW, ZoneOffset.UTC), eventPublisher);
     }
 
     @Test
@@ -61,5 +64,6 @@ class CouponCommandServiceTest {
         assertThat(saved.getCreatedAt()).isEqualTo(NOW);
         assertThat(response.couponId()).isEqualTo(COUPON_ID);
         assertThat(response.issuedQuantity()).isZero();
+        verify(eventPublisher).publishEvent(new CouponCreatedEvent(COUPON_ID, 100));
     }
 }

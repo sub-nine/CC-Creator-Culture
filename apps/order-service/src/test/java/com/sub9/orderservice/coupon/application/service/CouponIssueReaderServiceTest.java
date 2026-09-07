@@ -27,7 +27,7 @@ class CouponIssueReaderServiceTest {
     @Mock private CouponRepository couponRepository;
 
     @Test
-    @DisplayName("발급 가능한 쿠폰의 식별자와 만료 시각을 반환한다")
+    @DisplayName("발급 가능한 쿠폰의 식별자와 만료 시각 및 잔여 수량을 반환한다")
     void when_coupon_is_issuable_target_is_returned() {
         Coupon coupon = coupon(2);
         when(couponRepository.findActiveById(coupon.getId())).thenReturn(Optional.of(coupon));
@@ -36,6 +36,7 @@ class CouponIssueReaderServiceTest {
 
         assertThat(target.couponId()).isEqualTo(coupon.getId());
         assertThat(target.expiredAt()).isEqualTo(EXPIRED_AT);
+        assertThat(target.remainingQuantity()).isEqualTo(2);
     }
 
     @Test

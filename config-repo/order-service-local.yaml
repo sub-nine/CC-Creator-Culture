@@ -6,3 +6,10 @@ spring:
     url: ${ORDER_DATASOURCE_URL:jdbc:postgresql://localhost:5432/order_db}
     username: ${ORDER_DB_USERNAME}
     password: ${ORDER_DB_PASSWORD}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      connect-timeout: 2s
+      timeout: 2s

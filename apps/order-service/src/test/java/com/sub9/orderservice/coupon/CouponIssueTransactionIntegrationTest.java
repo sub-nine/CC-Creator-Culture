@@ -2,16 +2,19 @@ package com.sub9.orderservice.coupon;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.Mockito.when;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.cart.application.service.CartService;
 import com.sub9.orderservice.coupon.application.dto.CouponReservation;
+import com.sub9.orderservice.coupon.application.dto.CouponIssueFailureType;
 import com.sub9.orderservice.coupon.application.port.CouponIssueProcessor;
 import com.sub9.orderservice.coupon.domain.exception.CouponErrorCode;
 import com.sub9.orderservice.coupon.domain.model.Coupon;
 import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
+import com.sub9.orderservice.coupon.infrastructure.persistence.CouponIssueFailureClassifier;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
@@ -62,6 +65,7 @@ class CouponIssueTransactionIntegrationTest {
     @Autowired private CouponRepository couponRepository;
     @Autowired private CouponIssueProcessor couponIssueProcessor;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private CouponIssueFailureClassifier failureClassifier;
     @MockitoBean private Clock clock;
     private final UuidV7Generator generator = new UuidV7Generator();
 
@@ -108,9 +112,13 @@ class CouponIssueTransactionIntegrationTest {
         UUID userId = generator.generate();
         couponIssueProcessor.process(new CouponReservation(coupon.getId(), userId, generator.generate()));
 
-        assertThatThrownBy(() -> couponIssueProcessor.process(
-                new CouponReservation(coupon.getId(), userId, generator.generate())))
-                .isInstanceOf(DataIntegrityViolationException.class);
+        RuntimeException failure = catchThrowableOfType(RuntimeException.class, () ->
+                couponIssueProcessor.process(
+                        new CouponReservation(coupon.getId(), userId, generator.generate())));
+
+        assertThat(failure).isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(failureClassifier.classify(failure))
+                .isEqualTo(CouponIssueFailureType.ALREADY_ISSUED);
 
         assertThat(couponRepository.findActiveById(coupon.getId()).orElseThrow().getIssuedQuantity())
                 .isEqualTo(1);
