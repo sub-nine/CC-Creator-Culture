@@ -10,6 +10,8 @@ public interface CartRepository {
 
   List<Cart> findAllByUserIdAndIdIn(UUID customerId, List<UUID> cartIds);
 
+  List<Cart> findAllByUserId(UUID userId);
+
   int countByUserId(UUID userId);
 
   void deleteAllByUserIdAndIdIn(UUID userId, List<UUID> cartIds);

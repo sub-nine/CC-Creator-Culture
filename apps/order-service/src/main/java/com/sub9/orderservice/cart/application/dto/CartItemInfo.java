@@ -2,7 +2,8 @@ package com.sub9.orderservice.cart.application.dto;
 
 import java.util.UUID;
 
-public record CartItemProducInfo(
+public record CartItemInfo(
+    UUID cartId,
     UUID skuId,
     UUID productId,
     UUID creatorId,

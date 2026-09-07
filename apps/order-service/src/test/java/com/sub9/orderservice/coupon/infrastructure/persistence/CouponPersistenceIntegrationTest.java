@@ -4,11 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sub9.common.identifier.UuidV7Generator;
+import com.sub9.orderservice.cart.application.service.CartQueryService;
 import com.sub9.orderservice.coupon.domain.model.Coupon;
 import com.sub9.orderservice.coupon.domain.model.UserCoupon;
 import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
 import com.sub9.orderservice.coupon.domain.repository.UserCouponRepository;
-import com.sub9.orderservice.cart.application.service.CartService;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
@@ -70,7 +70,7 @@ class CouponPersistenceIntegrationTest {
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private PlatformTransactionManager transactionManager;
 
-    @MockitoBean CartService cartService;
+    @MockitoBean CartQueryService cartService;
 
     @MockitoBean PaymentCancellationPort paymentCancellationPort;
 

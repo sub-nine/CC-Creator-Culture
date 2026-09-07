@@ -1,6 +1,8 @@
 package com.sub9.orderservice.cart.presentation.controller;
 
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,12 +13,14 @@ import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.orderservice.cart.application.dto.AddCartItemCommand;
 import com.sub9.orderservice.cart.application.dto.DeleteCartItemCommand;
 import com.sub9.orderservice.cart.application.dto.UpdateCartItemCommand;
-import com.sub9.orderservice.cart.application.service.CartService;
+import com.sub9.orderservice.cart.application.service.CartCommandService;
+import com.sub9.orderservice.cart.application.service.CartQueryService;
 import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import com.sub9.orderservice.cart.presentation.request.AddCartItemRequest;
 import com.sub9.orderservice.cart.presentation.request.DeleteCartItemRequest;
 import com.sub9.orderservice.cart.presentation.request.UpdateCartItemRequest;
 import com.sub9.orderservice.support.AbstractControllerTest;
+import com.sub9.orderservice.cart.presentation.response.CartItemResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -31,7 +35,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @DisplayName("CartController - 단위 테스트")
 @WebMvcTest(controllers = CartController.class)
 class CartControllerUnitTest extends AbstractControllerTest {
-  @MockitoBean private CartService cartService;
+  @MockitoBean private CartCommandService cartCommandService;
+  @MockitoBean private CartQueryService cartQueryService;
+
   private final UUID userId = UUID.randomUUID();
   private final UUID skuId = UUID.randomUUID();
 
@@ -49,7 +55,7 @@ class CartControllerUnitTest extends AbstractControllerTest {
           .perform(authenticatedRequest().content(jsonMapper.writeValueAsString(request)))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.message").value("장바구니 등록 성공"));
-      verify(cartService).addCartItem(new AddCartItemCommand(userId, skuId, 2));
+      verify(cartCommandService).addCartItem(new AddCartItemCommand(userId, skuId, 2));
     }
 
     @Test
@@ -63,7 +69,7 @@ class CartControllerUnitTest extends AbstractControllerTest {
           .perform(authenticatedRequest().content(jsonMapper.writeValueAsString(request)))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.VALIDATION_ERROR.code()));
-      verifyNoInteractions(cartService);
+      verifyNoInteractions(cartCommandService);
     }
 
     @ParameterizedTest
@@ -78,7 +84,7 @@ class CartControllerUnitTest extends AbstractControllerTest {
           .perform(authenticatedRequest().content(jsonMapper.writeValueAsString(request)))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.VALIDATION_ERROR.code()));
-      verifyNoInteractions(cartService);
+      verifyNoInteractions(cartCommandService);
     }
 
     @Test
@@ -94,7 +100,7 @@ class CartControllerUnitTest extends AbstractControllerTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(jsonMapper.writeValueAsString(request)))
           .andExpect(status().isUnauthorized());
-      verifyNoInteractions(cartService);
+      verifyNoInteractions(cartCommandService);
     }
 
     @Test
@@ -103,7 +109,7 @@ class CartControllerUnitTest extends AbstractControllerTest {
       // given
       AddCartItemRequest request = new AddCartItemRequest(skuId, 2);
       willThrow(new BusinessException(CartErrorCode.CART_ITEM_ALREADY_EXISTS))
-          .given(cartService)
+          .given(cartCommandService)
           .addCartItem(new AddCartItemCommand(userId, skuId, 2));
 
       // when & then
@@ -131,7 +137,7 @@ class CartControllerUnitTest extends AbstractControllerTest {
                   .content(jsonMapper.writeValueAsString(request)))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.message").value("상품 수량이 변경되었습니다."));
-      verify(cartService).updateCartItem(new UpdateCartItemCommand(userId, cartId, 3));
+      verify(cartCommandService).updateCartItem(new UpdateCartItemCommand(userId, cartId, 3));
     }
 
     @ParameterizedTest
@@ -148,7 +154,7 @@ class CartControllerUnitTest extends AbstractControllerTest {
                   .content(jsonMapper.writeValueAsString(request)))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.VALIDATION_ERROR.code()));
-      verifyNoInteractions(cartService);
+      verifyNoInteractions(cartCommandService);
     }
 
     @Test
@@ -157,7 +163,7 @@ class CartControllerUnitTest extends AbstractControllerTest {
       // given
       UUID cartId = UUID.randomUUID();
       willThrow(new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND))
-          .given(cartService)
+          .given(cartCommandService)
           .updateCartItem(new UpdateCartItemCommand(userId, cartId, 3));
 
       // when & then
@@ -187,7 +193,7 @@ class CartControllerUnitTest extends AbstractControllerTest {
                   .content(jsonMapper.writeValueAsString(request)))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.message").value("상품이 장바구니에서 삭제되었습니다"));
-      verify(cartService).removeCartItem(new DeleteCartItemCommand(userId, cartIds));
+      verify(cartCommandService).removeCartItem(new DeleteCartItemCommand(userId, cartIds));
     }
 
     @ParameterizedTest
@@ -199,7 +205,69 @@ class CartControllerUnitTest extends AbstractControllerTest {
           .perform(authenticatedRequest(post("/api/v1/cart/items/delete")).content(content))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.VALIDATION_ERROR.code()));
-      verifyNoInteractions(cartService);
+      verifyNoInteractions(cartCommandService);
+    }
+  }
+
+  @Nested
+  @DisplayName("장바구니 조회 API 테스트")
+  class GetCartItemsTests {
+    @Test
+    @DisplayName("장바구니 조회에 성공하면 상품 정보와 수량을 반환한다.")
+    void getCartItems_success() throws Exception {
+      // given
+      UUID cartId = UUID.randomUUID();
+      given(cartQueryService.getCart(userId)).willReturn(List.of(
+          new CartItemResponse(cartId, skuId, "상품", "옵션", "ACTIVE", 3, 1000)));
+
+      // when & then
+      mockMvc.perform(authenticatedRequest(get("/api/v1/cart/items")))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.message").value("장바구니 조회 성공"))
+          .andExpect(jsonPath("$.data.length()").value(1))
+          .andExpect(jsonPath("$.data[0].cartId").value(cartId.toString()))
+          .andExpect(jsonPath("$.data[0].skuId").value(skuId.toString()))
+          .andExpect(jsonPath("$.data[0].productName").value("상품"))
+          .andExpect(jsonPath("$.data[0].skuName").value("옵션"))
+          .andExpect(jsonPath("$.data[0].productStatus").value("ACTIVE"))
+          .andExpect(jsonPath("$.data[0].quantity").value(3))
+          .andExpect(jsonPath("$.data[0].price").value(1000));
+      verify(cartQueryService).getCart(userId);
+    }
+
+    @Test
+    @DisplayName("장바구니가 비어 있으면 빈 목록을 반환한다.")
+    void getCartItems_success_when_empty() throws Exception {
+      // given
+      given(cartQueryService.getCart(userId)).willReturn(List.of());
+
+      // when & then
+      mockMvc.perform(authenticatedRequest(get("/api/v1/cart/items")))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").isArray())
+          .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    @DisplayName("인증 정보가 없으면 401 예외가 발생해야한다.")
+    void getCartItems_fails_when_unauthenticated() throws Exception {
+      // when & then
+      mockMvc.perform(get("/api/v1/cart/items"))
+          .andExpect(status().isUnauthorized());
+      verifyNoInteractions(cartQueryService);
+    }
+
+    @Test
+    @DisplayName("상품 서비스 연결에 실패하면 503과 SERVICE_UNAVAILABLE 오류 코드를 반환한다.")
+    void getCartItems_fails_when_service_unavailable() throws Exception {
+      // given
+      given(cartQueryService.getCart(userId))
+          .willThrow(new BusinessException(CommonErrorCode.SERVICE_UNAVAILABLE));
+
+      // when & then
+      mockMvc.perform(authenticatedRequest(get("/api/v1/cart/items")))
+          .andExpect(status().isServiceUnavailable())
+          .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.SERVICE_UNAVAILABLE.code()));
     }
   }
 

@@ -1,63 +1,27 @@
 package com.sub9.orderservice.order.application.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.within;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import com.sub9.common.dto.response.ErrorResponse;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.common.identifier.UuidV7Generator;
-import com.sub9.orderservice.cart.application.service.CartService;
+import com.sub9.orderservice.cart.application.service.CartQueryService;
 import com.sub9.orderservice.common.security.GatewayHeaderAuthenticationFilter;
-import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
-import com.sub9.orderservice.order.domain.model.Money;
-import com.sub9.orderservice.order.domain.model.Order;
-import com.sub9.orderservice.order.domain.model.OrderCommandType;
-import com.sub9.orderservice.order.domain.model.OrderItem;
-import com.sub9.orderservice.order.domain.model.OrderItemStatus;
-import com.sub9.orderservice.order.domain.model.OrderNumber;
-import com.sub9.orderservice.order.domain.model.OrderStatus;
-import com.sub9.orderservice.order.domain.model.ProductSnapshot;
-import com.sub9.orderservice.order.domain.model.ShippingAddress;
+import com.sub9.orderservice.order.domain.model.*;
 import com.sub9.orderservice.order.domain.repository.OrderQueryRepository;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -80,6 +44,20 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import tools.jackson.databind.JsonNode;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.*;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
         "spring.cloud.config.enabled=false",
@@ -91,7 +69,7 @@ import tools.jackson.databind.JsonNode;
         "management.tracing.export.enabled=false"
 })
 @MockitoBean(types = {
-        CartService.class,
+    CartQueryService.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
         StockPort.class,

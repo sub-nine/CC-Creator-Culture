@@ -1,18 +1,8 @@
 package com.sub9.orderservice.payment.application.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
-
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
-import com.sub9.orderservice.cart.application.service.CartService;
+import com.sub9.orderservice.cart.application.service.CartQueryService;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
@@ -20,13 +10,7 @@ import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.application.port.output.StockPort.RestoreReason;
 import com.sub9.orderservice.order.application.port.output.StockPort.StockItem;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
-import com.sub9.orderservice.order.domain.model.Money;
-import com.sub9.orderservice.order.domain.model.Order;
-import com.sub9.orderservice.order.domain.model.OrderItem;
-import com.sub9.orderservice.order.domain.model.OrderNumber;
-import com.sub9.orderservice.order.domain.model.OrderStatus;
-import com.sub9.orderservice.order.domain.model.ProductSnapshot;
-import com.sub9.orderservice.order.domain.model.ShippingAddress;
+import com.sub9.orderservice.order.domain.model.*;
 import com.sub9.orderservice.order.domain.repository.OrderQueryRepository;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
 import com.sub9.orderservice.payment.application.dto.MockPaymentResult;
@@ -34,10 +18,6 @@ import com.sub9.orderservice.payment.domain.model.Payment;
 import com.sub9.orderservice.payment.domain.model.PaymentStatus;
 import com.sub9.orderservice.payment.infrastructure.persistence.PaymentRepositoryAdapter;
 import jakarta.persistence.EntityManager;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -63,6 +43,16 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 @Testcontainers
 @SpringBootTest(properties = {
         "spring.cloud.config.enabled=false",
@@ -73,7 +63,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         "spring.datasource.hikari.connection-init-sql=SET TIME ZONE 'UTC'",
         "management.tracing.export.enabled=false"
 })
-@MockitoBean(types = {CartService.class, CouponApplicationPort.class, PaymentCancellationPort.class})
+@MockitoBean(types = {CartQueryService.class, CouponApplicationPort.class, PaymentCancellationPort.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @DisplayName("PostgreSQL 모의 결제 처리")
 class MockPaymentIntegrationTest {

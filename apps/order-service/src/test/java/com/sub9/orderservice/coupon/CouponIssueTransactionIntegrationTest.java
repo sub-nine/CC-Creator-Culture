@@ -7,7 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
-import com.sub9.orderservice.cart.application.service.CartService;
+import com.sub9.orderservice.cart.application.service.CartQueryService;
 import com.sub9.orderservice.coupon.application.dto.CouponReservation;
 import com.sub9.orderservice.coupon.application.dto.CouponIssueFailureType;
 import com.sub9.orderservice.coupon.application.port.CouponIssueProcessor;
@@ -40,7 +40,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @MockitoBean(types = {
-    CartService.class,
+    CartQueryService.class,
     CouponApplicationPort.class,
     CouponUsagePort.class,
     StockPort.class,

@@ -1,14 +1,11 @@
 package com.sub9.orderservice.coupon.infrastructure.redis;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import com.sub9.orderservice.cart.application.service.CartService;
+import com.sub9.orderservice.cart.application.service.CartQueryService;
+import com.sub9.orderservice.coupon.application.event.CouponCreatedEvent;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
-import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
-import com.sub9.orderservice.coupon.application.event.CouponCreatedEvent;
-import java.util.UUID;
+import com.sub9.orderservice.order.application.port.output.StockPort;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,6 +25,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
         "spring.cloud.config.enabled=false",
@@ -38,7 +39,7 @@ import org.testcontainers.utility.DockerImageName;
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @MockitoBean(types = {
-        CartService.class, CouponApplicationPort.class, CouponUsagePort.class, StockPort.class,
+        CartQueryService.class, CouponApplicationPort.class, CouponUsagePort.class, StockPort.class,
         PaymentCancellationPort.class
 })
 @DisplayName("쿠폰 Redis 잔여 수량 커밋 후 초기화")
