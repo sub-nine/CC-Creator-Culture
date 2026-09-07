@@ -1,10 +1,5 @@
 package com.sub9.orderservice.cart.application.service;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willThrow;
-import static org.mockito.Mockito.*;
-
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.orderservice.cart.application.dto.AddCartItemCommand;
@@ -13,22 +8,33 @@ import com.sub9.orderservice.cart.application.port.CartProductPort;
 import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import com.sub9.orderservice.cart.domain.repository.CartRepository;
 import com.sub9.orderservice.cart.infrastructure.feign.exception.CartProductClientErrorCode;
-
-import java.util.Optional;
-import java.util.UUID;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.*;
+
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CartService - 단위 테스트")
 class CartServiceUnitTest {
-  @Mock private CartRepository cartRepository;
-  @Mock private CartProductPort cartProductPort;
-  @InjectMocks private CartService cartService;
+  @Mock
+  private CartRepository cartRepository;
+  @Mock
+  private CartProductPort cartProductPort;
+  @InjectMocks
+  private CartService cartService;
 
   private AddCartItemCommand command;
 
@@ -55,7 +61,7 @@ class CartServiceUnitTest {
     }
 
     @Test
-    @DisplayName("이미 등록된 SKU의 제약 위반은 중복 등록 오류로 변환한다.")
+    @DisplayName("중복된 상품이 있으면 CART_ITEM_ALREADY_EXISTS 예외가 발생해야한다.")
     void addCartItem_fails_when_cart_item_already_exists() {
       // given
       given(cartRepository.saveAndFlush(any()))
