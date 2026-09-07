@@ -2,18 +2,18 @@ package com.sub9.productservice.product.application.command.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.sub9.common.kafka.event.ProductCreatedEvent;
 import com.sub9.productservice.product.application.command.dto.CreateProductCommand;
 import com.sub9.productservice.product.application.command.dto.CreateSkuCommand;
 import com.sub9.productservice.product.application.command.dto.UpdateProductCommand;
 import com.sub9.productservice.product.application.command.dto.UpdateProductStatusCommand;
-import com.sub9.productservice.product.application.event.ProductCreatedEvent;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import com.sub9.productservice.product.domain.model.Sku;
 import com.sub9.productservice.product.domain.model.Stock;
-import com.sub9.productservice.product.infrastructure.command.product.ProductCommandJpaRepository;
-import com.sub9.productservice.product.infrastructure.command.sku.SkuCommandJpaRepository;
-import com.sub9.productservice.product.infrastructure.command.stock.StockCommandJpaRepository;
+import com.sub9.productservice.product.infrastructure.persistence.command.product.ProductCommandJpaRepository;
+import com.sub9.productservice.product.infrastructure.persistence.command.sku.SkuCommandJpaRepository;
+import com.sub9.productservice.product.infrastructure.persistence.command.stock.StockCommandJpaRepository;
 import com.sub9.productservice.support.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
 import java.util.List;

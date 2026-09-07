@@ -22,11 +22,9 @@ dependencies {
     // Kafka
     implementation 'org.springframework.boot:spring-boot-starter-kafka'
 
-    // Redis
-    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-
-    // Database
+    // Database & Redis
     runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
     // QueryDSL
     implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
