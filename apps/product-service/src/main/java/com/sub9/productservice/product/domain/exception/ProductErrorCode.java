@@ -21,7 +21,6 @@ public enum ProductErrorCode implements ErrorCode {
   DEFAULT_SKU_CANNOT_DELETED("SKU_0005", HttpStatus.BAD_REQUEST, "대표 옵션은 삭제할 수 없습니다."),
   DEFAULT_SKU_CANNOT_UNSET("SKU_0006", HttpStatus.BAD_REQUEST, "대표 옵션은 대표 설정을 직접 해제할 수 없습니다."),
   DEFAULT_SKU_NOT_FOUND("SKU_0007", HttpStatus.NOT_FOUND, "대표 옵션이 존재하지 않습니다."),
-  SKU_SOLD_OUT("SKU_0008", HttpStatus.CONFLICT, "품절된 옵션입니다."),
 
   INVALID_STOCK_QUANTITY("STOCK_0001", HttpStatus.BAD_REQUEST, "재고 수량은 0 이상이어야 합니다."),
   INSUFFICIENT_STOCK("STOCK_0002", HttpStatus.CONFLICT, "재고가 부족합니다."),
