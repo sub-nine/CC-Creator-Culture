@@ -32,7 +32,7 @@ import static org.mockito.Mockito.verify;
 @Transactional
 @SpringBootTest
 @DisplayName("CartService - 통합 테스트")
-class CartServiceIntegrationTest extends AbstractIntegrationTest {
+class CartCommandServiceIntegrationTest extends AbstractIntegrationTest {
   @Autowired private CartCommandService cartCommandService;
   @Autowired private CartJpaRepository cartRepository;
   @Autowired private EntityManager entityManager;

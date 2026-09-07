@@ -1,17 +1,21 @@
-package com.sub9.orderservice.cart.infrastructure.feign;
+package com.sub9.orderservice.cart.infrastructure.client;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
-import com.sub9.orderservice.cart.infrastructure.feign.exception.CartProductClientErrorCode;
+import com.sub9.orderservice.cart.application.dto.CartProductInfo;
+import com.sub9.orderservice.cart.infrastructure.client.exception.CartProductClientErrorCode;
 import feign.FeignException;
 import feign.Request;
 import feign.Response;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.*;
@@ -68,6 +72,29 @@ class CartProductFeignAdapterUnitTest {
       assertThatThrownBy(() -> adapter.validateSkuForCart(skuId))
           .isInstanceOf(BusinessException.class)
           .hasMessage(CommonErrorCode.SERVICE_UNAVAILABLE.message());
+    }
+  }
+
+  @Nested
+  @DisplayName("장바구니 상품 조회 테스트")
+  class GetCartItemProductsTests {
+    @Test
+    @DisplayName("상품 조회에 성공하면 상품 정보 목록을 반환한다.")
+    void getCartItemProducts_success() {
+      // given
+      List<UUID> skuIds = List.of(UUID.randomUUID());
+      CartProductInfo info =
+          new CartProductInfo(
+              skuIds.getFirst(), UUID.randomUUID(), UUID.randomUUID(), "상품", "옵션", "ACTIVE", 1000L);
+
+      given(feignClient.getCartItemProducts(skuIds)).willReturn(List.of(info));
+
+      // when
+      List<CartProductInfo> result = adapter.getCartItemProducts(skuIds);
+
+      // then
+      assertThat(result).containsExactly(info);
+      verify(feignClient).getCartItemProducts(skuIds);
     }
   }
 
