@@ -8,6 +8,7 @@ import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.model.OrderNumber;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
+import com.sub9.orderservice.payment.application.dto.MockPaymentResult;
 import com.sub9.orderservice.payment.domain.model.Payment;
 import com.sub9.orderservice.payment.domain.model.PaymentStatus;
 import com.sub9.orderservice.payment.domain.repository.PaymentRepository;

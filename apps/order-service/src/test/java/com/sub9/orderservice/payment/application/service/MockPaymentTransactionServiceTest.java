@@ -24,6 +24,7 @@ import com.sub9.orderservice.order.domain.model.OrderStatus;
 import com.sub9.orderservice.order.domain.model.ProductSnapshot;
 import com.sub9.orderservice.order.domain.model.ShippingAddress;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
+import com.sub9.orderservice.payment.application.dto.MockPaymentResult;
 import com.sub9.orderservice.payment.domain.model.Payment;
 import com.sub9.orderservice.payment.domain.model.PaymentMethod;
 import com.sub9.orderservice.payment.domain.model.PaymentStatus;

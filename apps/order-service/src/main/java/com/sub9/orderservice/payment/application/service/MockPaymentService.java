@@ -3,6 +3,7 @@ package com.sub9.orderservice.payment.application.service;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.application.port.output.StockRestoreCommand;
 import com.sub9.orderservice.order.domain.model.OrderNumber;
+import com.sub9.orderservice.payment.application.dto.MockPaymentResult;
 import com.sub9.orderservice.payment.domain.model.PaymentStatus;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
