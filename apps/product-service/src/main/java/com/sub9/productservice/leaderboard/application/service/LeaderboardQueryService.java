@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class LeaderboardService {
+public class LeaderboardQueryService {
     private final CategoryQueryPort categoryQueryPort;
     private final HashtagQueryPort hashtagQueryPort;
     private final LeaderboardSnapshotRepository leaderboardSnapshotRepository;
