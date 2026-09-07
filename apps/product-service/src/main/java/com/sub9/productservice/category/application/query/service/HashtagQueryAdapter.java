@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class HashtagQueryService implements HashtagQueryPort {
+public class HashtagQueryAdapter implements HashtagQueryPort {
     private final HashtagQueryRepository hashtagQueryRepository;
 
     @Override
