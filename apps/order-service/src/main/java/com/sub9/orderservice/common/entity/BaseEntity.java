@@ -1,8 +1,6 @@
 package com.sub9.orderservice.common.entity;
 
-import com.sub9.orderservice.common.persistence.InstantTimestampConverter;
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
@@ -27,13 +25,11 @@ public abstract class BaseEntity {
     private UUID id;
 
     @CreatedDate
-    @Convert(converter = InstantTimestampConverter.class)
-    @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamp")
+    @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamp with time zone")
     private Instant createdAt;
 
     @LastModifiedDate
-    @Convert(converter = InstantTimestampConverter.class)
-    @Column(name = "updated_at", nullable = false, columnDefinition = "timestamp")
+    @Column(name = "updated_at", nullable = false, columnDefinition = "timestamp with time zone")
     private Instant updatedAt;
 
     protected BaseEntity(UUID id) {
