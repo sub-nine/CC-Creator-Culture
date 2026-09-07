@@ -3,6 +3,7 @@ package com.sub9.orderservice.coupon.infrastructure.redis;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sub9.orderservice.coupon.application.event.CouponCreatedEvent;
+import com.sub9.orderservice.coupon.application.event.CouponUpdatedEvent;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -56,7 +57,7 @@ class RedisCouponRemainingQuantityInitializerIntegrationTest {
         initializer.initialize(new CouponCreatedEvent(COUPON_ID, 100));
         assertThat(redisTemplate.opsForValue().get(key)).isEqualTo("100");
 
-        initializer.initialize(new CouponCreatedEvent(COUPON_ID, 80));
+        initializer.update(new CouponUpdatedEvent(COUPON_ID, 80));
         assertThat(redisTemplate.opsForValue().get(key)).isEqualTo("80");
         assertThat(redisTemplate.getExpire(key)).isEqualTo(-1);
     }

@@ -200,6 +200,47 @@ class CouponPersistenceIntegrationTest {
     }
 
     @Test
+    @DisplayName("미발급 쿠폰만 조건부로 내용과 수정 감사를 갱신한다")
+    void when_coupon_is_unissued_conditional_update_changes_values_and_audit() {
+        Coupon coupon = coupon(10);
+        UUID updaterId = uuidGenerator.generate();
+        Instant updatedAt = STARTED_AT.minusSeconds(1);
+        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+
+        Integer affectedRows = transaction().execute(status ->
+                couponRepository.updateIfUnissued(
+                        coupon.getId(), "수정된 쿠폰", 20, 30,
+                        STARTED_AT.plusSeconds(1), EXPIRED_AT.plusSeconds(1),
+                        updaterId, updatedAt));
+        Coupon updated = couponRepository.findActiveById(coupon.getId()).orElseThrow();
+
+        assertThat(affectedRows).isEqualTo(1);
+        assertThat(updated.getCouponName()).isEqualTo("수정된 쿠폰");
+        assertThat(updated.getDiscountRate()).isEqualTo(20);
+        assertThat(updated.getTotalQuantity()).isEqualTo(30);
+        assertThat(updated.getStartedAt()).isEqualTo(STARTED_AT.plusSeconds(1));
+        assertThat(updated.getExpiredAt()).isEqualTo(EXPIRED_AT.plusSeconds(1));
+        assertThat(updated.getUpdatedBy()).isEqualTo(updaterId);
+        assertThat(updated.getUpdatedAt()).isEqualTo(updatedAt);
+    }
+
+    @Test
+    @DisplayName("발급 이력이 있는 쿠폰은 조건부 수정에서 제외한다")
+    void when_coupon_has_been_issued_conditional_update_changes_nothing() {
+        Coupon coupon = coupon(10);
+        coupon.issue(uuidGenerator.generate(), STARTED_AT);
+        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+        Integer affectedRows = transaction().execute(status -> couponRepository.updateIfUnissued(
+                coupon.getId(), "수정 시도 쿠폰", 20, 30,
+                STARTED_AT, EXPIRED_AT,
+                uuidGenerator.generate(), STARTED_AT.plusSeconds(1)));
+
+        assertThat(affectedRows).isZero();
+        assertThat(couponRepository.findActiveById(coupon.getId()).orElseThrow().getCouponName())
+                .isEqualTo("영속성 테스트 쿠폰");
+    }
+
+    @Test
     @DisplayName("기간 밖이거나 삭제된 쿠폰은 조건부 수량 갱신에서 제외한다")
     void when_coupon_is_outside_period_or_deleted_conditional_update_changes_nothing() {
         Coupon coupon = coupon(10);

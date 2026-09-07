@@ -16,4 +16,14 @@ public interface CouponRepository {
     Page<Coupon> findAllActive(Pageable pageable);
 
     int increaseIssuedQuantityIfIssuable(UUID couponId, UUID userId, Instant issuedAt);
+
+    int updateIfUnissued(
+            UUID couponId,
+            String couponName,
+            int discountRate,
+            int totalQuantity,
+            Instant startedAt,
+            Instant expiredAt,
+            UUID updaterId,
+            Instant updatedAt);
 }

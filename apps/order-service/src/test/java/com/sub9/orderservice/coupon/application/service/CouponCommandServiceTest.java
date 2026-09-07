@@ -1,12 +1,17 @@
 package com.sub9.orderservice.coupon.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.sub9.common.identifier.UuidV7Generator;
-    import com.sub9.orderservice.coupon.application.event.CouponCreatedEvent;
+import com.sub9.common.exception.BusinessException;
+import com.sub9.orderservice.coupon.application.dto.CouponUpdateCommand;
+import com.sub9.orderservice.coupon.application.event.CouponCreatedEvent;
+import com.sub9.orderservice.coupon.application.event.CouponUpdatedEvent;
+import com.sub9.orderservice.coupon.domain.exception.CouponErrorCode;
 import com.sub9.orderservice.coupon.domain.model.Coupon;
 import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
 import com.sub9.orderservice.coupon.presentation.request.CreateCouponRequest;
@@ -65,5 +70,74 @@ class CouponCommandServiceTest {
         assertThat(response.couponId()).isEqualTo(COUPON_ID);
         assertThat(response.issuedQuantity()).isZero();
         verify(eventPublisher).publishEvent(new CouponCreatedEvent(COUPON_ID, 100));
+    }
+
+    @Test
+    @DisplayName("전달된 필드만 변경하고 DB 수정 후 Redis 갱신 이벤트를 발행한다")
+    void when_partial_update_is_given_only_requested_values_are_changed() {
+        Coupon coupon = coupon();
+        CouponUpdateCommand command = new CouponUpdateCommand(
+                "수정 쿠폰", null, 200, null, null);
+        when(couponRepository.findActiveById(COUPON_ID)).thenReturn(java.util.Optional.of(coupon));
+        when(couponRepository.updateIfUnissued(
+                org.mockito.ArgumentMatchers.eq(COUPON_ID),
+                org.mockito.ArgumentMatchers.eq("수정 쿠폰"),
+                org.mockito.ArgumentMatchers.eq(15),
+                org.mockito.ArgumentMatchers.eq(200),
+                org.mockito.ArgumentMatchers.eq(STARTED_AT),
+                org.mockito.ArgumentMatchers.eq(EXPIRED_AT),
+                org.mockito.ArgumentMatchers.eq(CREATOR_ID),
+                org.mockito.ArgumentMatchers.eq(NOW)))
+                .thenReturn(1);
+
+        CouponResponse response = couponCommandService.update(COUPON_ID, command, CREATOR_ID);
+
+        verify(couponRepository).updateIfUnissued(
+                COUPON_ID, "수정 쿠폰", 15, 200,
+                STARTED_AT, EXPIRED_AT, CREATOR_ID, NOW);
+        assertThat(response.totalQuantity()).isEqualTo(200);
+        verify(eventPublisher).publishEvent(new CouponUpdatedEvent(COUPON_ID, 200));
+    }
+
+    @Test
+    @DisplayName("조건부 수정 결과가 0행이면 발급된 쿠폰 변경 오류를 반환한다")
+    void when_conditional_update_changes_nothing_not_modifiable_error_is_thrown() {
+        Coupon coupon = coupon();
+        CouponUpdateCommand command = new CouponUpdateCommand(null, 20, null, null, null);
+        when(couponRepository.findActiveById(COUPON_ID)).thenReturn(java.util.Optional.of(coupon));
+        when(couponRepository.updateIfUnissued(
+                org.mockito.ArgumentMatchers.eq(COUPON_ID),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.any(Instant.class),
+                org.mockito.ArgumentMatchers.any(Instant.class),
+                org.mockito.ArgumentMatchers.eq(CREATOR_ID),
+                org.mockito.ArgumentMatchers.eq(NOW)))
+                .thenReturn(0);
+
+        assertThatThrownBy(() -> couponCommandService.update(COUPON_ID, command, CREATOR_ID))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(CouponErrorCode.COUPON_NOT_MODIFIABLE));
+    }
+
+    @Test
+    @DisplayName("부분 수정 결과의 기간이 올바르지 않으면 거부한다")
+    void when_partial_update_makes_invalid_period_update_is_rejected() {
+        Coupon coupon = coupon();
+        CouponUpdateCommand command = new CouponUpdateCommand(
+                null, null, null, EXPIRED_AT.plusSeconds(1), null);
+        when(couponRepository.findActiveById(COUPON_ID)).thenReturn(java.util.Optional.of(coupon));
+
+        assertThatThrownBy(() -> couponCommandService.update(COUPON_ID, command, CREATOR_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("쿠폰 시작 시각은 만료 시각보다 빨라야 합니다.");
+    }
+
+    private Coupon coupon() {
+        return Coupon.create(
+                COUPON_ID, "기존 쿠폰", 15, 100,
+                STARTED_AT, EXPIRED_AT, CREATOR_ID, NOW.minusSeconds(1));
     }
 }

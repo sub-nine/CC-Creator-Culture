@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.sub9.orderservice.coupon.application.event.CouponCreatedEvent;
+import com.sub9.orderservice.coupon.application.event.CouponUpdatedEvent;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +41,14 @@ class RedisCouponRemainingQuantityInitializerTest {
         initializer.initialize(new CouponCreatedEvent(COUPON_ID, 100));
 
         verify(valueOperations).set(CouponRedisKey.remaining(COUPON_ID), "100");
+    }
+
+    @Test
+    @DisplayName("수정된 쿠폰 전체 수량으로 Redis 잔여 수량을 갱신한다")
+    void updates_remaining_quantity() {
+        initializer.update(new CouponUpdatedEvent(COUPON_ID, 200));
+
+        verify(valueOperations).set(CouponRedisKey.remaining(COUPON_ID), "200");
     }
 
     @Test
