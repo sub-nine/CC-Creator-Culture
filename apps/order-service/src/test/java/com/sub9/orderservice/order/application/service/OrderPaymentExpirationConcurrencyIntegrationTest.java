@@ -9,8 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.sub9.common.exception.BusinessException;
-import com.sub9.orderservice.cart.application.service.CartService;
-import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
+import com.sub9.orderservice.cart.application.service.CartQueryService;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
@@ -63,7 +62,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         "management.tracing.export.enabled=false"
 })
 @MockitoBean(types = {
-        CartService.class,
+        CartQueryService.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
         StockPort.class,

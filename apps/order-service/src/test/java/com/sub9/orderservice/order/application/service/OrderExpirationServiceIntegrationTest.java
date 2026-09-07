@@ -1,27 +1,12 @@
 package com.sub9.orderservice.order.application.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.verify;
-
-import com.sub9.orderservice.cart.application.service.CartService;
-import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
+import com.sub9.orderservice.cart.application.service.CartQueryService;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
-import com.sub9.orderservice.order.domain.model.Money;
-import com.sub9.orderservice.order.domain.model.Order;
-import com.sub9.orderservice.order.domain.model.OrderItem;
-import com.sub9.orderservice.order.domain.model.OrderStatus;
-import com.sub9.orderservice.order.domain.model.ProductSnapshot;
-import com.sub9.orderservice.order.domain.model.ShippingAddress;
+import com.sub9.orderservice.order.domain.model.*;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,6 +21,14 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.*;
+
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
         "spring.cloud.config.enabled=false",
@@ -47,7 +40,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         "management.tracing.export.enabled=false"
 })
 @MockitoBean(types = {
-        CartService.class,
+    CartQueryService.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
         StockPort.class,

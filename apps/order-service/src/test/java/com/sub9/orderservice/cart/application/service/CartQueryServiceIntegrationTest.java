@@ -12,6 +12,7 @@ import com.sub9.orderservice.cart.presentation.response.CartItemResponse;
 import com.sub9.orderservice.order.application.port.output.CartSnapshotPort.CartItemSnapshot;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.support.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
@@ -35,6 +36,7 @@ class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
   @MockitoBean private CouponApplicationPort couponApplicationPort;
   @MockitoBean private CouponUsagePort couponUsagePort;
   @MockitoBean private StockPort stockPort;
+  @MockitoBean private PaymentCancellationPort paymentCancellationPort;
 
   private UUID userId;
 
