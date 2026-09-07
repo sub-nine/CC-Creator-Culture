@@ -1,7 +1,7 @@
 package com.sub9.productservice.product.infrastructure.kafka.listener;
 
 import com.sub9.common.kafka.topic.KafkaTopics;
-import com.sub9.productservice.product.application.command.dto.IncrementDailyViewCountsCommand;
+import com.sub9.productservice.product.application.command.dto.product.IncrementDailyViewCountsCommand;
 import com.sub9.productservice.product.application.command.service.ProductViewCountCommandService;
 import com.sub9.common.kafka.event.ProductViewSyncEvent;
 import lombok.RequiredArgsConstructor;

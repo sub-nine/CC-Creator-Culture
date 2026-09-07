@@ -1,7 +1,7 @@
 package com.sub9.productservice.product.application.validation;
 
 import com.sub9.common.exception.BusinessException;
-import com.sub9.productservice.product.application.command.dto.CreateSkuCommand;
+import com.sub9.productservice.product.application.command.dto.sku.CreateSkuCommand;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import java.util.List;
 import lombok.experimental.UtilityClass;
