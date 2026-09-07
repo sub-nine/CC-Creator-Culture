@@ -115,6 +115,83 @@ public class Order extends BaseEntity {
         return Collections.unmodifiableList(items);
     }
 
+    public void markPaid(Instant processedAt) {
+        validatePaymentResult(processedAt);
+        status = OrderStatus.PAID;
+        paidAt = processedAt;
+    }
+
+    public void markPaymentFailed(Instant processedAt) {
+        validatePaymentResult(processedAt);
+        status = OrderStatus.FAILED;
+    }
+
+    public boolean expire(Instant now) {
+        Objects.requireNonNull(now, "주문 만료 확인 시각은 필수입니다.");
+        if (status != OrderStatus.PENDING_PAYMENT || now.isBefore(expiresAt)) {
+            return false;
+        }
+        status = OrderStatus.EXPIRED;
+        return true;
+    }
+
+    public void cancel(UUID customerId, Instant canceledAt) {
+        if (!this.customerId.equals(customerId)) {
+            throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
+        }
+        Objects.requireNonNull(canceledAt, "주문 취소 시각은 필수입니다.");
+        if (items.stream().anyMatch(item -> item.getStatus().isCreatorTarget())) {
+            throw new BusinessException(OrderErrorCode.CANNOT_CANCEL_ORDER_IN_PROGRESS);
+        }
+        if (status != OrderStatus.PAID
+                || items.stream().anyMatch(item -> item.getStatus() != OrderItemStatus.ORDERED)) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS);
+        }
+
+        items.forEach(item -> item.changeStatusTo(OrderItemStatus.CANCELED));
+        status = OrderStatus.CANCELED;
+        this.canceledAt = canceledAt;
+    }
+
+    public OrderItem changeItemStatus(
+            UUID creatorId, UUID orderItemId, OrderItemStatus targetStatus) {
+        OrderItem item = items.stream()
+                .filter(candidate -> candidate.getId().equals(orderItemId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        if (!item.getCreatorId().equals(creatorId)) {
+            throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
+        }
+        if (targetStatus == null || !targetStatus.isCreatorTarget()) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_ITEM_STATUS_TRANSITION);
+        }
+        if (item.getStatus() == targetStatus) {
+            return item;
+        }
+        if (status != OrderStatus.PAID && status != OrderStatus.PROCESSING) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS);
+        }
+
+        item.changeStatusTo(targetStatus);
+        status = items.stream().allMatch(candidate -> candidate.getStatus() == OrderItemStatus.COMPLETED)
+                ? OrderStatus.COMPLETED
+                : OrderStatus.PROCESSING;
+        return item;
+    }
+
+    private void validatePaymentResult(Instant processedAt) {
+        Objects.requireNonNull(processedAt, "결제 처리 시각은 필수입니다.");
+        if (status == OrderStatus.EXPIRED) {
+            throw new BusinessException(OrderErrorCode.ORDER_ALREADY_EXPIRED);
+        }
+        if (status != OrderStatus.PENDING_PAYMENT) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS);
+        }
+        if (!processedAt.isBefore(expiresAt)) {
+            throw new BusinessException(OrderErrorCode.ORDER_ALREADY_EXPIRED);
+        }
+    }
+
     private void addItems(List<OrderItem> candidates) {
         if (candidates == null || candidates.isEmpty()) {
             throw new BusinessException(OrderErrorCode.INVALID_ORDER_ITEMS);
