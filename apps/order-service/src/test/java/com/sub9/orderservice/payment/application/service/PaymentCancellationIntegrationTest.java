@@ -1,6 +1,9 @@
 package com.sub9.orderservice.payment.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -19,9 +22,15 @@ import com.sub9.orderservice.cart.application.service.CartQueryService;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
+import com.sub9.orderservice.order.application.service.OrderCommandIdempotencyService;
+import com.sub9.orderservice.order.application.service.OrderItemStatusService;
+import com.sub9.orderservice.order.domain.model.IdempotencyKey;
 import com.sub9.orderservice.order.domain.model.Money;
 import com.sub9.orderservice.order.domain.model.Order;
+import com.sub9.orderservice.order.domain.model.OrderCommandRequest;
+import com.sub9.orderservice.order.domain.model.OrderCommandType;
 import com.sub9.orderservice.order.domain.model.OrderItem;
+import com.sub9.orderservice.order.domain.model.OrderItemStatus;
 import com.sub9.orderservice.order.domain.model.ProductSnapshot;
 import com.sub9.orderservice.order.domain.model.ShippingAddress;
 import com.sub9.orderservice.payment.domain.model.Payment;
@@ -32,6 +41,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,8 +53,10 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -78,8 +90,11 @@ class PaymentCancellationIntegrationTest {
     @Autowired private EntityManager em;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;
+    @Autowired private PaymentCancellationService cancellationService;
+    @Autowired private OrderItemStatusService itemStatusService;
     @Autowired private ObjectMapper mapper;
     @MockitoSpyBean private PaymentRepositoryAdapter payments;
+    @MockitoSpyBean private OrderCommandIdempotencyService commands;
     @MockitoBean private StockPort stock;
     @MockitoBean private CouponUsagePort couponUsage;
 
@@ -137,6 +152,71 @@ class PaymentCancellationIntegrationTest {
         assertThat(countCancellations()).isEqualTo(1);
         verify(stock).restore(eq(order.getId()), anyList(), eq(StockPort.RestoreReason.ORDER_CANCEL));
         verifyNoInteractions(couponUsage);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"missing", "failed", "canceled"})
+    void when_payment_cannot_be_canceled_order_changes_are_rolled_back(String condition) throws Exception {
+        Order order = paidOrder(10000, condition.equals("failed") ? PaymentStatus.FAILED : PaymentStatus.SUCCESS);
+        if (condition.equals("missing")) {
+            jdbc.update("delete from p_payments");
+        } else if (condition.equals("canceled")) {
+            transaction().executeWithoutResult(ignored -> {
+                UUID commandId = ids.generate();
+                em.persist(OrderCommandRequest.start(commandId, CUSTOMER, OrderCommandType.CANCEL_ORDER,
+                        IdempotencyKey.from("previous"), "a".repeat(64)));
+                cancellationService.cancel(order.getId(), commandId, PAID_AT.plusSeconds(60));
+            });
+        }
+        mvc.perform(request(order, "cancel")).andExpect(status().isConflict())
+                .andExpect(jsonPath("errorCode").value("PAYMENT_0002"));
+        assertState("PAID", "ORDERED", condition.equals("canceled") ? 1 : 0, "FAILED");
+        verifyNoInteractions(stock, couponUsage);
+    }
+
+    @Test
+    void when_shipping_has_started_payment_is_unchanged() throws Exception {
+        Order order = paidOrder(10000, PaymentStatus.SUCCESS);
+        OrderItem item = order.getItems().getFirst();
+        itemStatusService.update(item.getCreatorId(), item.getId(), OrderItemStatus.PREPARING);
+        mvc.perform(request(order, "cancel")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("errorCode").value("ORDER_0005"));
+        assertThat(countCancellations()).isZero();
+        assertThat(jdbc.queryForObject("select status from p_payments", String.class)).isEqualTo("SUCCESS");
+        verifyNoInteractions(stock, couponUsage);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void when_save_fails_entire_cancellation_rolls_back(boolean failPaymentSave) throws Exception {
+        Order order = paidOrder(10000, PaymentStatus.SUCCESS);
+        if (failPaymentSave) {
+            doAnswer(invocation -> {
+                invocation.callRealMethod();
+                em.flush();
+                throw new IllegalStateException("결제 취소 저장 실패");
+            }).when(payments).save(any());
+        } else {
+            doAnswer(invocation -> {
+                invocation.callRealMethod();
+                em.flush();
+                throw new IllegalStateException("명령 성공 결과 저장 실패");
+            }).when(AopTestUtils.<OrderCommandIdempotencyService>getUltimateTargetObject(commands))
+                    .completeSuccess(any(), any(), anyInt(), any());
+        }
+        mvc.perform(request(order, "cancel")).andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("errorCode").value("COMMON_0001"));
+        assertState("PAID", "ORDERED", 0, "FAILED");
+        assertThat(jdbc.queryForObject("select status from p_payments", String.class)).isEqualTo("SUCCESS");
+        verifyNoInteractions(stock, couponUsage);
+    }
+
+    @Test
+    void when_no_transaction_exists_cancellation_is_rejected_before_saving() {
+        Order order = paidOrder(10000, PaymentStatus.SUCCESS);
+        assertThatThrownBy(() -> cancellationService.cancel(order.getId(), ids.generate(), PAID_AT))
+                .isInstanceOf(IllegalTransactionStateException.class);
+        assertThat(countCancellations()).isZero();
     }
 
     private Order paidOrder(long amount, PaymentStatus paymentStatus) {
