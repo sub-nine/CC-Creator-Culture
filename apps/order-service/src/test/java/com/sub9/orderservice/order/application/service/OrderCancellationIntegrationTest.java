@@ -20,6 +20,7 @@ import com.sub9.common.dto.response.ErrorResponse;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.common.identifier.UuidV7Generator;
+import com.sub9.orderservice.cart.application.service.CartService;
 import com.sub9.orderservice.common.security.GatewayHeaderAuthenticationFilter;
 import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
@@ -90,7 +91,7 @@ import tools.jackson.databind.JsonNode;
         "management.tracing.export.enabled=false"
 })
 @MockitoBean(types = {
-        CartSnapshotPort.class,
+        CartService.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
         StockPort.class,
