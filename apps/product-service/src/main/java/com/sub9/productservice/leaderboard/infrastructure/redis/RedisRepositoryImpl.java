@@ -1,6 +1,8 @@
 package com.sub9.productservice.leaderboard.infrastructure.redis;
 
 import com.sub9.productservice.leaderboard.application.port.out.RedisRepository;
+import com.sub9.productservice.leaderboard.domain.model.LeaderboardEventType;
+import com.sub9.productservice.leaderboard.domain.model.LeaderboardScore;
 import com.sub9.productservice.leaderboard.domain.model.LeaderboardType;
 import com.sub9.productservice.leaderboard.domain.model.RankedMember;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +16,6 @@ import org.springframework.stereotype.Repository;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -53,32 +54,24 @@ public class RedisRepositoryImpl implements RedisRepository {
     }
 
     @Override
-    public boolean incrementScoresIfNotProcessedForOrder(
-            UUID orderId,
-            Duration ttl,
-            Map<UUID, Double> categoryScores,
-            Map<UUID, Double> hashtagScores
+    public boolean incrementScoresIfNotProcessed(
+            LeaderboardEventType type,
+            UUID keyId,
+            List<LeaderboardScore> categoryScores,
+            List<LeaderboardScore> hashtagScores
     ) {
-        return applyIfNotProcessed(
-                LeaderboardRedisKey.processedOrder(orderId), ttl, categoryScores, hashtagScores);
-    }
+        String markerKey = LeaderboardRedisKey.processed(type, keyId);
 
-    @Override
-    public boolean incrementScoresIfNotProcessedForProductView(
-            UUID eventId,
-            Duration ttl,
-            Map<UUID, Double> categoryScores,
-            Map<UUID, Double> hashtagScores
-    ) {
+        // increment_score_if_not_processed.lua 스크립트를 통한 Redis 리더보드 스코어 멱등 갱신
         return applyIfNotProcessed(
-                LeaderboardRedisKey.processProductView(eventId), ttl, categoryScores, hashtagScores);
+                markerKey, type.getIdempotencyTtl(), categoryScores, hashtagScores);
     }
 
     private boolean applyIfNotProcessed(
             String markerKey,
             Duration ttl,
-            Map<UUID, Double> categoryScores,
-            Map<UUID, Double> hashtagScores
+            List<LeaderboardScore> categoryScores,
+            List<LeaderboardScore> hashtagScores
     ) {
         List<String> keys = List.of(
                 markerKey,
@@ -95,11 +88,11 @@ public class RedisRepositoryImpl implements RedisRepository {
         return Long.valueOf(1L).equals(applied);
     }
 
-    private void appendScoreArgs(List<String> args, int keyIndex, Map<UUID, Double> scores) {
-        scores.forEach((targetId, score) -> {
+    private void appendScoreArgs(List<String> args, int keyIndex, List<LeaderboardScore> scores) {
+        scores.forEach((leaderboardScore) -> {
             args.add(String.valueOf(keyIndex));
-            args.add(targetId.toString());
-            args.add(String.valueOf(score));
+            args.add(leaderboardScore.targetId().toString());
+            args.add(String.valueOf(leaderboardScore.score()));
         });
     }
 }

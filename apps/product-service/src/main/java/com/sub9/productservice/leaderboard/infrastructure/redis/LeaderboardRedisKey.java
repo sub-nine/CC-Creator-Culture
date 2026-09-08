@@ -1,5 +1,6 @@
 package com.sub9.productservice.leaderboard.infrastructure.redis;
 
+import com.sub9.productservice.leaderboard.domain.model.LeaderboardEventType;
 import com.sub9.productservice.leaderboard.domain.model.LeaderboardType;
 
 import java.util.UUID;
@@ -11,17 +12,14 @@ public final class LeaderboardRedisKey {
     private static final String PROCESSED_ORDER_PREFIX = "leaderboard:processed:order:paid:";
     private static final String PROCESSED_PRODUCT_VIEW_PREFIX = "leaderboard:processed:product:viewed:";
 
-    private LeaderboardRedisKey() {}
-
     public static String current(LeaderboardType type) {
         return CURRENT_PREFIX + type.name().toLowerCase();
     }
 
-    public static String processedOrder(UUID orderId) {
-        return PROCESSED_ORDER_PREFIX + orderId;
-    }
-
-    public static String processProductView(UUID eventId) {
-        return PROCESSED_PRODUCT_VIEW_PREFIX + eventId;
+    public static String processed(LeaderboardEventType type, UUID id) {
+        return switch (type) {
+            case LeaderboardEventType.ORDER_PAID -> PROCESSED_ORDER_PREFIX + id;
+            case LeaderboardEventType.PRODUCT_SYNC_VIEW -> PROCESSED_PRODUCT_VIEW_PREFIX + id;
+        };
     }
 }
