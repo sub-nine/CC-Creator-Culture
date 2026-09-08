@@ -14,7 +14,7 @@ public interface ProductDailyViewCommandJPARepository
   @Query(
       value =
           """
-                  INSERT INTO p_product_daily_views (
+                  INSERT INTO private.p_product_daily_views (
                       id,
                       product_id,
                       view_count,
@@ -28,7 +28,7 @@ public interface ProductDailyViewCommandJPARepository
                   )
                   ON CONFLICT (product_id, view_date)
                   DO UPDATE SET
-                      view_count = p_product_daily_views.view_count + EXCLUDED.view_count
+                      view_count = private.p_product_daily_views.view_count + EXCLUDED.view_count
                   """,
       nativeQuery = true)
   void upsert(UUID id, UUID productId, long viewCount, LocalDate viewDate);
