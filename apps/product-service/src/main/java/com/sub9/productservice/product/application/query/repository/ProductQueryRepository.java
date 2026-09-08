@@ -12,7 +12,7 @@ import org.springframework.data.domain.Pageable;
 public interface ProductQueryRepository {
   Optional<ProductDetailInfo> findProductDetailById(UUID productId);
 
-  List<SkuInfo> findAllSkuInfoByIds(List<UUID> skuIds);
+  List<SkuInfo> getCartItemProducts(List<UUID> skuIds);
 
   Page<ProductInfo> searchProducts(String keyword, Pageable pageable);
 

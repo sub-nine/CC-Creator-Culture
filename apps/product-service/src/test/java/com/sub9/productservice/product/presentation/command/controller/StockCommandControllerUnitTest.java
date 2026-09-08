@@ -29,7 +29,7 @@ class StockCommandControllerUnitTest extends AbstractControllerTest {
   @MockitoBean StockCommandService stockCommandService;
   private final UUID creatorId = UUID.randomUUID();
   private final UUID skuId = UUID.randomUUID();
-  private final String endPoint = "/api/v1/stock/{skuId}/adjustments";
+  private final String endPoint = "/api/v1/skus/{skuId}/stock/adjustments";
 
   @Nested
   @DisplayName("재고 조정 테스트")

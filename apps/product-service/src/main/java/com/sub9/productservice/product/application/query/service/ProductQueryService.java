@@ -9,6 +9,8 @@ import com.sub9.productservice.product.application.query.dto.ProductInfo;
 import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import java.util.List;
 import java.util.UUID;
+
+import com.sub9.productservice.product.domain.model.ProductStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -38,10 +40,20 @@ public class ProductQueryService {
     return response;
   }
 
-  public List<SkuInfo> getSkus(List<UUID> skuIds) {
+  public List<SkuInfo> getCartItemProducts(List<UUID> skuIds) {
     if (skuIds.isEmpty()) {
       return List.of();
     }
-    return productQueryRepository.findAllSkuInfoByIds(skuIds);
+    return productQueryRepository.getCartItemProducts(skuIds);
+  }
+
+  public void validateSkuForCart(UUID skuId) {
+    List<SkuInfo> skuinfos = productQueryRepository.getCartItemProducts(List.of(skuId));
+
+    if (skuinfos.isEmpty()) throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
+    SkuInfo skuInfo = skuinfos.getFirst();
+
+    if (skuInfo.productStatus() != ProductStatus.ACTIVE) throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOR_SALE);
+    if (skuInfo.quantity() <= 0) throw new  BusinessException(ProductErrorCode.SKU_SOLD_OUT);
   }
 }
