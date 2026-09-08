@@ -66,7 +66,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import com.sub9.common.kafka.event.OrderPaidEvent;
 import org.mockito.ArgumentCaptor;
@@ -152,7 +151,7 @@ class MockPaymentIntegrationTest {
             verify(kafka).send(eq("order_paid"), eq(order.getId().toString()), payload.capture());
             assertThat(mapper.readValue(payload.getValue(), OrderPaidEvent.class))
                     .isEqualTo(new OrderPaidEvent(order.getId(),
-                            Map.of(order.getItems().getFirst().getProductId(), 2L)));
+                            List.of(new OrderPaidEvent.ProductQuantity(order.getItems().getFirst().getProductId(), 2L))));
             verifyNoMoreInteractions(kafka);
         } else {
             verifyNoInteractions(kafka);

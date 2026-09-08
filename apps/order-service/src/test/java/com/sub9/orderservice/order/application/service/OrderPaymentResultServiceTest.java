@@ -20,7 +20,6 @@ import com.sub9.orderservice.order.domain.model.ShippingAddress;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import com.sub9.common.kafka.event.OrderPaidEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.ArgumentCaptor;
@@ -156,8 +155,10 @@ class OrderPaymentResultServiceTest {
         ArgumentCaptor<OrderPaidEvent> event = ArgumentCaptor.forClass(OrderPaidEvent.class);
         verify(eventPublisher).publishEvent(event.capture());
         assertThat(event.getValue().orderId()).isEqualTo(order.getId());
-        assertThat(event.getValue().productQuantities()).isEqualTo(Map.of(first, 5L, second, 4L));
-        assertThatThrownBy(() -> event.getValue().productQuantities().put(first, 9L))
+        assertThat(event.getValue().productQuantities()).containsExactlyInAnyOrder(
+                new OrderPaidEvent.ProductQuantity(first, 5L),
+                new OrderPaidEvent.ProductQuantity(second, 4L));
+        assertThatThrownBy(() -> event.getValue().productQuantities().add(new OrderPaidEvent.ProductQuantity(first, 9L)))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 

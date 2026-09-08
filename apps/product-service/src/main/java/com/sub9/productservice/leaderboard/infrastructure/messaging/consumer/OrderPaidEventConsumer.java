@@ -23,10 +23,10 @@ public class OrderPaidEventConsumer {
         try {
             log.info("[KAFKA] 주문 결제 이벤트 수신 - orderId: {}, products: {}",
                     event.orderId(), event.productQuantities());
-            List<ProductQuantity> productQuantities = event.productQuantities().entrySet().stream().map((quantity) ->
+            List<ProductQuantity> productQuantities = event.productQuantities().stream().map((quantity) ->
                     new ProductQuantity(
-                            quantity.getKey(),
-                            quantity.getValue()
+                            quantity.productId(),
+                            quantity.quantity()
                     )
             ).toList();
             recordOrderScoreUseCase.recordOrderScore(event.orderId(), productQuantities);

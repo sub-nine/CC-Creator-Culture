@@ -9,7 +9,6 @@ import com.sub9.common.kafka.event.OrderPaidEvent;
 import com.sub9.productservice.leaderboard.application.model.ProductQuantity;
 import com.sub9.productservice.leaderboard.application.port.in.RecordOrderScoreUseCase;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +28,8 @@ class OrderPaidEventConsumerTest {
         UUID orderId = UUID.randomUUID();
         UUID first = UUID.randomUUID();
         UUID second = UUID.randomUUID();
-        OrderPaidEvent event = new OrderPaidEvent(orderId, Map.of(first, 5L, second, 2L));
+        OrderPaidEvent event = new OrderPaidEvent(orderId, List.of(new OrderPaidEvent.ProductQuantity(first, 5L),
+                new OrderPaidEvent.ProductQuantity(second, 2L)));
 
         consumer.consume(event, ack);
 
@@ -50,7 +50,7 @@ class OrderPaidEventConsumerTest {
                 .when(useCase).recordOrderScore(eq(orderId), anyList());
 
         assertThatThrownBy(() -> consumer.consume(
-                new OrderPaidEvent(orderId, Map.of(productId, 5L)), ack))
+                new OrderPaidEvent(orderId, List.of(new OrderPaidEvent.ProductQuantity(productId, 5L))), ack))
                 .isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(ack);
     }

@@ -38,7 +38,9 @@ public class OrderPaymentResultService implements PaymentResultUseCase {
                 .collect(Collectors.groupingBy(
                         item -> item.getProductId(),
                         Collectors.summingLong(item -> item.getProductSnapshot().getQuantity())));
-        eventPublisher.publishEvent(new OrderPaidEvent(orderId, Map.copyOf(quantities)));
+        eventPublisher.publishEvent(new OrderPaidEvent(orderId, quantities.entrySet().stream()
+                .map(entry -> new OrderPaidEvent.ProductQuantity(entry.getKey(), entry.getValue()))
+                .toList()));
     }
 
     @Override

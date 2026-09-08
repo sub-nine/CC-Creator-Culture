@@ -6,7 +6,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import com.sub9.common.kafka.event.OrderPaidEvent;
-import java.util.Map;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.DisplayName;
@@ -23,7 +23,7 @@ class OrderPaidKafkaPublisherTest {
     private final JsonMapper mapper = new JsonMapper();
     private final OrderPaidKafkaPublisher publisher = new OrderPaidKafkaPublisher(kafka, mapper);
     private final OrderPaidEvent event = new OrderPaidEvent(UUID.randomUUID(),
-            Map.of(UUID.randomUUID(), 5L));
+            List.of(new OrderPaidEvent.ProductQuantity(UUID.randomUUID(), 5L)));
 
     @Test
     @DisplayName("지정된 토픽과 주문 ID 키로 이벤트 JSON을 발행한다")
