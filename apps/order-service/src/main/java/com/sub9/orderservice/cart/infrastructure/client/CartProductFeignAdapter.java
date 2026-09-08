@@ -30,7 +30,7 @@ public class CartProductFeignAdapter implements CartProductPort {
   @Override
   public List<CartProductInfo> getCartItemProducts(List<UUID> skuIds) {
     try {
-       return feignClient.getCartItemProducts(skuIds);
+       return feignClient.getProductsForCart(skuIds);
     } catch (FeignException.NotFound | FeignException.Conflict | FeignException.BadRequest e) {
       throw new BusinessException(CartProductClientErrorCode.INVALID_CART_PRODUCT);
     } catch (FeignException e) {

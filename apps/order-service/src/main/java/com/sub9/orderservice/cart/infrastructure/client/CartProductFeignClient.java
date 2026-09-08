@@ -10,16 +10,15 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 
-// TODO : URL 경로가 변경되어 Merge 이후 Product에서 수정 필요
 @FeignClient(
     name = "product-service",
     path = "/internal/v1/skus",
     configuration = OpenFeignConfig.class)
 public interface CartProductFeignClient {
 
-  @GetMapping("/{skuId}")
+  @GetMapping("/{skuId}/validation")
   void validateSkuForCart(@PathVariable UUID skuId);
 
   @PostMapping
-  List<CartProductInfo> getCartItemProducts(List<UUID> skuIds);
+  List<CartProductInfo> getProductsForCart(List<UUID> skuIds);
 }

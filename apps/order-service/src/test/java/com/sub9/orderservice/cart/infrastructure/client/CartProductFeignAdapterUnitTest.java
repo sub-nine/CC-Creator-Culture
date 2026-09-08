@@ -87,14 +87,14 @@ class CartProductFeignAdapterUnitTest {
           new CartProductInfo(
               skuIds.getFirst(), UUID.randomUUID(), UUID.randomUUID(), "상품", "옵션", "ACTIVE", 1000L);
 
-      given(feignClient.getCartItemProducts(skuIds)).willReturn(List.of(info));
+      given(feignClient.getProductsForCart(skuIds)).willReturn(List.of(info));
 
       // when
       List<CartProductInfo> result = adapter.getCartItemProducts(skuIds);
 
       // then
       assertThat(result).containsExactly(info);
-      verify(feignClient).getCartItemProducts(skuIds);
+      verify(feignClient).getProductsForCart(skuIds);
     }
   }
 

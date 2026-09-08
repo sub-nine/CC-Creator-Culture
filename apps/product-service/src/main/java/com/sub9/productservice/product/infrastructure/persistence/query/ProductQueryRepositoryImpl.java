@@ -56,7 +56,7 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
   }
 
   @Override
-  public List<SkuInfo> findAllSkuInfoByIds(List<UUID> skuIds) {
+  public List<SkuInfo> getCartItemProducts(List<UUID> skuIds) {
     return queryFactory
         .select(
             Projections.constructor(
