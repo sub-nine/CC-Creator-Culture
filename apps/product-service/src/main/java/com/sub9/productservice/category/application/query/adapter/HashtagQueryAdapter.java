@@ -2,12 +2,12 @@ package com.sub9.productservice.category.application.query.adapter;
 
 import com.sub9.productservice.category.application.query.port.out.HashtagQueryRepository;
 import com.sub9.productservice.category.presentation.query.dto.HashtagResponse;
+import com.sub9.productservice.category.presentation.query.dto.ProductHashtagIdsResponse;
 import com.sub9.productservice.leaderboard.application.port.out.HashtagQueryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -21,8 +21,8 @@ public class HashtagQueryAdapter implements HashtagQueryPort {
     }
 
     @Override
-    public Map<UUID, List<UUID>> getHashtagIdsByProductIds(List<UUID> productIds) {
+    public List<ProductHashtagIdsResponse> getHashtagIdsByProductIds(List<UUID> productIds) {
         // TODO: HashtagProduct 리포지토리 연결 후 productId -> hashtagIds 매핑 구현
-        return Map.of();
+        return List.of();
     }
 }
