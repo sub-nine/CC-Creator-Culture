@@ -146,7 +146,7 @@ class ProductViewCountCommandServiceIntegrationTest extends AbstractIntegrationT
       entityManager.flush();
 
       entityManager
-          .createNativeQuery("UPDATE private.p_products SET view_count = 10 WHERE id = :productId")
+          .createNativeQuery("UPDATE p_products SET view_count = 10 WHERE id = :productId")
           .setParameter("productId", product.getId())
           .executeUpdate();
       entityManager.clear();
