@@ -15,15 +15,10 @@ spring:
         register-with-eureka: false
         fetch-registry: false
 
-  datasource:
-    hikari:
-      connection-init-sql: CREATE SCHEMA IF NOT EXISTS private
-
   jpa:
     hibernate:
       ddl-auto: create-drop
     show-sql: true
     properties:
       hibernate:
-        default_schema: private
         format_sql: true

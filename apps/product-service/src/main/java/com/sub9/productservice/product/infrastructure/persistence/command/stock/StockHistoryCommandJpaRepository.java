@@ -12,7 +12,7 @@ public interface StockHistoryCommandJpaRepository extends JpaRepository<StockHis
   @Query(
       value =
           """
-              INSERT INTO private.p_stock_history (
+              INSERT INTO p_stock_history (
                   id,
                   order_id,
                   sku_id,
