@@ -8,6 +8,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface CategoryCommandJpaRepository extends JpaRepository<Category, UUID> {
+public interface CategoryJpaRepository extends JpaRepository<Category, UUID> {
     Optional<Category> findByIdAndDeletedAtIsNull(UUID id);
 }

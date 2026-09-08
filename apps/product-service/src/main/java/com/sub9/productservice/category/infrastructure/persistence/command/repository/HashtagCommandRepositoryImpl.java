@@ -12,7 +12,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class HashtagCommandRepositoryImpl implements HashtagCommandRepository {
 
-    private final HashtagCommandJpaRepository jpaRepository;
+    private final HashtagJpaRepository jpaRepository;
 
     @Override
     public Hashtag save(Hashtag hashtag) {

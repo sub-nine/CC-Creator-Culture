@@ -11,19 +11,19 @@ import java.util.UUID;
 
 @Repository
 @RequiredArgsConstructor
-public class CategoryCommandRepositoryImpl implements CategoryCommandRepository {
+public class CategoryRepositoryImpl implements CategoryCommandRepository {
 
-    private final CategoryCommandJpaRepository categoryCommandJpaRepository;
+    private final CategoryJpaRepository categoryJpaRepository;
     private final CategoryHashtagCommandJpaRepository categoryHashtagCommandJpaRepository;
 
     @Override
     public Category save(Category category) {
-        return categoryCommandJpaRepository.save(category);
+        return categoryJpaRepository.save(category);
     }
 
     @Override
     public Optional<Category> findById(UUID categoryId) {
-        return categoryCommandJpaRepository.findByIdAndDeletedAtIsNull(categoryId);
+        return categoryJpaRepository.findByIdAndDeletedAtIsNull(categoryId);
     }
 
     @Override

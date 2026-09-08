@@ -8,6 +8,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface HashtagCommandJpaRepository extends JpaRepository<Hashtag, UUID> {
+public interface HashtagJpaRepository extends JpaRepository<Hashtag, UUID> {
     Optional<Hashtag> findByIdAndDeletedAtIsNull(UUID hashtagId);
 }
