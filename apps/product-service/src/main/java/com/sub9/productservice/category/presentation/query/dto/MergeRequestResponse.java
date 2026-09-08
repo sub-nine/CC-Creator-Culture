@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record MergeRequestResponse(
-        UUID requestId,
+        UUID id,
         UUID categoryId,
         String categoryName,
         UUID hashtagId,

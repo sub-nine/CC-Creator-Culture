@@ -4,7 +4,7 @@ import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.common.annotation.Manager;
 import com.sub9.productservice.product.application.command.service.ProductCommandService;
-import com.sub9.productservice.product.presentation.command.dto.reqeust.UpdateAdminProductStatusRequest;
+import com.sub9.productservice.product.presentation.command.dto.reqeust.product.UpdateAdminProductStatusRequest;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

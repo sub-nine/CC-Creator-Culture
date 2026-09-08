@@ -8,8 +8,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.sub9.common.exception.BusinessException;
-import com.sub9.productservice.product.application.command.dto.UpdateProductCommand;
-import com.sub9.productservice.product.application.command.dto.UpdateProductStatusCommand;
+import com.sub9.productservice.product.application.command.dto.product.UpdateProductCommand;
+import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;

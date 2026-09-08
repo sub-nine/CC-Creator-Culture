@@ -1,0 +1,421 @@
+package com.sub9.orderservice.coupon.infrastructure.persistence;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.sub9.common.identifier.UuidV7Generator;
+import com.sub9.orderservice.cart.application.service.CartQueryService;
+import com.sub9.orderservice.coupon.domain.model.Coupon;
+import com.sub9.orderservice.coupon.domain.model.UserCoupon;
+import com.sub9.orderservice.coupon.domain.model.UserCouponStatus;
+import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
+import com.sub9.orderservice.coupon.domain.repository.UserCouponRepository;
+import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
+import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
+import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
+import com.sub9.orderservice.order.application.port.output.StockPort;
+import jakarta.persistence.EntityManager;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+
+@Testcontainers(disabledWithoutDocker = true)
+@SpringBootTest(properties = {
+    "spring.cloud.config.enabled=false",
+    "eureka.client.enabled=false",
+    "spring.jpa.open-in-view=false",
+    "spring.jpa.hibernate.ddl-auto=create-drop",
+    "spring.jpa.properties.hibernate.jdbc.time_zone=UTC",
+    "spring.datasource.hikari.connection-init-sql=SET TIME ZONE 'UTC'",
+    "management.tracing.export.enabled=false"
+})
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@DisplayName("쿠폰 도메인 PostgreSQL 영속성")
+class CouponPersistenceIntegrationTest {
+
+    private static final Instant CREATED_AT = Instant.parse("2026-09-01T00:00:00Z");
+    private static final Instant STARTED_AT = Instant.parse("2026-09-01T01:00:00Z");
+    private static final Instant EXPIRED_AT = Instant.parse("2026-09-03T14:59:59Z");
+
+    @Container
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine")
+        .withDatabaseName("order_service_test")
+        .withUsername("test")
+        .withPassword("test");
+
+    private final UuidV7Generator uuidGenerator = new UuidV7Generator();
+
+    @Autowired private CouponRepository couponRepository;
+    @Autowired private UserCouponRepository userCouponRepository;
+    @Autowired private EntityManager entityManager;
+    @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private PlatformTransactionManager transactionManager;
+
+    @MockitoBean CartQueryService cartService;
+
+    @MockitoBean PaymentCancellationPort paymentCancellationPort;
+
+    @MockitoBean StockPort stockPort;
+
+    @MockitoBean CouponApplicationPort couponApplicationPort;
+
+    @MockitoBean CouponUsagePort couponUsagePort;
+
+    @DynamicPropertySource
+    static void registerDataSourceProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES::getUsername);
+        registry.add("spring.datasource.password", POSTGRES::getPassword);
+    }
+
+    @AfterEach
+    void cleanDatabase() {
+        jdbcTemplate.update("delete from p_user_coupons");
+        jdbcTemplate.update("delete from p_coupons");
+    }
+
+    @Test
+    @DisplayName("쿠폰과 사용자 쿠폰을 저장하고 식별자와 소유 관계로 조회한다")
+    void when_coupon_and_user_coupon_are_saved_relationship_is_restored() {
+        Coupon coupon = coupon(10);
+        UUID userId = uuidGenerator.generate();
+        UserCoupon userCoupon = UserCoupon.issue(uuidGenerator.generate(), coupon, userId, STARTED_AT);
+
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(coupon);
+            userCouponRepository.save(userCoupon);
+            entityManager.flush();
+        });
+
+        assertThat(couponRepository.findActiveById(coupon.getId())).isPresent();
+        assertThat(userCouponRepository.findById(userCoupon.getId()))
+            .get()
+            .extracting(UserCoupon::getCouponId, UserCoupon::getUserId)
+            .containsExactly(coupon.getId(), userId);
+        assertThat(userCouponRepository.existsByCouponIdAndUserId(coupon.getId(), userId)).isTrue();
+    }
+
+    @Test
+    @DisplayName("쿠폰 목록은 삭제된 쿠폰을 제외하고 요청한 순서로 조회한다")
+    void when_coupon_list_is_queried_deleted_coupon_is_excluded_and_sort_is_applied() {
+        Coupon earlier = coupon("먼저 시작하는 쿠폰", STARTED_AT);
+        Coupon later = coupon("나중에 시작하는 쿠폰", STARTED_AT.plusSeconds(60));
+        Coupon deleted = coupon("삭제된 쿠폰", STARTED_AT.plusSeconds(120));
+        deleted.delete(uuidGenerator.generate(), CREATED_AT.plusSeconds(1));
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(earlier);
+            couponRepository.save(later);
+            couponRepository.save(deleted);
+        });
+
+        var result = couponRepository.findAllActive(PageRequest.of(
+                0, 10, Sort.by(Sort.Direction.DESC, "startedAt")));
+
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getContent())
+                .extracting(Coupon::getCouponName)
+                .containsExactly("나중에 시작하는 쿠폰", "먼저 시작하는 쿠폰");
+    }
+
+    @Test
+    @DisplayName("내 쿠폰 목록은 다른 사용자를 제외하고 발급 시각 순서로 페이징한다")
+    void when_user_coupons_are_queried_only_owner_coupons_are_paged() {
+        Coupon earlierCoupon = coupon("먼저 발급된 사용자 쿠폰", STARTED_AT);
+        Coupon laterCoupon = coupon("나중에 발급된 사용자 쿠폰", STARTED_AT);
+        Coupon otherCoupon = coupon("다른 사용자 쿠폰", STARTED_AT);
+        UUID ownerId = uuidGenerator.generate();
+        UUID otherUserId = uuidGenerator.generate();
+        UserCoupon earlier = UserCoupon.issue(
+                uuidGenerator.generate(), earlierCoupon, ownerId, STARTED_AT);
+        UserCoupon later = UserCoupon.issue(
+                uuidGenerator.generate(), laterCoupon, ownerId, STARTED_AT.plusSeconds(1));
+        UserCoupon other = UserCoupon.issue(
+                uuidGenerator.generate(), otherCoupon, otherUserId, STARTED_AT.plusSeconds(2));
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(earlierCoupon);
+            couponRepository.save(laterCoupon);
+            couponRepository.save(otherCoupon);
+            userCouponRepository.save(earlier);
+            userCouponRepository.save(later);
+            userCouponRepository.save(other);
+        });
+
+        var result = userCouponRepository.findAllByUserId(
+                ownerId, null,
+                PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "issuedAt")));
+
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getContent()).extracting(UserCoupon::getId)
+                .containsExactly(later.getId());
+    }
+
+    @Test
+    @DisplayName("내 쿠폰 목록은 요청한 사용 상태만 조회한다")
+    void when_user_coupon_status_is_given_only_matching_status_is_returned() {
+        Coupon issuedCoupon = coupon("발급 상태 사용자 쿠폰", STARTED_AT);
+        Coupon usedCoupon = coupon("사용 상태 사용자 쿠폰", STARTED_AT);
+        UUID userId = uuidGenerator.generate();
+        UserCoupon issued = UserCoupon.issue(
+                uuidGenerator.generate(), issuedCoupon, userId, STARTED_AT);
+        UserCoupon used = UserCoupon.issue(
+                uuidGenerator.generate(), usedCoupon, userId, STARTED_AT.plusSeconds(1));
+        used.use(userId, uuidGenerator.generate(), STARTED_AT.plusSeconds(2));
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(issuedCoupon);
+            couponRepository.save(usedCoupon);
+            userCouponRepository.save(issued);
+            userCouponRepository.save(used);
+        });
+
+        var result = userCouponRepository.findAllByUserId(
+                userId, UserCouponStatus.USED, PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).extracting(UserCoupon::getId)
+                .containsExactly(used.getId());
+    }
+
+    @Test
+    @DisplayName("발급 가능한 쿠폰만 조건부로 수량과 수정 감사를 갱신한다")
+    void when_coupon_is_issuable_conditional_update_changes_quantity_and_audit() {
+        Coupon coupon = coupon(1);
+        UUID userId = uuidGenerator.generate();
+        Instant issuedAt = STARTED_AT.plusSeconds(1);
+        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+
+        Integer affectedRows = transaction().execute(status ->
+            couponRepository.increaseIssuedQuantityIfIssuable(coupon.getId(), userId, issuedAt));
+        Coupon updated = couponRepository.findActiveById(coupon.getId()).orElseThrow();
+        Integer soldOutRows = transaction().execute(status ->
+            couponRepository.increaseIssuedQuantityIfIssuable(coupon.getId(), userId, issuedAt));
+
+        assertThat(affectedRows).isEqualTo(1);
+        assertThat(updated.getIssuedQuantity()).isEqualTo(1);
+        assertThat(updated.getUpdatedBy()).isEqualTo(userId);
+        assertThat(updated.getUpdatedAt()).isEqualTo(issuedAt);
+        assertThat(soldOutRows).isZero();
+    }
+
+    @Test
+    @DisplayName("미발급 쿠폰만 조건부로 내용과 수정 감사를 갱신한다")
+    void when_coupon_is_unissued_conditional_update_changes_values_and_audit() {
+        Coupon coupon = coupon(10);
+        UUID updaterId = uuidGenerator.generate();
+        Instant updatedAt = STARTED_AT.minusSeconds(1);
+        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+
+        Integer affectedRows = transaction().execute(status ->
+                couponRepository.updateIfUnissued(
+                        coupon.getId(), "수정된 쿠폰", 20, 30,
+                        STARTED_AT.plusSeconds(1), EXPIRED_AT.plusSeconds(1),
+                        updaterId, updatedAt));
+        Coupon updated = couponRepository.findActiveById(coupon.getId()).orElseThrow();
+
+        assertThat(affectedRows).isEqualTo(1);
+        assertThat(updated.getCouponName()).isEqualTo("수정된 쿠폰");
+        assertThat(updated.getDiscountRate()).isEqualTo(20);
+        assertThat(updated.getTotalQuantity()).isEqualTo(30);
+        assertThat(updated.getStartedAt()).isEqualTo(STARTED_AT.plusSeconds(1));
+        assertThat(updated.getExpiredAt()).isEqualTo(EXPIRED_AT.plusSeconds(1));
+        assertThat(updated.getUpdatedBy()).isEqualTo(updaterId);
+        assertThat(updated.getUpdatedAt()).isEqualTo(updatedAt);
+    }
+
+    @Test
+    @DisplayName("발급 이력이 있는 쿠폰은 조건부 수정에서 제외한다")
+    void when_coupon_has_been_issued_conditional_update_changes_nothing() {
+        Coupon coupon = coupon(10);
+        coupon.issue(uuidGenerator.generate(), STARTED_AT);
+        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+        Integer affectedRows = transaction().execute(status -> couponRepository.updateIfUnissued(
+                coupon.getId(), "수정 시도 쿠폰", 20, 30,
+                STARTED_AT, EXPIRED_AT,
+                uuidGenerator.generate(), STARTED_AT.plusSeconds(1)));
+
+        assertThat(affectedRows).isZero();
+        assertThat(couponRepository.findActiveById(coupon.getId()).orElseThrow().getCouponName())
+                .isEqualTo("영속성 테스트 쿠폰");
+    }
+
+    @Test
+    @DisplayName("미발급 쿠폰만 조건부로 Soft Delete하고 삭제 감사를 저장한다")
+    void when_coupon_is_unissued_conditional_delete_sets_deletion_audit() {
+        Coupon coupon = coupon(10);
+        UUID deleterId = uuidGenerator.generate();
+        Instant deletedAt = STARTED_AT.minusSeconds(1);
+        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+
+        Integer affectedRows = transaction().execute(status ->
+                couponRepository.deleteIfUnissued(coupon.getId(), deleterId, deletedAt));
+
+        assertThat(affectedRows).isEqualTo(1);
+        assertThat(couponRepository.findActiveById(coupon.getId())).isEmpty();
+        assertThat(jdbcTemplate.queryForMap(
+                "select deleted_at, deleted_by, updated_at, updated_by from p_coupons where id = ?",
+                coupon.getId()))
+                .containsEntry("deleted_by", deleterId)
+                .containsEntry("updated_by", deleterId);
+        assertThat(jdbcTemplate.queryForObject(
+                "select deleted_at = updated_at from p_coupons where id = ?",
+                Boolean.class, coupon.getId())).isTrue();
+    }
+
+    @Test
+    @DisplayName("발급 이력이 있는 쿠폰은 조건부 삭제에서 제외한다")
+    void when_coupon_has_been_issued_conditional_delete_changes_nothing() {
+        Coupon coupon = coupon(10);
+        coupon.issue(uuidGenerator.generate(), STARTED_AT);
+        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+
+        Integer affectedRows = transaction().execute(status -> couponRepository.deleteIfUnissued(
+                coupon.getId(), uuidGenerator.generate(), STARTED_AT.plusSeconds(1)));
+
+        assertThat(affectedRows).isZero();
+        assertThat(couponRepository.findActiveById(coupon.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("기간 밖이거나 삭제된 쿠폰은 조건부 수량 갱신에서 제외한다")
+    void when_coupon_is_outside_period_or_deleted_conditional_update_changes_nothing() {
+        Coupon coupon = coupon(10);
+        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+
+        Integer beforeStart = transaction().execute(status -> couponRepository
+            .increaseIssuedQuantityIfIssuable(coupon.getId(), uuidGenerator.generate(), STARTED_AT.minusSeconds(1)));
+        coupon.delete(uuidGenerator.generate(), STARTED_AT.plusSeconds(1));
+        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+        Integer deleted = transaction().execute(status -> couponRepository
+            .increaseIssuedQuantityIfIssuable(coupon.getId(), uuidGenerator.generate(), STARTED_AT.plusSeconds(2)));
+
+        assertThat(beforeStart).isZero();
+        assertThat(deleted).isZero();
+    }
+
+    @Test
+    @DisplayName("활성 쿠폰만 요청한 정렬과 페이징으로 조회한다")
+    void when_coupons_are_queried_only_active_coupons_are_paged() {
+        Coupon older = coupon(10);
+        Coupon newer = Coupon.create(
+                uuidGenerator.generate(), "새 쿠폰", 10, 10,
+                STARTED_AT.plusSeconds(1), EXPIRED_AT, uuidGenerator.generate(), CREATED_AT.plusSeconds(1));
+        Coupon deleted = coupon(10);
+        deleted.delete(uuidGenerator.generate(), STARTED_AT);
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(older);
+            couponRepository.save(newer);
+            couponRepository.save(deleted);
+        });
+
+        var result = couponRepository.findAllActive(PageRequest.of(
+                0, 1, Sort.by(Sort.Direction.DESC, "startedAt")));
+
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getContent()).extracting(Coupon::getId).containsExactly(newer.getId());
+    }
+
+    @Test
+    @DisplayName("쿠폰 테이블의 제약, 인덱스와 모든 시간 컬럼을 생성한다")
+    void when_schema_is_created_expected_constraints_indexes_and_timestamp_types_exist() {
+        Set<String> constraints = Set.copyOf(jdbcTemplate.queryForList("""
+                select constraint_name
+                  from information_schema.table_constraints
+                 where table_schema = 'public'
+                   and table_name in ('p_coupons', 'p_user_coupons')
+                """, String.class));
+        Set<String> indexes = Set.copyOf(jdbcTemplate.queryForList("""
+                select indexname
+                  from pg_indexes
+                 where schemaname = 'public'
+                   and tablename in ('p_coupons', 'p_user_coupons')
+                """, String.class));
+
+        assertThat(constraints).contains(
+            "chk_coupon_discount_rate", "chk_coupon_total_quantity",
+            "chk_coupon_quantity", "chk_coupon_period",
+            "uk_user_coupon_user_coupon", "chk_user_coupon_status",
+            "chk_user_coupon_usage", "fk_user_coupons_coupon");
+        assertThat(indexes).contains(
+            "idx_coupon_period", "idx_coupon_deleted_at",
+            "idx_user_coupon_user_status", "idx_user_coupon_coupon");
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*)
+                  from information_schema.columns
+                 where table_schema = 'public'
+                   and table_name in ('p_coupons', 'p_user_coupons')
+                   and column_name in ('created_at', 'updated_at', 'deleted_at',
+                                       'started_at', 'expired_at', 'issued_at', 'used_at')
+                   and data_type = 'timestamp with time zone'
+                """, Integer.class)).isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("동일 사용자의 동일 쿠폰 중복 발급을 데이터베이스가 거부한다")
+    void when_same_coupon_is_issued_to_same_user_twice_database_rejects_duplicate() {
+        Coupon coupon = coupon(10);
+        UUID userId = uuidGenerator.generate();
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(coupon);
+            userCouponRepository.save(UserCoupon.issue(uuidGenerator.generate(), coupon, userId, STARTED_AT));
+            entityManager.flush();
+        });
+
+        assertThatThrownBy(() -> transaction().executeWithoutResult(status -> {
+            UserCoupon duplicate = UserCoupon.issue(uuidGenerator.generate(), coupon, userId, STARTED_AT.plusSeconds(1));
+            userCouponRepository.save(duplicate);
+            entityManager.flush();
+        })).isInstanceOf(ConstraintViolationException.class);
+    }
+
+    @Test
+    @DisplayName("사용 상태와 사용 정보가 일치하지 않는 사용자 쿠폰을 데이터베이스가 거부한다")
+    void when_user_coupon_usage_fields_conflict_with_status_database_rejects_write() {
+        Coupon coupon = coupon(10);
+        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                insert into p_user_coupons (
+                    id, coupon_id, user_id, status, issued_at, used_at, order_id,
+                    created_at, created_by, updated_at
+                ) values (?, ?, ?, 'ISSUED', ?, ?, ?, ?, ?, ?)
+                """,
+            uuidGenerator.generate(), coupon.getId(), uuidGenerator.generate(), Timestamp.from(STARTED_AT),
+            Timestamp.from(STARTED_AT.plusSeconds(1)), uuidGenerator.generate(),
+            Timestamp.from(CREATED_AT), uuidGenerator.generate(), Timestamp.from(CREATED_AT)))
+            .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    private Coupon coupon(int totalQuantity) {
+        return Coupon.create(
+            uuidGenerator.generate(), "영속성 테스트 쿠폰", 10, totalQuantity,
+            STARTED_AT, EXPIRED_AT, uuidGenerator.generate(), CREATED_AT);
+    }
+
+    private Coupon coupon(String couponName, Instant startedAt) {
+        return Coupon.create(
+                uuidGenerator.generate(), couponName, 10, 100,
+                startedAt, EXPIRED_AT, uuidGenerator.generate(), CREATED_AT);
+    }
+
+    private TransactionTemplate transaction() {
+        return new TransactionTemplate(transactionManager);
+    }
+}

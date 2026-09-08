@@ -3,7 +3,8 @@ package com.sub9.productservice.category.presentation.query.dto;
 import java.util.UUID;
 
 public record HashtagResponse(
-        UUID hashtagId,
-        String name
+        UUID id,
+        String name,
+        Long usageCount
 ) {
 }

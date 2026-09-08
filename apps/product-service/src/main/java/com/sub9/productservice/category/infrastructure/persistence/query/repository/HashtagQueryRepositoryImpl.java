@@ -14,6 +14,7 @@ import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.UUID;
 
 @Repository
 @RequiredArgsConstructor
@@ -27,7 +28,7 @@ public class HashtagQueryRepositoryImpl implements HashtagQueryRepository {
     public Page<HashtagResponse> searchHashtags(String keyword, Pageable pageable) {
         List<HashtagResponse> content = queryFactory
                 .select(Projections.constructor(HashtagResponse.class,
-                        hashtag.id, hashtag.name))
+                        hashtag.id, hashtag.name, hashtag.usageCount))
                 .from(hashtag)
                 .where(
                         hashtag.deletedAt.isNull(),
@@ -47,5 +48,22 @@ public class HashtagQueryRepositoryImpl implements HashtagQueryRepository {
                 );
 
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
+    }
+
+    @Override
+    public List<HashtagResponse> searchHashtagsByIds(List<UUID> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+
+        return queryFactory
+                .select(Projections.constructor(HashtagResponse.class,
+                        hashtag.id, hashtag.name, hashtag.usageCount))
+                .from(hashtag)
+                .where(
+                        hashtag.id.in(ids),
+                        hashtag.deletedAt.isNull()
+                )
+                .fetch();
     }
 }
