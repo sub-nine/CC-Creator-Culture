@@ -7,12 +7,14 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.sub9.productservice.category.application.query.port.out.CategoryQueryRepository;
 import com.sub9.productservice.category.domain.entity.QCategory;
 import com.sub9.productservice.category.domain.entity.QCategoryHashtag;
+import com.sub9.productservice.category.domain.entity.QCategoryProduct;
 import com.sub9.productservice.category.domain.entity.QHashtag;
 import com.sub9.productservice.category.domain.model.CategoryHashtagStatus;
 import com.sub9.productservice.category.domain.model.CategoryStatus;
 import com.sub9.productservice.category.infrastructure.persistence.query.support.QuerydslQuerySupport;
 import com.sub9.productservice.category.presentation.query.dto.CategoryResponse;
 import com.sub9.productservice.category.presentation.query.dto.HashtagResponse;
+import com.sub9.productservice.category.presentation.query.dto.ProductCategoryIdsResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,8 +22,12 @@ import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+
+import static com.querydsl.core.group.GroupBy.groupBy;
+import static com.querydsl.core.group.GroupBy.list;
 
 @Repository
 @RequiredArgsConstructor
@@ -30,6 +36,7 @@ public class CategoryQueryRepositoryImpl implements CategoryQueryRepository {
     private static final QCategory category = QCategory.category;
     private static final QCategoryHashtag categoryHashtag = QCategoryHashtag.categoryHashtag;
     private static final QHashtag hashtag = QHashtag.hashtag;
+    private static final QCategoryProduct categoryProduct = QCategoryProduct.categoryProduct;
 
     private final JPAQueryFactory queryFactory;
 
@@ -125,6 +132,26 @@ public class CategoryQueryRepositoryImpl implements CategoryQueryRepository {
                 .where(mergedInCategory(categoryId));
 
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
+    }
+
+    @Override
+    public List<ProductCategoryIdsResponse> findCategoryIdsByProductIds(List<UUID> productIds) {
+        if (productIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<UUID, List<UUID>> categoryIdsByProductId = queryFactory
+                .from(categoryProduct)
+                .where(
+                        categoryProduct.productId.in(productIds),
+                        categoryProduct.deletedAt.isNull(),
+                        categoryProduct.category.status.eq(CategoryStatus.ACTIVE)
+                )
+                .transform(groupBy(categoryProduct.productId).as(list(categoryProduct.category.id)));
+
+        return categoryIdsByProductId.entrySet().stream()
+                .map(entry -> new ProductCategoryIdsResponse(entry.getKey(), entry.getValue()))
+                .toList();
     }
 
     private BooleanExpression mergedInCategory(UUID categoryId) {

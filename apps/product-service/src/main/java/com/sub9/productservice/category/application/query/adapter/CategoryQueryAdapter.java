@@ -22,8 +22,6 @@ public class CategoryQueryAdapter implements CategoryQueryPort {
 
     @Override
     public List<ProductCategoryIdsResponse> getCategoryIdsByProductIds(List<UUID> productIds) {
-        // TODO: CategoryProduct 리포지토리 연결 후 targetId -> categoryId 매핑 구현
-
-        return List.of();
+        return categoryQueryRepository.findCategoryIdsByProductIds(productIds);
     }
 }

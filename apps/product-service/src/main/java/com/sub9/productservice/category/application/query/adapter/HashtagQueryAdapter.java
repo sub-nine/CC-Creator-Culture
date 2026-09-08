@@ -22,7 +22,6 @@ public class HashtagQueryAdapter implements HashtagQueryPort {
 
     @Override
     public List<ProductHashtagIdsResponse> getHashtagIdsByProductIds(List<UUID> productIds) {
-        // TODO: HashtagProduct 리포지토리 연결 후 productId -> hashtagIds 매핑 구현
-        return List.of();
+        return hashtagQueryRepository.findHashtagIdsByProductIds(productIds);
     }
 }
