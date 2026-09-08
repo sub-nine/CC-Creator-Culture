@@ -1,6 +1,6 @@
 package com.sub9.productservice.category.infrastructure.persistence.command.repository;
 
-import com.sub9.productservice.category.application.command.repository.HashtagCommandRepository;
+import com.sub9.productservice.category.application.command.port.out.HashtagCommandRepository;
 import com.sub9.productservice.category.domain.entity.Hashtag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -12,7 +12,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class HashtagCommandRepositoryImpl implements HashtagCommandRepository {
 
-    private final HashtagCommandJpaRepository jpaRepository;
+    private final HashtagJpaRepository jpaRepository;
 
     @Override
     public Hashtag save(Hashtag hashtag) {

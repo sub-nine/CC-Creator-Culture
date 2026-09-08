@@ -18,3 +18,4 @@ kafka:
   auto-offset-reset: latest
   product-group-id: product-group
   category-group-id: category-group
+  leaderboard-group-id: leaderboard-group
