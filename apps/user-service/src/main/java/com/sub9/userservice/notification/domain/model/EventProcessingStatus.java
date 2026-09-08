@@ -5,4 +5,8 @@ public enum EventProcessingStatus {
     PROCESSING,  //이벤트 처리중
     COMPLETED,   //이벤트 처리완료
     FAILED;      //이벤트 처리실패
+
+    public boolean isRetryable() {
+        return this == FAILED;
+    }
 }

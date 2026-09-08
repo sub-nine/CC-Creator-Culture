@@ -18,7 +18,7 @@ public class UserContextFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
     String userIdStr = request.getHeader("X-User-Id");
-    String roleStr = request.getHeader("X-Role");
+    String roleStr = request.getHeader("X-USER-Role");
 
     if (StringUtils.hasText(userIdStr)
         && SecurityContextHolder.getContext().getAuthentication() == null) {
