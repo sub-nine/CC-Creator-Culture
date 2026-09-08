@@ -20,6 +20,10 @@ import com.sub9.orderservice.order.domain.model.ShippingAddress;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import com.sub9.common.kafka.event.OrderPaidEvent;
+import org.springframework.context.ApplicationEventPublisher;
+import org.mockito.ArgumentCaptor;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +44,9 @@ class OrderPaymentResultServiceTest {
 
     @Mock
     private CouponUsagePort couponUsagePort;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private OrderPaymentResultService paymentResultService;
@@ -77,6 +84,7 @@ class OrderPaymentResultServiceTest {
                         tuple(uuid(3_021), 2),
                         tuple(uuid(3_022), 2));
         verify(couponUsagePort).restore(order.getId(), List.of(userCouponId));
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -132,6 +140,42 @@ class OrderPaymentResultServiceTest {
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
         verifyNoInteractions(couponUsagePort);
+    }
+
+    @Test
+    @DisplayName("여러 SKU를 결제하면 상품별 수량을 합산한 불변 이벤트를 등록한다")
+    void when_multiple_skus_are_paid_quantities_are_summed_by_product() {
+        UUID first = uuid(900);
+        UUID second = uuid(901);
+        Order order = order(60, paidItem(61, first, 2), paidItem(62, first, 3),
+                paidItem(63, second, 4));
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        paymentResultService.markPaid(order.getId(), CREATED_AT.plusSeconds(1));
+
+        ArgumentCaptor<OrderPaidEvent> event = ArgumentCaptor.forClass(OrderPaidEvent.class);
+        verify(eventPublisher).publishEvent(event.capture());
+        assertThat(event.getValue().orderId()).isEqualTo(order.getId());
+        assertThat(event.getValue().productQuantities()).isEqualTo(Map.of(first, 5L, second, 4L));
+        assertThatThrownBy(() -> event.getValue().productQuantities().put(first, 9L))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    @DisplayName("이미 결제된 주문의 성공 처리를 거부하고 이벤트를 등록하지 않는다")
+    void when_already_paid_success_is_rejected_without_event() {
+        Order order = order(70, item(71, null));
+        order.markPaid(CREATED_AT.plusSeconds(1));
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        assertOrderError(() -> paymentResultService.markPaid(order.getId(), CREATED_AT.plusSeconds(2)),
+                OrderErrorCode.INVALID_ORDER_STATUS);
+        verifyNoInteractions(eventPublisher);
+    }
+
+    private static OrderItem paidItem(long sequence, UUID productId, int quantity) {
+        return OrderItem.create(uuid(sequence), uuid(800), productId, uuid(sequence + 3000), null,
+                ProductSnapshot.of("상품", "옵션", Money.won(1000), quantity), Money.won(0));
     }
 
     private static Order order(long sequence, OrderItem... items) {

@@ -5,6 +5,12 @@ spring:
   config:
     import: ${CONFIG_SERVER_IMPORT:optional:configserver:http://localhost:8888}
 
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
   cloud:
     openfeign:
       client:

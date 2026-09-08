@@ -56,13 +56,14 @@ class MockPaymentTransactionServiceTest {
     @Mock private PaymentRepository payments;
     @Mock private CouponUsagePort coupons;
     @Mock private Clock clock;
+    @Mock private org.springframework.context.ApplicationEventPublisher events;
 
     private MockPaymentTransactionService service;
 
     @BeforeEach
     void setUp() {
         service = new MockPaymentTransactionService(
-                orders, payments, new OrderPaymentResultService(orders, coupons), clock, ids);
+                orders, payments, new OrderPaymentResultService(orders, coupons, events), clock, ids);
     }
 
     @ParameterizedTest

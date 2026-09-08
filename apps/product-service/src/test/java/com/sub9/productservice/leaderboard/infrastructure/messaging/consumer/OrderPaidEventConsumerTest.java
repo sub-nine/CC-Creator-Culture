@@ -11,10 +11,12 @@ import com.sub9.productservice.leaderboard.application.port.in.RecordOrderScoreU
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.kafka.support.Acknowledgment;
 
+@DisplayName("주문 결제 완료 이벤트 수신")
 class OrderPaidEventConsumerTest {
 
     private final RecordOrderScoreUseCase useCase = mock(RecordOrderScoreUseCase.class);
@@ -22,6 +24,7 @@ class OrderPaidEventConsumerTest {
     private final OrderPaidEventConsumer consumer = new OrderPaidEventConsumer(useCase);
 
     @Test
+    @DisplayName("상품별 총수량을 전달하고 점수 반영이 완료되면 수신을 확인한다")
     void when_consumed_product_totals_are_forwarded_before_acknowledgment() {
         UUID orderId = UUID.randomUUID();
         UUID first = UUID.randomUUID();
@@ -39,6 +42,7 @@ class OrderPaidEventConsumerTest {
     }
 
     @Test
+    @DisplayName("점수 반영에 실패하면 수신을 확인하지 않는다")
     void when_score_update_fails_message_is_not_acknowledged() {
         UUID orderId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
