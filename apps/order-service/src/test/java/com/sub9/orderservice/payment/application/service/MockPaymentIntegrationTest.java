@@ -345,8 +345,6 @@ class MockPaymentIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .header(GatewayHeaderAuthenticationFilter.USER_ID_HEADER, order.getCustomerId())
                 .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, "CUSTOMER")
-                .header(GatewayHeaderAuthenticationFilter.TOKEN_ID_HEADER, order.getId())
-                .header(GatewayHeaderAuthenticationFilter.TOKEN_EXPIRES_AT_HEADER, 1_800_000_000L)
                 .content("{\"result\":\"" + result + "\"}");
     }
 
