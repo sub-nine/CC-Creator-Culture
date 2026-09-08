@@ -21,7 +21,6 @@ import com.sub9.orderservice.cart.presentation.request.DeleteCartItemRequest;
 import com.sub9.orderservice.cart.presentation.request.UpdateCartItemRequest;
 import com.sub9.orderservice.support.AbstractControllerTest;
 import com.sub9.orderservice.cart.presentation.response.CartItemResponse;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.*;
@@ -280,8 +279,6 @@ class CartControllerUnitTest extends AbstractControllerTest {
     return request
         .header("X-User-Id", userId)
         .header("X-User-Role", "CUSTOMER")
-        .header("X-Token-Id", UUID.randomUUID())
-        .header("X-Token-Expires-At", Instant.now().plusSeconds(3600).getEpochSecond())
         .contentType(MediaType.APPLICATION_JSON);
   }
 }
