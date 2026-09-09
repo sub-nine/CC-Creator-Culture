@@ -3,6 +3,8 @@ package com.sub9.productservice.category.infrastructure.persistence.command.repo
 import com.sub9.productservice.category.application.command.port.out.CategoryCommandRepository;
 import com.sub9.productservice.category.domain.entity.Category;
 import com.sub9.productservice.category.domain.entity.CategoryHashtag;
+import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.CategoryHashtagCommandJpaRepository;
+import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.CategoryJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 

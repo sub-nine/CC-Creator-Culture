@@ -27,7 +27,7 @@ public class CategoryCommandService implements AddHashtagsToProductUseCase {
     @Transactional
     public void addHashtagsToProduct(UUID productId, List<String> hashtagStrings) {
         List<String> normalizedHashtagNames = normalizeHashtagNames(hashtagStrings);
-        // TODO: Hashtag Strings 필터링 (이상한 단어)
+        // TODO: Hashtag Strings 필터링 ex) 오타 또는 부적절한 문자열
 
         // TODO: 개별 upsert(최대 2N 왕복) 대신, 존재하는 것 일괄 조회 -> 없는 것만 배치 삽입 최적화 고려
         List<HashtagUpsertResult> upsertResults = normalizedHashtagNames.stream()
