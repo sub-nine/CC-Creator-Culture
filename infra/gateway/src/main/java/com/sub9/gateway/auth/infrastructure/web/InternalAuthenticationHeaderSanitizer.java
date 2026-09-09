@@ -5,6 +5,7 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 
 @Component
+// 외부에서 위조한 내부 인증 헤더를 제거
 public class InternalAuthenticationHeaderSanitizer {
 
     public static final String USER_ID_HEADER = "X-User-Id";

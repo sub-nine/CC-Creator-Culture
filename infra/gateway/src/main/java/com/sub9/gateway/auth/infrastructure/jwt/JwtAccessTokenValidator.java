@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 @Component
-// JWT 검증에 필요한 Parser, 설정값, 시간 기준을 주입받음
+// JWT 검증에 필요한 Parser, 설정값, 시간 기준을 주입받음 (JWT가 정상인지 검사)
 public class JwtAccessTokenValidator {
 
     private static final String ROLE_CLAIM = "role";

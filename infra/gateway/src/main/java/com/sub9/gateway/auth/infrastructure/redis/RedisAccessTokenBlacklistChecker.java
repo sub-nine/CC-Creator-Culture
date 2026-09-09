@@ -11,7 +11,7 @@ import reactor.core.publisher.Mono;
 
 @Component
 @RequiredArgsConstructor
-// ReactiveStringRedisTemplate을 사용해 키 존재 여부를 비동기로 확인
+// ReactiveStringRedisTemplate을 사용해 키 존재 여부를 비동기로 확인 (로그아웃된 JWT인지 검사)
 public class RedisAccessTokenBlacklistChecker {
 
     private final ReactiveStringRedisTemplate redisTemplate;

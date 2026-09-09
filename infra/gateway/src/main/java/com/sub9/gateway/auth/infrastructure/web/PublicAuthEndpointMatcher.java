@@ -6,6 +6,7 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 
 @Component
+// 인증이 필요 없는 요청인지 판단
 public class PublicAuthEndpointMatcher {
 
     private static final Set<PublicEndpoint> PUBLIC_ENDPOINTS = Set.of(
