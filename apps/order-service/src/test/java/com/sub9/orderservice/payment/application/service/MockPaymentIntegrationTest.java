@@ -68,6 +68,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import com.sub9.common.kafka.event.OrderPaidEvent;
+import com.sub9.common.kafka.event.OrderNotificationEvent;
 import org.mockito.ArgumentCaptor;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
@@ -152,10 +153,16 @@ class MockPaymentIntegrationTest {
             assertThat(mapper.readValue(payload.getValue(), OrderPaidEvent.class))
                     .isEqualTo(new OrderPaidEvent(order.getId(),
                             List.of(new OrderPaidEvent.ProductQuantity(order.getItems().getFirst().getProductId(), 2L))));
-            verifyNoMoreInteractions(kafka);
-        } else {
-            verifyNoInteractions(kafka);
         }
+        ArgumentCaptor<String> notificationPayload = ArgumentCaptor.forClass(String.class);
+        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), notificationPayload.capture());
+        OrderNotificationEvent notification = mapper.readValue(notificationPayload.getValue(), OrderNotificationEvent.class);
+        assertThat(notification.eventId().version()).isEqualTo(7);
+        assertThat(notification).isEqualTo(new OrderNotificationEvent(notification.eventId(),
+                status == PaymentStatus.SUCCESS ? "PAYMENT_PAID" : "PAYMENT_FAILED", "ORDER_SERVICE", "ORDER",
+                order.getId(), order.getCustomerId(), order.getOrderNumber().toString(),
+                status == PaymentStatus.SUCCESS ? "PAID" : "FAILED", null, first.processedAt()));
+        verifyNoMoreInteractions(kafka);
         Payment saved = payments.findByOrderId(order.getId()).orElseThrow();
         Order savedOrder = queries.findDetailByOrderNumber(order.getOrderNumber()).orElseThrow();
 
@@ -385,6 +392,7 @@ class MockPaymentIntegrationTest {
         process(order, PaymentStatus.SUCCESS);
 
         verify(kafka).send(eq("order_paid"), eq(order.getId().toString()), anyString());
+        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
     }
 
     @ParameterizedTest
@@ -406,6 +414,7 @@ class MockPaymentIntegrationTest {
         assertThat(paymentCount()).isEqualTo(1);
         assertThat(process(order, PaymentStatus.SUCCESS)).isEqualTo(result);
         verify(kafka).send(eq("order_paid"), eq(order.getId().toString()), anyString());
+        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
     }
 
     private MockHttpServletRequestBuilder paymentRequest(Order order, PaymentStatus result) {
