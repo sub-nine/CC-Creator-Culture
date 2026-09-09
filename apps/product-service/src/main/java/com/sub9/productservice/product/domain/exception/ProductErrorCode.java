@@ -12,6 +12,7 @@ public enum ProductErrorCode implements ErrorCode {
       "PRODUCT_0003", HttpStatus.BAD_REQUEST, "유효하지 않은 상품 상태 변경 요청입니다."),
   PRODUCT_NOT_FOR_SALE("PRODUCT_004", HttpStatus.BAD_REQUEST, "현재 판매 중인 상품이 아닙니다."),
   PRODUCT_SOLD_OUT("PRODUCT_0005", HttpStatus.CONFLICT, "품절된 상품입니다."),
+  PRODUCT_IMAGE_NOT_FOUND("PRODUCT_006", HttpStatus.NOT_FOUND, "유효하지 않은 상품 이미지 입니다."),
 
   SKU_REQUIRED("SKU_0001", HttpStatus.BAD_REQUEST, "상품에는 최소 하나의 옵션이 필요합니다."),
   INVALID_DEFAULT_SKU_COUNT("SKU_0002", HttpStatus.BAD_REQUEST, "대표 옵션은 하나여야 합니다."),
