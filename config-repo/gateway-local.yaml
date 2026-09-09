@@ -1,2 +1,21 @@
 server:
   port: ${GATEWAY_PORT:8080}
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: user-service
+              uri: lb://user-service
+              predicates:
+                - Path=/api/v1/users/**,/api/v1/auth/**
+            - id: product-service
+              uri: lb://product-service
+              predicates:
+                - Path=/api/v1/products/**,/api/v1/categories/**,/api/v1/hashtags/**,/api/v1/leaderboards/**,/api/v1/admin/categories/**
+            - id: order-service
+              uri: lb://order-service
+              predicates:
+                - Path=/api/v1/orders/**,/api/v1/creator/order-items/**,/api/v1/admin/orders/**,/api/v1/cart/**,/api/v1/coupons/**,/api/v1/user-coupons/**

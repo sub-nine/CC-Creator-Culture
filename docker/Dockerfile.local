@@ -1,0 +1,31 @@
+# syntax=docker/dockerfile:1
+
+FROM eclipse-temurin:21-jdk-alpine AS build
+WORKDIR /workspace
+COPY gradlew settings.gradle build.gradle ./
+COPY gradle/ gradle/
+COPY libs/common/ libs/common/
+COPY infra/config-server/ infra/config-server/
+COPY infra/eureka-server/ infra/eureka-server/
+COPY infra/gateway/ infra/gateway/
+COPY apps/user-service/ apps/user-service/
+COPY apps/product-service/ apps/product-service/
+COPY apps/order-service/ apps/order-service/
+RUN --mount=type=cache,target=/root/.gradle \
+    sh ./gradlew :infra:config-server:bootJar :infra:eureka-server:bootJar \
+    :infra:gateway:bootJar :apps:user-service:bootJar \
+    :apps:product-service:bootJar :apps:order-service:bootJar \
+    --no-daemon --no-parallel
+
+FROM eclipse-temurin:21-jre-alpine@sha256:974b08960c5d96694c780e65b2d5705268ab1e1ca1a0dd0caf4ba6c3fe34d699 AS service
+WORKDIR /app
+RUN apk add --no-cache curl \
+    && addgroup -S spring \
+    && adduser -S spring -G spring
+ARG MODULE
+COPY --from=build --chown=spring:spring /workspace/${MODULE}/build/libs/*.jar /app/app.jar
+USER spring:spring
+ENTRYPOINT ["java", "-jar", "app.jar"]
+
+FROM service AS config-server
+COPY --chown=spring:spring config-repo /config-repo

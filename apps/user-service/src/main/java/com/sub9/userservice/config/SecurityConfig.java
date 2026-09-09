@@ -34,16 +34,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    GatewayHeaderAuthenticationFilter gatewayHeaderAuthenticationFilter(
-            CustomAuthenticationEntryPoint authenticationEntryPoint) {
-        return new GatewayHeaderAuthenticationFilter(authenticationEntryPoint);
-    }
-
-    @Bean
     @Order(2)
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            GatewayHeaderAuthenticationFilter gatewayHeaderAuthenticationFilter,
             CustomAuthenticationEntryPoint authenticationEntryPoint,
             CustomAccessDeniedHandler accessDeniedHandler) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable);
@@ -55,7 +48,8 @@ public class SecurityConfig {
                 .authenticationEntryPoint(authenticationEntryPoint)
                 .accessDeniedHandler(accessDeniedHandler));
         http.addFilterBefore(
-                gatewayHeaderAuthenticationFilter,
+                // Servlet 전역 필터로 중복 등록되지 않도록 API 보안 체인 안에서만 생성합니다.
+                new GatewayHeaderAuthenticationFilter(authenticationEntryPoint),
                 UsernamePasswordAuthenticationFilter.class);
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(PUBLIC_AUTH_PATHS)
