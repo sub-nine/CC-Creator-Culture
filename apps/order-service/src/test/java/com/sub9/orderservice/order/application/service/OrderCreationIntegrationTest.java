@@ -49,7 +49,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         "management.tracing.export.enabled=false"
 })
 @MockitoBean(types = {
-        CartQueryService.class,
+        CartSnapshotPort.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
         StockPort.class,
