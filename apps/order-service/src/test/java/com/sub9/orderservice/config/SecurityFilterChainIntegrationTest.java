@@ -37,9 +37,6 @@ class SecurityFilterChainIntegrationTest {
 
     private static final UUID USER_ID =
             UUID.fromString("0198f2a0-76c0-7000-8000-000000000001");
-    private static final UUID TOKEN_ID =
-            UUID.fromString("0198f2a0-76c0-7000-8000-000000000002");
-    private static final long EXPIRES_AT = 1_788_400_000L;
 
     @Autowired
     private MockMvc mockMvc;
@@ -98,9 +95,7 @@ class SecurityFilterChainIntegrationTest {
     private MockHttpServletRequestBuilder 주문_요청(String role) {
         return post("/api/v1/orders")
                 .header(GatewayHeaderAuthenticationFilter.USER_ID_HEADER, USER_ID)
-                .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, role)
-                .header(GatewayHeaderAuthenticationFilter.TOKEN_ID_HEADER, TOKEN_ID)
-                .header(GatewayHeaderAuthenticationFilter.TOKEN_EXPIRES_AT_HEADER, EXPIRES_AT);
+                .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, role);
     }
 
     @RestController

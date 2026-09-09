@@ -12,6 +12,10 @@ import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import com.sub9.common.kafka.event.OrderPaidEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,11 +27,20 @@ public class OrderPaymentResultService implements PaymentResultUseCase {
 
     private final OrderRepository orderRepository;
     private final CouponUsagePort couponUsagePort;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
     public void markPaid(UUID orderId, Instant processedAt) {
-        findForUpdate(orderId).markPaid(processedAt);
+        Order order = findForUpdate(orderId);
+        order.markPaid(processedAt);
+        Map<UUID, Long> quantities = order.getItems().stream()
+                .collect(Collectors.groupingBy(
+                        item -> item.getProductId(),
+                        Collectors.summingLong(item -> item.getProductSnapshot().getQuantity())));
+        eventPublisher.publishEvent(new OrderPaidEvent(orderId, quantities.entrySet().stream()
+                .map(entry -> new OrderPaidEvent.ProductQuantity(entry.getKey(), entry.getValue()))
+                .toList()));
     }
 
     @Override

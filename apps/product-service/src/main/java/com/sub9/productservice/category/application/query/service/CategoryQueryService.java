@@ -1,15 +1,14 @@
 package com.sub9.productservice.category.application.query.service;
 
 import com.sub9.common.exception.BusinessException;
-import com.sub9.productservice.category.application.query.repository.CategoryHashtagQueryRepository;
-import com.sub9.productservice.category.application.query.repository.CategoryQueryRepository;
-import com.sub9.productservice.category.application.query.repository.HashtagQueryRepository;
+import com.sub9.productservice.category.application.query.port.out.CategoryQueryRepository;
+import com.sub9.productservice.category.application.query.port.out.HashtagQueryRepository;
+import com.sub9.productservice.category.application.query.port.out.MergeRequestQueryRepository;
 import com.sub9.productservice.category.domain.exception.CategoryErrorCode;
 import com.sub9.productservice.category.presentation.query.dto.CategoryDetailResponse;
 import com.sub9.productservice.category.presentation.query.dto.CategoryResponse;
 import com.sub9.productservice.category.presentation.query.dto.HashtagResponse;
 import com.sub9.productservice.category.presentation.query.dto.MergeRequestResponse;
-import com.sub9.productservice.leaderboard.application.port.CategoryQueryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,11 +21,11 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class CategoryQueryService implements CategoryQueryPort {
+public class CategoryQueryService {
 
     private final CategoryQueryRepository categoryQueryRepository;
     private final HashtagQueryRepository hashtagQueryRepository;
-    private final CategoryHashtagQueryRepository categoryHashtagQueryRepository;
+    private final MergeRequestQueryRepository mergeRequestQueryRepository;
 
     public Page<CategoryResponse> searchCategories(String keyword, Pageable pageable) {
         return categoryQueryRepository.searchCategories(keyword, pageable);
@@ -36,7 +35,7 @@ public class CategoryQueryService implements CategoryQueryPort {
         CategoryResponse category = categoryQueryRepository.findById(categoryId)
                 .orElseThrow(() -> new BusinessException(CategoryErrorCode.CATEGORY_NOT_FOUND));
 
-        List<HashtagResponse> hashtags = categoryHashtagQueryRepository.findHashtagsByCategoryId(categoryId);
+        List<HashtagResponse> hashtags = categoryQueryRepository.findHashtagsByCategoryId(categoryId);
 
         return new CategoryDetailResponse(category.id(), category.name(), category.description(), hashtags);
     }
@@ -45,19 +44,14 @@ public class CategoryQueryService implements CategoryQueryPort {
         categoryQueryRepository.findById(categoryId)
                 .orElseThrow(() -> new BusinessException(CategoryErrorCode.CATEGORY_NOT_FOUND));
 
-        return categoryHashtagQueryRepository.findHashtagsByCategoryId(categoryId, pageable);
+        return categoryQueryRepository.findHashtagsByCategoryId(categoryId, pageable);
     }
 
     public Page<MergeRequestResponse> getMergeRequests(Pageable pageable) {
-        return categoryHashtagQueryRepository.findPendingMergeRequests(pageable);
+        return mergeRequestQueryRepository.findPendingMergeRequests(pageable);
     }
 
     public Page<HashtagResponse> searchHashtags(String keyword, Pageable pageable) {
         return hashtagQueryRepository.searchHashtags(keyword, pageable);
-    }
-
-    @Override
-    public List<CategoryResponse> getCategoriesByIds(List<UUID> ids) {
-        return categoryQueryRepository.searchCategoriesByIds(ids);
     }
 }

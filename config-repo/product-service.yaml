@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://${PRODUCT_DB_HOST:localhost}:${PRODUCT_DB_PORT:5432}/${PRODUCT_DB_NAME:user_service}
+    url: jdbc:postgresql://${PRODUCT_DB_HOST:localhost}:${PRODUCT_DB_PORT:5432}/${PRODUCT_DB_NAME:product_db}
     username: ${PRODUCT_DB_USERNAME}
     password: ${PRODUCT_DB_PASSWORD}
     hikari:
@@ -12,11 +12,8 @@ spring:
       ddl-auto: update
     properties:
       hibernate:
-        default_schema: private
         jdbc:
           time_zone: UTC
-        hbm2ddl:
-          create_namespaces: true
 
   data:
     redis:
@@ -24,3 +21,10 @@ spring:
       port: ${REDIS_PORT:6379}
       connect-timeout: 2s
       timeout: 2s
+
+kafka:
+  bootstrap-servers: ${KAFKA_HOST}
+  auto-offset-reset: latest
+  product-group-id: product-group
+  category-group-id: category-group
+  leaderboard-group-id: leaderboard-group

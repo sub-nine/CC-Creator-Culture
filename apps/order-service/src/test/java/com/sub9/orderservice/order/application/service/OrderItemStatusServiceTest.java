@@ -127,7 +127,7 @@ class OrderItemStatusServiceTest {
 
     private static OrderItem item(long sequence, UUID creatorId) {
         OrderItem item = OrderItem.create(
-                uuid(sequence),
+                uuid(sequence), null,
                 creatorId,
                 uuid(sequence + 2_000),
                 uuid(sequence + 3_000),

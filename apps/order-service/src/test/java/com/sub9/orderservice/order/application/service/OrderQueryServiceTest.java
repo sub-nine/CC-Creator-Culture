@@ -285,7 +285,7 @@ class OrderQueryServiceTest {
 
     private static OrderItem item(long sequence, UUID creatorId) {
         OrderItem item = OrderItem.create(
-                uuid(1_000 + sequence),
+                uuid(1_000 + sequence), null,
                 creatorId,
                 uuid(2_000 + sequence),
                 uuid(3_000 + sequence),

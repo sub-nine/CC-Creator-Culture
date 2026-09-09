@@ -160,6 +160,8 @@ class OrderCreationServiceTest {
         assertThat(order.getItems())
                 .extracting(OrderItem::getStatus)
                 .containsOnly(OrderItemStatus.ORDERED);
+        assertThat(order.getItems()).extracting(OrderItem::getCartItemId)
+                .containsExactly(CART_ITEM_ID_1, CART_ITEM_ID_2);
         assertThat(order.getItems().get(0).getUserCouponId()).isNull();
         assertThat(order.getItems().get(1).getUserCouponId()).isEqualTo(USER_COUPON_ID);
         assertThat(couponListCaptor.getValue()).containsExactly(APPLIED_COUPON);

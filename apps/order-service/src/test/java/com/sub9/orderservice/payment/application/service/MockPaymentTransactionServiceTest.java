@@ -56,13 +56,14 @@ class MockPaymentTransactionServiceTest {
     @Mock private PaymentRepository payments;
     @Mock private CouponUsagePort coupons;
     @Mock private Clock clock;
+    @Mock private org.springframework.context.ApplicationEventPublisher events;
 
     private MockPaymentTransactionService service;
 
     @BeforeEach
     void setUp() {
         service = new MockPaymentTransactionService(
-                orders, payments, new OrderPaymentResultService(orders, coupons), clock, ids);
+                orders, payments, new OrderPaymentResultService(orders, coupons, events), clock, ids);
     }
 
     @ParameterizedTest
@@ -227,7 +228,7 @@ class MockPaymentTransactionServiceTest {
     private Order order(long amount) {
         return Order.create(ids.generate(), ids.generate(),
                 ShippingAddress.of("홍길동", "010-1234-5678", "06236", "서울 강남구", "101호"),
-                List.of(OrderItem.create(ids.generate(), ids.generate(), ids.generate(), ids.generate(),
+                List.of(OrderItem.create(ids.generate(), null, ids.generate(), ids.generate(), ids.generate(),
                         ids.generate(), ProductSnapshot.of("키링", "기본", Money.won(20_000), 2),
                         Money.won(40_000 - amount))), CREATED_AT);
     }

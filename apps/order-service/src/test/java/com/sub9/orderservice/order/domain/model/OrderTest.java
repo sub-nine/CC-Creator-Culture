@@ -396,7 +396,7 @@ class OrderTest {
 
     private OrderItem item(UUID skuId, long unitPrice, int quantity, long discount) {
         return OrderItem.create(
-                uuidGenerator.generate(),
+                uuidGenerator.generate(), null,
                 uuidGenerator.generate(),
                 uuidGenerator.generate(),
                 skuId,

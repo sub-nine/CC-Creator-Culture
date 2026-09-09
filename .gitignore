@@ -120,7 +120,7 @@ cmake-build-*/
 *.iws
 
 # IntelliJ
-out/
+/out/
 
 # mpeltonen/sbt-idea plugin
 .idea_modules/
@@ -301,6 +301,8 @@ outputs/
 
 # Local environment
 .env
+.env.*
+!.env.example
 
 # Deployment runtime and local cloud inputs
 deploy/runtime/

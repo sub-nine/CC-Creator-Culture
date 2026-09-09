@@ -3,6 +3,7 @@ package com.sub9.orderservice.coupon.infrastructure.persistence;
 import com.sub9.orderservice.coupon.domain.model.UserCoupon;
 import com.sub9.orderservice.coupon.domain.model.UserCouponStatus;
 import com.sub9.orderservice.coupon.domain.repository.UserCouponRepository;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -38,5 +39,15 @@ public class UserCouponRepositoryAdapter implements UserCouponRepository {
     @Override
     public boolean existsByCouponIdAndUserId(UUID couponId, UUID userId) {
         return userCouponJpaRepository.existsByCoupon_IdAndUserId(couponId, userId);
+    }
+
+    @Override
+    public int useIfAvailable(UUID userCouponId, UUID orderId, Instant usedAt) {
+        return userCouponJpaRepository.useIfAvailable(userCouponId, orderId, usedAt);
+    }
+
+    @Override
+    public int restoreIfUsedByOrder(UUID userCouponId, UUID orderId, Instant restoredAt) {
+        return userCouponJpaRepository.restoreIfUsedByOrder(userCouponId, orderId, restoredAt);
     }
 }
