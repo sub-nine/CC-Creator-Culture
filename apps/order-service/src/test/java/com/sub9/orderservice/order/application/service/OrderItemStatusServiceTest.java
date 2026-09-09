@@ -56,6 +56,8 @@ class OrderItemStatusServiceTest {
         assertThat(result.orderNumber()).isEqualTo(order.getOrderNumber().toString());
         assertThat(result.status()).isEqualTo(OrderItemStatus.PREPARING);
         assertThat(result.orderStatus()).isEqualTo(OrderStatus.PROCESSING);
+        assertThat(result.shippingAddress().recipientPhone()).isEqualTo("010-1234-5678");
+        assertThat(result.shippingAddress().addressLine2()).isEqualTo("101호");
         verify(orderRepository).findByOrderItemIdForUpdate(item.getId());
     }
 
@@ -72,6 +74,8 @@ class OrderItemStatusServiceTest {
 
         assertThat(result.status()).isEqualTo(OrderItemStatus.COMPLETED);
         assertThat(result.orderStatus()).isEqualTo(OrderStatus.COMPLETED);
+        assertThat(result.shippingAddress().recipientPhone()).isEqualTo("****");
+        assertThat(result.shippingAddress().addressLine2()).isEqualTo("****");
     }
 
     @Test

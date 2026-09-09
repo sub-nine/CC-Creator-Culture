@@ -157,11 +157,12 @@ class OrderQueryControllerTest {
         verify(orderQueryService).getCreatorOrderItems(USER_ID, pageable);
     }
 
-    @Test
-    @DisplayName("창작자 주문 상품 상세는 본인 상품 정보만 반환한다")
-    void when_creator_queries_order_item_detail_only_item_data_is_returned() throws Exception {
+    @ParameterizedTest
+    @EnumSource(value = OrderStatus.class, names = {"PAID", "PROCESSING", "COMPLETED", "CANCELED"})
+    @DisplayName("창작자 주문 상품 상세는 본인 상품과 상태별 배송 정보를 반환한다")
+    void when_creator_queries_order_item_detail_shipping_data_is_returned(OrderStatus status) throws Exception {
         when(orderQueryService.getCreatorOrderItem(USER_ID, ORDER_ITEM_ID))
-                .thenReturn(creatorDetail());
+                .thenReturn(creatorDetail(status));
 
         mockMvc.perform(authenticatedGet(
                         "/api/v1/creator/order-items/" + ORDER_ITEM_ID,
@@ -170,7 +171,15 @@ class OrderQueryControllerTest {
                 .andExpect(jsonPath("$.data.orderItemId").value(ORDER_ITEM_ID.toString()))
                 .andExpect(jsonPath("$.data.productId").value(PRODUCT_ID.toString()))
                 .andExpect(jsonPath("$.data.originalAmount").value(36_000L))
-                .andExpect(jsonPath("$..shippingAddress").doesNotExist())
+                .andExpect(jsonPath("$.data.shippingAddress.recipientName").value("홍길동"))
+                .andExpect(jsonPath("$.data.shippingAddress.postalCode").value("06236"))
+                .andExpect(jsonPath("$.data.shippingAddress.addressLine1").value("서울"))
+                .andExpect(jsonPath("$.data.shippingAddress.recipientPhone").value(
+                        status == OrderStatus.PAID || status == OrderStatus.PROCESSING
+                                ? "010-1234-5678" : "****"))
+                .andExpect(jsonPath("$.data.shippingAddress.addressLine2").value(
+                        status == OrderStatus.PAID || status == OrderStatus.PROCESSING
+                                ? "101호" : "****"))
                 .andExpect(jsonPath("$.data.customerId").doesNotExist())
                 .andExpect(jsonPath("$..userCouponId").doesNotExist())
                 .andExpect(jsonPath("$..id").doesNotExist())
@@ -445,11 +454,11 @@ class OrderQueryControllerTest {
                 CREATED_AT);
     }
 
-    private static CreatorOrderItemDetail creatorDetail() {
+    private static CreatorOrderItemDetail creatorDetail(OrderStatus status) {
         return new CreatorOrderItemDetail(
                 ORDER_ITEM_ID,
                 ORDER_NUMBER,
-                OrderStatus.PAID,
+                status,
                 PRODUCT_ID,
                 SKU_ID,
                 "아크릴 스탠드",
@@ -460,7 +469,12 @@ class OrderQueryControllerTest {
                 1_800L,
                 34_200L,
                 OrderItemStatus.ORDERED,
-                CREATED_AT);
+                CREATED_AT,
+                new ShippingAddressResponse("홍길동",
+                        status == OrderStatus.PAID || status == OrderStatus.PROCESSING
+                                ? "010-1234-5678" : "****",
+                        "06236", "서울",
+                        status == OrderStatus.PAID || status == OrderStatus.PROCESSING ? "101호" : "****"));
     }
 
     private static AdminOrderSummary adminSummary() {
