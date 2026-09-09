@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 
@@ -17,12 +18,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OrderPaidEventConsumer {
     private final RecordOrderScoreUseCase recordOrderScoreUseCase;
+    private final JsonMapper jsonMapper;
 
     @KafkaListener(topics = KafkaTopics.ORDER_PAID, groupId = "${kafka.leaderboard-group-id}")
-    public void consume(OrderPaidEvent event, Acknowledgment ack) {
+    public void consume(String payload, Acknowledgment ack) {
         try {
-            log.info("[KAFKA] 주문 결제 이벤트 수신 - orderId: {}, products: {}",
-                    event.orderId(), event.productQuantities());
+            log.info("[KAFKA] 주문 결제 이벤트 수신 - payload: {}", payload);
+
+            OrderPaidEvent event = jsonMapper.readValue(payload, OrderPaidEvent.class);
+
             List<ProductQuantity> productQuantities = event.productQuantities().stream().map((quantity) ->
                     new ProductQuantity(
                             quantity.productId(),

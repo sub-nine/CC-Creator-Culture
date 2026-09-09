@@ -1,0 +1,147 @@
+name: cc-service-apps
+
+x-service: &service
+  build: &service-build
+    context: .
+    dockerfile: docker/Dockerfile.local
+    target: service
+  mem_limit: 512m
+  environment: &app-environment
+    SPRING_PROFILES_ACTIVE: dev
+    CONFIG_SERVER_IMPORT: configserver:http://config-server:8888
+    EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+    REDIS_HOST: redis
+    SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    JAVA_TOOL_OPTIONS: -Xms64m -Xmx256m -XX:+ExitOnOutOfMemoryError
+  healthcheck:
+    test: ["CMD-SHELL", "curl -fsS http://localhost:$${SERVER_PORT}/actuator/health >/dev/null"]
+    interval: 10s
+    timeout: 5s
+    retries: 12
+    start_period: 60s
+
+x-platform: &platform
+  config-server:
+    condition: service_healthy
+  eureka-server:
+    condition: service_healthy
+
+x-app-dependencies: &app-dependencies
+  <<: *platform
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+
+services:
+  postgres:
+    mem_limit: 512m
+
+  kafka:
+    mem_limit: 768m
+    environment:
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+
+  zipkin:
+    mem_limit: 384m
+    environment:
+      JAVA_OPTS: -Xms64m -Xmx256m
+
+  kafka-ui:
+    profiles: ["observability"]
+
+  grafana:
+    profiles: ["observability"]
+
+  config-server:
+    <<: *service
+    build:
+      <<: *service-build
+      target: config-server
+      args:
+        MODULE: infra/config-server
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_REPO_PATH: /config-repo
+      SERVER_PORT: "8888"
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
+    ports:
+      - "127.0.0.1:8888:8888"
+
+  eureka-server:
+    <<: *service
+    build:
+      <<: *service-build
+      args:
+        MODULE: infra/eureka-server
+    environment:
+      SERVER_PORT: "8761"
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
+    ports:
+      - "127.0.0.1:8761:8761"
+
+  user-service:
+    <<: *service
+    build:
+      <<: *service-build
+      args:
+        MODULE: apps/user-service
+    environment:
+      <<: *app-environment
+      SERVER_PORT: "8081"
+      USER_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${USER_DB_NAME:?USER_DB_NAME is required}
+      USER_DB_USERNAME: ${USER_DB_USERNAME:?USER_DB_USERNAME is required}
+      USER_DB_PASSWORD: ${USER_DB_PASSWORD:?USER_DB_PASSWORD is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+    depends_on: *app-dependencies
+
+  product-service:
+    <<: *service
+    build:
+      <<: *service-build
+      args:
+        MODULE: apps/product-service
+    environment:
+      <<: *app-environment
+      SERVER_PORT: "8082"
+      PRODUCT_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${PRODUCT_DB_NAME:?PRODUCT_DB_NAME is required}
+      PRODUCT_DB_USERNAME: ${PRODUCT_DB_USERNAME:?PRODUCT_DB_USERNAME is required}
+      PRODUCT_DB_PASSWORD: ${PRODUCT_DB_PASSWORD:?PRODUCT_DB_PASSWORD is required}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+    depends_on:
+      <<: *app-dependencies
+      kafka:
+        condition: service_healthy
+
+  order-service:
+    <<: *service
+    build:
+      <<: *service-build
+      args:
+        MODULE: apps/order-service
+    environment:
+      <<: *app-environment
+      SERVER_PORT: "8083"
+      ORDER_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${ORDER_DB_NAME:?ORDER_DB_NAME is required}
+      ORDER_DB_USERNAME: ${ORDER_DB_USERNAME:?ORDER_DB_USERNAME is required}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:?ORDER_DB_PASSWORD is required}
+    depends_on: *app-dependencies
+
+  gateway:
+    <<: *service
+    build:
+      <<: *service-build
+      args:
+        MODULE: infra/gateway
+    environment:
+      <<: *app-environment
+      SERVER_PORT: "8080"
+    depends_on: *platform
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  prometheus:
+    profiles: ["observability"]
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro

@@ -248,9 +248,7 @@ class PaymentCancellationIntegrationTest {
         return post("/api/v1/orders/{orderNumber}/cancel", order.getOrderNumber().toString())
                 .header("Idempotency-Key", key)
                 .header(GatewayHeaderAuthenticationFilter.USER_ID_HEADER, CUSTOMER)
-                .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, "CUSTOMER")
-                .header(GatewayHeaderAuthenticationFilter.TOKEN_ID_HEADER, ids.generate())
-                .header(GatewayHeaderAuthenticationFilter.TOKEN_EXPIRES_AT_HEADER, 1_788_400_000L);
+                .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, "CUSTOMER");
     }
 
     private void assertState(String orderStatus, String itemStatus, int cancellations, String commandStatus) {

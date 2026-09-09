@@ -539,9 +539,7 @@ class OrderCancellationIntegrationTest {
     private MockHttpServletRequestBuilder cancelRequest(UUID customerId, Order order) {
         return post("/api/v1/orders/{orderNumber}/cancel", order.getOrderNumber().toString())
                 .header(GatewayHeaderAuthenticationFilter.USER_ID_HEADER, customerId)
-                .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, "CUSTOMER")
-                .header(GatewayHeaderAuthenticationFilter.TOKEN_ID_HEADER, uuidGenerator.generate())
-                .header(GatewayHeaderAuthenticationFilter.TOKEN_EXPIRES_AT_HEADER, 1_788_400_000L);
+                .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, "CUSTOMER");
     }
 
     private static Stream<String> invalidKeys() {

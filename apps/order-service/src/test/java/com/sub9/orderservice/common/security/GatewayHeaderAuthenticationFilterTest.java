@@ -23,9 +23,6 @@ class GatewayHeaderAuthenticationFilterTest {
 
     private static final UUID USER_ID =
             UUID.fromString("0198f2a0-76c0-7000-8000-000000000001");
-    private static final UUID TOKEN_ID =
-            UUID.fromString("0198f2a0-76c0-7000-8000-000000000002");
-    private static final long EXPIRES_AT = 1_788_400_000L;
 
     private final GatewayHeaderAuthenticationFilter filter = new GatewayHeaderAuthenticationFilter(
             (request, response, exception) -> {
@@ -39,8 +36,8 @@ class GatewayHeaderAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("네 내부 헤더가 유효할 때 필터를 실행하면 인증 객체를 설정한다")
-    void 네_내부_헤더가_유효할_때_필터를_실행하면_인증_객체를_설정한다() throws Exception {
+    @DisplayName("토큰 헤더 없이 사용자 헤더가 유효할 때 필터를 실행하면 인증 객체를 설정한다")
+    void 토큰_헤더_없이_사용자_헤더가_유효할_때_필터를_실행하면_인증_객체를_설정한다() throws Exception {
         MockHttpServletRequest request = 유효한_주문_요청();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -53,17 +50,13 @@ class GatewayHeaderAuthenticationFilterTest {
                 .containsExactly("ROLE_CUSTOMER");
         assertThat(authentication.getPrincipal()).isEqualTo(new GatewayAuthenticationPrincipal(
                 USER_ID,
-                GatewayAuthenticationPrincipal.Role.CUSTOMER,
-                TOKEN_ID,
-                EXPIRES_AT));
+                GatewayAuthenticationPrincipal.Role.CUSTOMER));
     }
 
     @ParameterizedTest(name = "{0} 누락")
     @ValueSource(strings = {
             GatewayHeaderAuthenticationFilter.USER_ID_HEADER,
-            GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER,
-            GatewayHeaderAuthenticationFilter.TOKEN_ID_HEADER,
-            GatewayHeaderAuthenticationFilter.TOKEN_EXPIRES_AT_HEADER
+            GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER
     })
     @DisplayName("필수 내부 헤더가 누락될 때 필터를 실행하면 COMMON_0007과 401을 반환한다")
     void 필수_내부_헤더가_누락될_때_필터를_실행하면_인증_오류를_반환한다(String headerName)
@@ -119,10 +112,7 @@ class GatewayHeaderAuthenticationFilterTest {
         return Stream.of(
                 Arguments.of(GatewayHeaderAuthenticationFilter.USER_ID_HEADER, "not-a-uuid"),
                 Arguments.of(GatewayHeaderAuthenticationFilter.USER_ID_HEADER, "1-1-1-1-1"),
-                Arguments.of(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, "UNKNOWN"),
-                Arguments.of(GatewayHeaderAuthenticationFilter.TOKEN_ID_HEADER, "not-a-uuid"),
-                Arguments.of(GatewayHeaderAuthenticationFilter.TOKEN_ID_HEADER, "1-1-1-1-1"),
-                Arguments.of(GatewayHeaderAuthenticationFilter.TOKEN_EXPIRES_AT_HEADER, "not-a-number"));
+                Arguments.of(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, "UNKNOWN"));
     }
 
     private MockHttpServletRequest 유효한_주문_요청() {
@@ -130,8 +120,6 @@ class GatewayHeaderAuthenticationFilterTest {
         request.setServletPath("/api/v1/orders");
         request.addHeader(GatewayHeaderAuthenticationFilter.USER_ID_HEADER, USER_ID.toString());
         request.addHeader(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, "CUSTOMER");
-        request.addHeader(GatewayHeaderAuthenticationFilter.TOKEN_ID_HEADER, TOKEN_ID.toString());
-        request.addHeader(GatewayHeaderAuthenticationFilter.TOKEN_EXPIRES_AT_HEADER, EXPIRES_AT);
         return request;
     }
 }

@@ -3,13 +3,6 @@
 .gradle
 **/.gradle
 **/build
-apps
-infra
-libs
-gradle
-build.gradle
-settings.gradle
-gradlew
 gradlew.bat
 docs
 work
@@ -21,3 +14,4 @@ compose.apps.yaml
 .env
 .env.*
 *.iml
+.image
