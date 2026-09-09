@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.presentation.command.dto.reqeust.product;
+package com.sub9.productservice.product.presentation.command.dto.product;
 
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
 import jakarta.validation.constraints.NotNull;

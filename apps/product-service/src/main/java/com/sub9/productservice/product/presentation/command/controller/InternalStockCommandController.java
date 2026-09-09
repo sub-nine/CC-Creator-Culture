@@ -1,8 +1,8 @@
 package com.sub9.productservice.product.presentation.command.controller;
 
 import com.sub9.productservice.product.application.command.service.StockCommandService;
-import com.sub9.productservice.product.presentation.command.dto.reqeust.stock.DeductStockRequest;
-import com.sub9.productservice.product.presentation.command.dto.reqeust.stock.RestoreStockRequest;
+import com.sub9.productservice.product.presentation.command.dto.stock.DeductStockRequest;
+import com.sub9.productservice.product.presentation.command.dto.stock.RestoreStockRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;

@@ -4,7 +4,7 @@ import com.sub9.common.annotation.Creator;
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.product.application.command.service.StockCommandService;
-import com.sub9.productservice.product.presentation.command.dto.reqeust.stock.AdjustStockRequest;
+import com.sub9.productservice.product.presentation.command.dto.stock.AdjustStockRequest;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
