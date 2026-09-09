@@ -41,12 +41,12 @@ class ThumbnailatorImageProcessorUnitTest {
   }
 
   @Test
-  @DisplayName("빈 이미지는 BAD_REQUEST 예외가 발생해야한다.")
+  @DisplayName("빈 이미지는 UNSUPPORTED_MEDIA_TYPE 예외가 발생해야한다.")
   void resize_fails_when_image_is_empty() {
     // when & then
     assertThatThrownBy(() -> processor.resize(new ImageData("image/png", new byte[0])))
         .isInstanceOf(BusinessException.class)
-        .hasMessage(CommonErrorCode.BAD_REQUEST.message());
+        .hasMessage(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE.message());
   }
 
   @Test
@@ -59,11 +59,11 @@ class ThumbnailatorImageProcessorUnitTest {
   }
 
   @Test
-  @DisplayName("타입이 PNG여도 실제 내용이 이미지가 아니면 BAD_REQUEST 예외가 발생해야한다.")
+  @DisplayName("타입이 PNG여도 실제 내용이 이미지가 아니면 UNSUPPORTED_MEDIA_TYPE 예외가 발생해야한다.")
   void resize_fails_when_image_is_corrupted() {
     // when & then
     assertThatThrownBy(() -> processor.resize(new ImageData("image/png", new byte[] {1, 2, 3})))
         .isInstanceOf(BusinessException.class)
-        .hasMessage(CommonErrorCode.BAD_REQUEST.message());
+        .hasMessage(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE.message());
   }
 }

@@ -30,8 +30,20 @@ spring:
       connect-timeout: 2s
       timeout: 2s
 
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 26MB
+
+cloudflare:
+  r2:
+    access-key: ${R2_ACCESS_KEY}
+    secret-key: ${R2_SECRET_KEY}
+    endpoint: ${R2_ENDPOINT}
+    bucket: ${R2_BUCKET}
+
 kafka:
-  bootstrap-servers: ${KAFKA_HOST}
+  bootstrap-servers: ${KAFKA_HOST:localhost:9092}
   auto-offset-reset: latest
   product-group-id: product-group
   category-group-id: category-group

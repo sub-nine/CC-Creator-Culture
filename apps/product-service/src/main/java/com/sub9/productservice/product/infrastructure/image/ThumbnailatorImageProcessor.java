@@ -29,7 +29,7 @@ public class ThumbnailatorImageProcessor implements ImageProcessorPort {
 
       return new ImageData(MediaType.IMAGE_JPEG_VALUE, outputStream.toByteArray());
     } catch (IOException e) {
-      throw new BusinessException(CommonErrorCode.BAD_REQUEST);
+      throw new BusinessException(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE);
     }
   }
 }
