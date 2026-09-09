@@ -103,7 +103,7 @@ class CartCleanupIntegrationTest {
 
     @Test
     @DisplayName("선택한 본인 항목만 삭제하고 중복 실행에도 새로 담은 항목을 유지한다")
-    void 선택한_항목일_때_작업을_실행하면_본인_원본만_삭제한다() {
+    void when_cleanup_runs_only_selected_owned_items_are_deleted() {
         Cart selected = cart(UUID.randomUUID());
         Cart unselected = cart(selected.getUserId());
         Cart other = cart(UUID.randomUUID());
@@ -125,7 +125,7 @@ class CartCleanupIntegrationTest {
 
     @Test
     @DisplayName("삭제 후 예외가 나면 삭제와 작업 완료를 롤백하고 새 실행기에서 재처리한다")
-    void 삭제중_실패일_때_다시_실행하면_롤백한_작업을_복구한다() {
+    void when_deletion_fails_retry_recovers_rolled_back_task() {
         Cart selected = cart(UUID.randomUUID());
         Order order = order(selected);
         payments.process(order.getCustomerId(), order.getOrderNumber(), PaymentStatus.SUCCESS);
@@ -151,7 +151,7 @@ class CartCleanupIntegrationTest {
 
     @Test
     @DisplayName("재시도 시각 저장도 실패하면 작업을 남기고 다음 작업을 계속 처리한다")
-    void 재시도_기록도_실패일_때_실행하면_작업을_보존한다() {
+    void when_retry_recording_fails_task_is_preserved() {
         Cart first = cart(UUID.randomUUID());
         CartCleanupTask failed = enqueue(first);
         Cart second = cart(UUID.randomUUID());
@@ -173,7 +173,7 @@ class CartCleanupIntegrationTest {
 
     @Test
     @DisplayName("결제 성공 후 작업을 저장하고 별도 실행에서 장바구니를 삭제한다")
-    void 결제_성공일_때_작업을_실행하면_장바구니를_삭제한다() {
+    void when_payment_succeeds_cleanup_deletes_cart_items() {
         Cart selected = cart(UUID.randomUUID());
         Order order = order(selected);
         payments.process(order.getCustomerId(), order.getOrderNumber(), PaymentStatus.SUCCESS);
@@ -188,7 +188,7 @@ class CartCleanupIntegrationTest {
 
     @Test
     @DisplayName("결제가 커밋되기 전에는 별도 실행기가 작업을 볼 수 없다")
-    void 결제_저장중일_때_실행하면_커밋전_삭제하지_않는다() {
+    void when_payment_is_being_saved_cleanup_does_not_delete_before_commit() {
         Cart selected = cart(UUID.randomUUID());
         Order order = order(selected);
         doAnswer(call -> {
@@ -207,7 +207,7 @@ class CartCleanupIntegrationTest {
 
     @Test
     @DisplayName("결제 저장 후 롤백되면 정리 작업과 결제 기록도 남지 않는다")
-    void 결제_롤백일_때_실행하면_작업과_삭제가_없다() {
+    void when_payment_rolls_back_cleanup_task_and_deletion_are_absent() {
         Cart selected = cart(UUID.randomUUID());
         Order order = order(selected);
         doAnswer(call -> {
@@ -227,7 +227,7 @@ class CartCleanupIntegrationTest {
 
     @Test
     @DisplayName("작업 저장이 실패하면 결제 성공도 함께 롤백한다")
-    void 작업_저장_실패일_때_결제하면_성공을_롤백한다() {
+    void when_task_storage_fails_payment_success_is_rolled_back() {
         Cart selected = cart(UUID.randomUUID());
         Order order = order(selected);
         doAnswer(call -> {
@@ -245,7 +245,7 @@ class CartCleanupIntegrationTest {
 
     @Test
     @DisplayName("결제 실패와 주문 만료는 정리 작업을 만들지 않는다")
-    void 실패나_만료일_때_처리하면_장바구니를_유지한다() {
+    void when_payment_fails_or_order_expires_cart_items_are_preserved() {
         Cart failedCart = cart(UUID.randomUUID());
         Order failed = order(failedCart);
         payments.process(failed.getCustomerId(), failed.getOrderNumber(), PaymentStatus.FAILED);
@@ -261,7 +261,7 @@ class CartCleanupIntegrationTest {
 
     @Test
     @DisplayName("원본 ID가 없는 주문은 제외하고 일부만 있으면 해당 항목만 정리한다")
-    void 원본_ID가_누락일_때_결제하면_존재하는_ID만_삭제한다() {
+    void when_source_ids_are_missing_cleanup_deletes_only_known_items() {
         Cart legacyCart = cart(UUID.randomUUID());
         Order legacy = order(legacyCart, java.util.Arrays.asList((UUID) null));
         payments.process(legacy.getCustomerId(), legacy.getOrderNumber(), PaymentStatus.SUCCESS);
@@ -278,7 +278,7 @@ class CartCleanupIntegrationTest {
 
     @Test
     @DisplayName("주문 후 수량 변경은 원본을 삭제하고 삭제 후 다시 담은 항목은 유지한다")
-    void 주문후_장바구니_변경일_때_결제하면_원본_ID로만_정리한다() {
+    void when_cart_changes_after_order_cleanup_uses_original_item_ids() {
         Cart changed = cart(UUID.randomUUID());
         Order first = order(changed);
         changed.changeQuantity(5);
@@ -297,7 +297,7 @@ class CartCleanupIntegrationTest {
 
     @Test
     @DisplayName("동시에 같은 작업을 실행하면 잠금을 얻은 실행기만 삭제한다")
-    void 같은_작업일_때_동시_실행하면_한번만_삭제한다() throws Exception {
+    void when_same_task_runs_concurrently_items_are_deleted_once() throws Exception {
         Cart selected = cart(UUID.randomUUID());
         CartCleanupTask task = enqueue(selected);
         CountDownLatch deleting = new CountDownLatch(1);
@@ -326,7 +326,7 @@ class CartCleanupIntegrationTest {
 
     @Test
     @DisplayName("작업 완료 저장이 실패하면 장바구니 삭제도 롤백한다")
-    void 완료_저장_실패일_때_재처리하면_삭제를_복구한다() {
+    void when_completion_storage_fails_retry_recovers_deletion() {
         Cart selected = cart(UUID.randomUUID());
         CartCleanupTask task = enqueue(selected);
         doAnswer(call -> {

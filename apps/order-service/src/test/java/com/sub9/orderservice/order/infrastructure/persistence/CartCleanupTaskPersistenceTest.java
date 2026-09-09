@@ -53,7 +53,7 @@ class CartCleanupTaskPersistenceTest {
 
     @Test
     @DisplayName("같은 주문의 작업을 다시 저장하면 유일성 제약으로 거부한다")
-    void 동일_주문일_때_다시_저장하면_중복을_거부한다() {
+    void when_same_order_is_saved_again_duplicate_task_is_rejected() {
         CartCleanupTask first = task(NOW);
         repository.save(first);
         jpa.flush();
@@ -65,7 +65,7 @@ class CartCleanupTaskPersistenceTest {
 
     @Test
     @DisplayName("재시도를 미루면 지정한 시각에만 다시 선택한다")
-    void 실패한_작업일_때_재시도를_미루면_기한까지_제외한다() {
+    void when_retry_is_postponed_task_is_excluded_until_due() {
         CartCleanupTask task = repository.save(task(NOW));
         repository.save(task(NOW.plusSeconds(120)));
         assertThat(repository.findDue(NOW, 1)).extracting(CartCleanupTask::getId).containsExactly(task.getId());
@@ -77,7 +77,7 @@ class CartCleanupTaskPersistenceTest {
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @DisplayName("다른 트랜잭션이 잠근 작업을 건너뛰고 롤백 후 다시 잠근다")
-    void 작업이_잠겼을_때_다시_조회하면_건너뛰고_롤백후_복구한다() {
+    void when_task_is_locked_query_skips_it_and_recovers_after_rollback() {
         TransactionTemplate tx = new TransactionTemplate(manager);
         CartCleanupTask task = tx.execute(status -> repository.save(task(NOW)));
         try (var executor = Executors.newSingleThreadExecutor()) {
@@ -107,7 +107,7 @@ class CartCleanupTaskPersistenceTest {
 
     @Test
     @DisplayName("배포 SQL로 만든 테이블에서 작업 저장과 잠금 조회가 동작한다")
-    void 배포_SQL일_때_테이블을_생성하면_작업을_처리한다() throws Exception {
+    void when_deployment_sql_creates_table_task_can_be_processed() throws Exception {
         jdbc.execute("create schema cart_cleanup_ddl");
         jdbc.execute("set local search_path to cart_cleanup_ddl, public");
         String sql = Files.readString(Path.of("../../deploy/postgres/create-order-cart-cleanup-tasks.sql"));
