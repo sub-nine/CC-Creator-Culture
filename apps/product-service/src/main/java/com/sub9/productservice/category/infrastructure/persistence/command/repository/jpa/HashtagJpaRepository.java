@@ -1,4 +1,4 @@
-package com.sub9.productservice.category.infrastructure.persistence.command.repository;
+package com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa;
 
 import com.sub9.productservice.category.domain.entity.Hashtag;
 import org.springframework.data.jpa.repository.JpaRepository;
