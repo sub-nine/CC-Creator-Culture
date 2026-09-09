@@ -97,7 +97,7 @@ class PaymentControllerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"X-User-Id", "X-User-Role", "X-Token-Id", "X-Token-Expires-At"})
+    @ValueSource(strings = {"X-User-Id", "X-User-Role"})
     @DisplayName("인증 헤더가 잘못되면 결제를 처리하지 않는다")
     void when_authentication_header_is_invalid_request_is_rejected(String header) throws Exception {
         var request = request(Role.CUSTOMER).content("{\"result\":\"SUCCESS\"}")
@@ -195,9 +195,7 @@ class PaymentControllerTest {
     private MockHttpServletRequestBuilder request(Role role, String path) {
         return post(path).contentType(MediaType.APPLICATION_JSON)
                 .header(GatewayHeaderAuthenticationFilter.USER_ID_HEADER, USER_ID)
-                .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, role.name())
-                .header(GatewayHeaderAuthenticationFilter.TOKEN_ID_HEADER, PAYMENT_ID)
-                .header(GatewayHeaderAuthenticationFilter.TOKEN_EXPIRES_AT_HEADER, 1_800_000_000L);
+                .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, role.name());
     }
 
     private MockPaymentResult result(PaymentStatus status, long amount) {

@@ -17,6 +17,7 @@ outputs
 deploy
 docker
 compose.yaml
+compose.apps.yaml
 .env
 .env.*
 *.iml

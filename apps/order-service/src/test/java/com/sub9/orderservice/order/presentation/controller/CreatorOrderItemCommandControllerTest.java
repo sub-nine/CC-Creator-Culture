@@ -43,8 +43,6 @@ class CreatorOrderItemCommandControllerTest {
 
     private static final UUID USER_ID =
             UUID.fromString("01990a00-0000-7000-8000-000000000001");
-    private static final UUID TOKEN_ID =
-            UUID.fromString("01990a00-0000-7000-8000-000000000002");
     private static final UUID ORDER_ITEM_ID =
             UUID.fromString("01990a00-0000-7000-8000-000000000003");
     private static final UUID PRODUCT_ID =
@@ -153,8 +151,6 @@ class CreatorOrderItemCommandControllerTest {
         return patch(path)
                 .header(GatewayHeaderAuthenticationFilter.USER_ID_HEADER, USER_ID)
                 .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, role.name())
-                .header(GatewayHeaderAuthenticationFilter.TOKEN_ID_HEADER, TOKEN_ID)
-                .header(GatewayHeaderAuthenticationFilter.TOKEN_EXPIRES_AT_HEADER, 1_788_400_000L)
                 .contentType(MediaType.APPLICATION_JSON);
     }
 

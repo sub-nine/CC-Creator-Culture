@@ -1,42 +1,54 @@
 package com.sub9.orderservice.cart.application.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
-
+import com.sub9.orderservice.cart.application.dto.CartItemInfo;
 import com.sub9.orderservice.cart.application.dto.CartProductInfo;
-import com.sub9.orderservice.cart.application.port.CartProductPort;
+import com.sub9.orderservice.cart.application.port.out.CartProductPort;
 import com.sub9.orderservice.cart.domain.model.Cart;
 import com.sub9.orderservice.cart.infrastructure.persistence.CartJpaRepository;
 import com.sub9.orderservice.cart.presentation.response.CartItemResponse;
-import com.sub9.orderservice.order.application.port.output.CartSnapshotPort.CartItemSnapshot;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.support.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
-import java.util.List;
-import java.util.UUID;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.*;
+
 @Transactional
 @SpringBootTest
 @DisplayName("CartQueryService - 통합 테스트")
 class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
-  @Autowired private CartQueryService cartQueryService;
-  @Autowired private CartJpaRepository cartRepository;
-  @Autowired private EntityManager entityManager;
+  @Autowired
+  private CartQueryService cartQueryService;
+  @Autowired
+  private CartJpaRepository cartRepository;
+  @Autowired
+  private EntityManager entityManager;
 
-  @MockitoBean private CartProductPort cartProductPort;
-  @MockitoBean private CouponApplicationPort couponApplicationPort;
-  @MockitoBean private CouponUsagePort couponUsagePort;
-  @MockitoBean private StockPort stockPort;
-  @MockitoBean private PaymentCancellationPort paymentCancellationPort;
+  @MockitoBean
+  private CartProductPort cartProductPort;
+  @MockitoBean
+  private CouponApplicationPort couponApplicationPort;
+  @MockitoBean
+  private CouponUsagePort couponUsagePort;
+  @MockitoBean
+  private StockPort stockPort;
+  @MockitoBean
+  private PaymentCancellationPort paymentCancellationPort;
 
   private UUID userId;
 
@@ -90,6 +102,7 @@ class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
     void getCart_success_when_empty() {
       // given
       saveCart(UUID.randomUUID(), 2);
+
       entityManager.flush();
       entityManager.clear();
 
@@ -145,7 +158,7 @@ class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
   @DisplayName("주문용 장바구니 조회 성공 테스트")
   class GetCartItemsTests {
     @Test
-    @DisplayName("선택한 본인 항목의 상품 정보와 수량으로 주문 스냅샷을 반환한다.")
+    @DisplayName("선택한 본인 항목의 상품 정보와 수량으로 장바구니 정보를 반환한다.")
     void getCartItems_success() {
       // given
       Cart selected = saveCart(userId, 4);
@@ -162,19 +175,20 @@ class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
       entityManager.clear();
 
       // when
-      List<CartItemSnapshot> result =
+      List<CartItemInfo> result =
           cartQueryService.getCartItems(userId, List.of(selected.getId()));
 
       // then
       assertThat(result)
           .containsExactly(
-              new CartItemSnapshot(
+              new CartItemInfo(
                   selected.getId(),
-                  info.creatorId(),
-                  info.productId(),
                   selected.getSkuId(),
+                  info.productId(),
+                  info.creatorId(),
                   info.productName(),
                   info.skuName(),
+                  info.productStatus(),
                   3000L,
                   4));
     }

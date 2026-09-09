@@ -49,7 +49,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         "management.tracing.export.enabled=false"
 })
 @MockitoBean(types = {
-        CartQueryService.class,
+        CartSnapshotPort.class,
         CouponApplicationPort.class,
         CouponUsagePort.class,
         StockPort.class,
@@ -124,6 +124,9 @@ class OrderCreationIntegrationTest {
         assertThat(commandStatus()).isEqualTo(OrderCommandStatus.SUCCEEDED.name());
         assertThat(count("p_orders")).isEqualTo(1);
         assertThat(count("p_order_items")).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForList("select cart_item_id from p_order_items", UUID.class))
+                .containsExactlyInAnyOrderElementsOf(fixture.snapshots().stream()
+                        .map(CartItemSnapshot::cartItemId).toList());
         verify(cartSnapshotPort, times(1)).getCartItems(eq(CUSTOMER_ID), anyList());
         verify(couponApplicationPort, times(1)).apply(eq(CUSTOMER_ID), anyList());
         verify(stockPort, times(1)).deduct(org.mockito.ArgumentMatchers.any(), anyList());

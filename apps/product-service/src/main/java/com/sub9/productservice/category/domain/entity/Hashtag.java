@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -26,6 +27,8 @@ import java.util.UUID;
 )
 public class Hashtag extends BaseEntity {
 
+    public static final UUID ACTIVE_UNIQUE_VERSION = UUID.fromString("00000000-0000-0000-0000-000000000000");
+
     @Column(name = "name", nullable = false)
     private String name;
 
@@ -34,6 +37,11 @@ public class Hashtag extends BaseEntity {
 
     @Column(name = "unique_version", nullable = false)
     private UUID uniqueVersion;
+
+    // usage_count 동시 증가 시 lost update 방지를 위한 낙관적 락
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     @Override
     public void delete(UUID deletedBy) {
@@ -45,7 +53,7 @@ public class Hashtag extends BaseEntity {
     public static Hashtag create(String name) {
         return Hashtag.builder()
                 .name(name)
-                .uniqueVersion(UUID.fromString("00000000-0000-0000-0000-000000000000"))
+                .uniqueVersion(ACTIVE_UNIQUE_VERSION)
                 .build();
     }
 

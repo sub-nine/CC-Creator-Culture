@@ -4,9 +4,7 @@ import java.util.UUID;
 
 public record GatewayAuthenticationPrincipal(
         UUID userId,
-        Role role,
-        UUID accessTokenId,
-        long expiresAtEpochSecond) {
+        Role role) {
 
     public enum Role {
         CUSTOMER,

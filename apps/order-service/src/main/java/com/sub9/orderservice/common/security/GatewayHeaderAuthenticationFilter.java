@@ -18,8 +18,6 @@ public class GatewayHeaderAuthenticationFilter extends OncePerRequestFilter {
 
     public static final String USER_ID_HEADER = "X-User-Id";
     public static final String USER_ROLE_HEADER = "X-User-Role";
-    public static final String TOKEN_ID_HEADER = "X-Token-Id";
-    public static final String TOKEN_EXPIRES_AT_HEADER = "X-Token-Expires-At";
 
     private final AuthenticationEntryPoint authenticationEntryPoint;
 
@@ -36,9 +34,7 @@ public class GatewayHeaderAuthenticationFilter extends OncePerRequestFilter {
         try {
             principal = new GatewayAuthenticationPrincipal(
                     requiredUuidHeader(request, USER_ID_HEADER),
-                    GatewayAuthenticationPrincipal.Role.valueOf(requiredHeader(request, USER_ROLE_HEADER)),
-                    requiredUuidHeader(request, TOKEN_ID_HEADER),
-                    Long.parseLong(requiredHeader(request, TOKEN_EXPIRES_AT_HEADER)));
+                    GatewayAuthenticationPrincipal.Role.valueOf(requiredHeader(request, USER_ROLE_HEADER)));
         } catch (IllegalArgumentException exception) {
             SecurityContextHolder.clearContext();
             authenticationEntryPoint.commence(

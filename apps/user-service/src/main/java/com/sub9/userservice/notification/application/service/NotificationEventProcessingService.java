@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
-
+import com.sub9.common.identifier.UuidV7Generator;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +31,7 @@ public class NotificationEventProcessingService {
     private final NotificationMessageFactory messageFactory;
     private final SlackPolicy slackPolicy;
     private final SensitiveDataMasker sensitiveDataMasker;
+    private final UuidV7Generator uuidV7Generator;
 
     @Transactional
     public void process(NotificationEventCommand notificationeventcommand) {
@@ -56,6 +57,7 @@ public class NotificationEventProcessingService {
                     notificationeventcommand.eventId(), destination
             )) {
                 slackDeliveryRepository.save(SlackDelivery.pending(
+                        uuidV7Generator.generate(),
                         notificationeventcommand.eventId(),
                         destination,
                         sensitiveDataMasker.mask(buildSlackMessage(notificationeventcommand, message))
@@ -76,6 +78,7 @@ public class NotificationEventProcessingService {
             return;
         }
         notificationRepository.save(Notification.create(
+                uuidV7Generator.generate(),
                 notificationeventcommand.eventId(),
                 recipientId,
                 notificationeventcommand.eventType(),
