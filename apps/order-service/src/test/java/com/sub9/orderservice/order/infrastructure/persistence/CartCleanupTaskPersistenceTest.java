@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.*;
 import com.sub9.orderservice.order.domain.model.CartCleanupTask;
 import com.sub9.orderservice.order.domain.repository.CartCleanupTaskRepository;
 import java.time.Instant;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -39,6 +42,7 @@ class CartCleanupTaskPersistenceTest {
     @Autowired CartCleanupTaskRepository repository;
     @Autowired CartCleanupTaskJpaRepository jpa;
     @Autowired PlatformTransactionManager manager;
+    @Autowired JdbcTemplate jdbc;
 
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
@@ -99,6 +103,25 @@ class CartCleanupTaskPersistenceTest {
         } finally {
             jpa.deleteAll();
         }
+    }
+
+    @Test
+    @DisplayName("배포 SQL로 만든 테이블에서 작업 저장과 잠금 조회가 동작한다")
+    void 배포_SQL일_때_테이블을_생성하면_작업을_처리한다() throws Exception {
+        jdbc.execute("create schema cart_cleanup_ddl");
+        jdbc.execute("set local search_path to cart_cleanup_ddl, public");
+        String sql = Files.readString(Path.of("../../deploy/postgres/create-order-cart-cleanup-tasks.sql"));
+        for (String statement : sql.split(";")) {
+            if (!statement.isBlank()) jdbc.execute(statement);
+        }
+        CartCleanupTask task = repository.save(task(NOW));
+        jpa.flush();
+        assertThat(repository.findDueForUpdate(task.getId(), NOW)).isPresent();
+        assertThat(jdbc.queryForObject("""
+                select data_type from information_schema.columns
+                 where table_schema = 'cart_cleanup_ddl' and table_name = 'p_order_cart_cleanup_tasks'
+                   and column_name = 'created_at'
+                """, String.class)).isEqualTo("timestamp without time zone");
     }
 
     private static CartCleanupTask task(Instant createdAt) {
