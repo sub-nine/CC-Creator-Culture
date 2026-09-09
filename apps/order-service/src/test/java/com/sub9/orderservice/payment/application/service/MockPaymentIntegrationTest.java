@@ -447,7 +447,7 @@ class MockPaymentIntegrationTest {
     private Order saveOrder(long amount, boolean withCoupon) {
         Order order = Order.create(ids.generate(), ids.generate(),
                 ShippingAddress.of("홍길동", "010-1234-5678", "06236", "서울 강남구", "101호"),
-                List.of(OrderItem.create(ids.generate(), ids.generate(), ids.generate(), ids.generate(),
+                List.of(OrderItem.create(ids.generate(), null, ids.generate(), ids.generate(), ids.generate(),
                         withCoupon ? ids.generate() : null,
                         ProductSnapshot.of("키링", "기본", Money.won(20_000), 2), Money.won(40_000 - amount))),
                 CREATED_AT);

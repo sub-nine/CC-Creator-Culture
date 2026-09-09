@@ -390,7 +390,7 @@ class OrderCommandIdempotencyIntegrationTest {
 
     private Order order() {
         OrderItem item = OrderItem.create(
-                uuidGenerator.generate(),
+                uuidGenerator.generate(), null,
                 uuidGenerator.generate(),
                 uuidGenerator.generate(),
                 uuidGenerator.generate(),
