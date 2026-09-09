@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -27,7 +28,7 @@ public class NotificationEventMapper {
         return new NotificationEventCommand(
                 eventId(record), EventType.PRODUCT_CREATED, SourceService.PRODUCT_SERVICE,
                 ReferenceType.PRODUCT, event.productId(), event.creatorId(),
-                null, null, null, event.name(), null, null, null, null, null, null,
+                null, List.of(), null, event.name(), null, null, null, null, null, null,
                 messageTimestamp(record)
         );
     }
@@ -42,7 +43,7 @@ public class NotificationEventMapper {
         return new NotificationEventCommand(
                 eventId(record), EventType.PAYMENT_PAID, SourceService.ORDER_SERVICE,
                 ReferenceType.ORDER, event.orderId(), null, order.buyerId(),
-                null, null, null, order.orderNumber(), null, "PAID", null, null, null,
+                order.sellerUserIds(), null, null, order.orderNumber(), null, "PAID", null, null, null,
                 messageTimestamp(record)
         );
     }

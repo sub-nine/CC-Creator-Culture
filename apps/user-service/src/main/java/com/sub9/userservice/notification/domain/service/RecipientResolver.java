@@ -5,7 +5,7 @@ import com.sub9.userservice.notification.domain.repository.FollowerLookup;
 import com.sub9.userservice.notification.domain.repository.WishlistLookup;
 import lombok.RequiredArgsConstructor;
 
-import java.util.LinkedHashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -26,21 +26,29 @@ public class RecipientResolver {
             );
             case PRODUCT_RESTOCKED -> wishlistLookup.findInterestedUserIds(context.referenceId());
 
-            case ORDER_CREATED -> List.of(
-                    required(context.sellerId(), "sellerId")
-            );
-            case ORDER_CANCELLED -> List.of(
-                    required(context.buyerId(), "buyerId"),
-                    required(context.sellerId(), "sellerId")
-            );
+            case ORDER_CREATED -> requiredSellers(context.sellerUserIds());
+            case ORDER_CANCELLED -> {
+                List<UUID> recipients = new ArrayList<>();
+                recipients.add(required(context.buyerId(), "buyerId"));
+                recipients.addAll(requiredSellers(context.sellerUserIds()));
+                yield recipients;
+            }
             case PAYMENT_PAID, PAYMENT_FAILED -> List.of(
                     required(context.buyerId(), "buyerId")
             );
         };
 
-        return new LinkedHashSet<>(candidates.stream().filter(Objects::nonNull).toList())
-                .stream()
+        return candidates.stream()
+                .filter(Objects::nonNull)
+                .distinct()
                 .toList();
+    }
+
+    private List<UUID> requiredSellers(List<UUID> sellerUserIds) {
+        if (sellerUserIds == null || sellerUserIds.isEmpty()) {
+            throw new IllegalArgumentException("sellerUserIds is required for this event type");
+        }
+        return sellerUserIds;
     }
 
     private UUID required(UUID value, String fieldName) {
