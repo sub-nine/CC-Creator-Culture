@@ -1,21 +1,26 @@
 package com.sub9.productservice.product.application.command.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.sub9.common.exception.BusinessException;
+import com.sub9.productservice.product.application.command.dto.product.CreateProductCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
+import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import com.sub9.productservice.product.domain.repository.ProductCommandRepository;
 import com.sub9.productservice.product.domain.repository.SkuCommandRepository;
 import com.sub9.productservice.product.domain.repository.StockCommandRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -34,10 +39,25 @@ class ProductCommandServiceUnitTest {
   @Mock private SkuCommandRepository skuCommandRepository;
   @Mock private StockCommandRepository stockCommandRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private ProductImageCommandService imageCommandService;
   @InjectMocks private ProductCommandService productCommandService;
 
   private final UUID creatorId = UUID.randomUUID();
   private final UUID productId = UUID.randomUUID();
+
+  @Test
+  @DisplayName("SKU가 없는 상품은 이미지를 업로드하지 않고 등록을 거부한다.")
+  void createProduct_fails_when_skus_are_empty() {
+    // given
+    var command = new CreateProductCommand(List.of("말랑이"), creatorId, "말랑이", "상품 설명", List.of());
+    var image = new UploadImageCommand("image/png", new byte[] {1});
+
+    // when & then
+    assertThatThrownBy(() -> productCommandService.createProduct(command, List.of(image)))
+        .isInstanceOf(BusinessException.class)
+        .hasMessage(ProductErrorCode.SKU_REQUIRED.message());
+    verifyNoInteractions(imageCommandService, productCommandRepository);
+  }
 
   @Nested
   @DisplayName("상품 정보 수정 테스트")
@@ -48,6 +68,7 @@ class ProductCommandServiceUnitTest {
       // given
       UpdateProductCommand command =
           new UpdateProductCommand(creatorId, productId, "수정된 상품명", "수정된 상품 설명");
+
       given(productCommandRepository.findByIdAndDeletedAtIsNull(productId))
           .willReturn(Optional.empty());
 
@@ -67,6 +88,7 @@ class ProductCommandServiceUnitTest {
 
       given(productCommandRepository.findByIdAndDeletedAtIsNull(productId))
           .willReturn(Optional.of(product));
+
       willThrow(new BusinessException(ProductErrorCode.PRODUCT_ACCESS_DENIED))
           .given(product)
           .validateOwner(creatorId);
@@ -110,6 +132,7 @@ class ProductCommandServiceUnitTest {
       UpdateProductStatusCommand command =
           new UpdateProductStatusCommand(
               creatorId, productId, "CREATOR", ProductStatus.INACTIVE.name());
+
       given(productCommandRepository.findByIdAndDeletedAtIsNull(productId))
           .willReturn(Optional.empty());
 
@@ -124,12 +147,14 @@ class ProductCommandServiceUnitTest {
     void updateStatusProduct_fails_when_creator_is_not_owner() {
       // given
       Product product = mock(Product.class);
+
       UpdateProductStatusCommand command =
           new UpdateProductStatusCommand(
               creatorId, productId, "CREATOR", ProductStatus.INACTIVE.name());
 
       given(productCommandRepository.findByIdAndDeletedAtIsNull(productId))
           .willReturn(Optional.of(product));
+
       willThrow(new BusinessException(ProductErrorCode.PRODUCT_ACCESS_DENIED))
           .given(product)
           .validateOwner(creatorId);
@@ -146,6 +171,21 @@ class ProductCommandServiceUnitTest {
   @Nested
   @DisplayName("상품 삭제 테스트")
   class DeleteProductTests {
+    @Test
+    @DisplayName("소유자가 아니면 상품과 이미지 삭제를 수행하지 않는다.")
+    void deleteProduct_fails_when_not_owner() {
+      // given
+      Product product = Product.create(UUID.randomUUID(), "말랑이", "상품 설명");
+      given(productCommandRepository.findByIdForUpdate(productId)).willReturn(Optional.of(product));
+
+      // when & then
+      assertThatThrownBy(() -> productCommandService.deleteProduct(creatorId, productId))
+          .isInstanceOf(BusinessException.class)
+          .hasMessage(ProductErrorCode.PRODUCT_ACCESS_DENIED.message());
+      verifyNoInteractions(imageCommandService, skuCommandRepository);
+      assertThat(product.getDeletedAt()).isNull();
+    }
+
     @Test
     @DisplayName("상품이 존재하지 않는 경우 PRODUCT_NOT_FOUND 예외가 발생해야한다.")
     void deleteProduct_fails_when_product_not_found() {
