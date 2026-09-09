@@ -2,16 +2,19 @@ package com.sub9.orderservice.cart.application.service;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
-import com.sub9.orderservice.cart.application.dto.*;
-import com.sub9.orderservice.cart.application.port.CartProductPort;
+import com.sub9.orderservice.cart.application.dto.AddCartItemCommand;
+import com.sub9.orderservice.cart.application.dto.DeleteCartItemCommand;
+import com.sub9.orderservice.cart.application.dto.UpdateCartItemCommand;
+import com.sub9.orderservice.cart.application.port.out.CartProductPort;
 import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import com.sub9.orderservice.cart.domain.model.Cart;
 import com.sub9.orderservice.cart.domain.repository.CartRepository;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -28,7 +31,7 @@ public class CartCommandService {
     if (cartRepository.countByUserId(command.userId()) >= MAX_CART_ITEM_COUNT) {
       throw new BusinessException(CartErrorCode.CART_ITEM_LIMIT_EXCEEDED);
     }
-    // TODO : Product에 아직 미구현
+
     cartProductPort.validateSkuForCart(command.skuId());
 
     Cart cart = Cart.create(cartId, command.userId(), command.skuId(), command.quantity());
