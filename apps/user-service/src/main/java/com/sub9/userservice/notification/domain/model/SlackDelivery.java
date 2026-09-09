@@ -29,6 +29,7 @@ public class SlackDelivery {
 
 
     public static SlackDelivery pending(
+            UUID slackDeliveryId,
             UUID eventId,
             String destination,
             String message
@@ -36,7 +37,7 @@ public class SlackDelivery {
         Instant now = Instant.now();
 
         return new SlackDelivery(
-                UuidV7Generator.generate(),
+                slackDeliveryId,
                 eventId,
                 destination,
                 message,
