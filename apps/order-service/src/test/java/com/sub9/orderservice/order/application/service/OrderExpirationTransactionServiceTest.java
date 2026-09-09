@@ -107,7 +107,7 @@ class OrderExpirationTransactionServiceTest {
 
     private static OrderItem item(long sequence, UUID userCouponId) {
         return OrderItem.create(
-                uuid(sequence),
+                uuid(sequence), null,
                 uuid(sequence + 2_000),
                 uuid(sequence + 2_500),
                 uuid(sequence + 3_000),

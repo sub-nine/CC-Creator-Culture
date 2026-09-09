@@ -136,6 +136,28 @@ class OrderPersistenceIntegrationTest {
     }
 
     @Test
+    @DisplayName("원본 장바구니 식별자와 기존 주문의 null을 저장 후 재조회한다")
+    void 장바구니_식별자가_있는_항목과_없는_항목일_때_재조회하면_원래_값을_유지한다() {
+        UUID cartItemId = uuidGenerator.generate();
+        OrderItem item = OrderItem.create(uuidGenerator.generate(), cartItemId,
+                uuidGenerator.generate(), uuidGenerator.generate(), uuidGenerator.generate(), null,
+                ProductSnapshot.of("상품", "옵션", Money.won(10_000), 1), Money.won(0));
+        Order order = Order.create(uuidGenerator.generate(), uuidGenerator.generate(),
+                ShippingAddress.of("홍길동", "010-1234-5678", "06236", "서울시 강남구", "101호"),
+                List.of(item, OrderItem.create(uuidGenerator.generate(), null,
+                        uuidGenerator.generate(), uuidGenerator.generate(), uuidGenerator.generate(), null,
+                        ProductSnapshot.of("기존 상품", "옵션", Money.won(5_000), 1), Money.won(0))), CREATED_AT);
+        transaction().executeWithoutResult(status -> {
+            orderRepository.save(order);
+            entityManager.flush();
+            entityManager.clear();
+            Order restored = orderRepository.findByIdForUpdate(order.getId()).orElseThrow();
+            assertThat(restored.getItems()).extracting(OrderItem::getCartItemId)
+                    .containsExactlyInAnyOrder(cartItemId, null);
+        });
+    }
+
+    @Test
     @DisplayName("소비자 주문 목록은 본인 주문만 생성 시각 내림차순으로 조회한다")
     void when_customer_orders_are_queried_only_owned_orders_are_returned() {
         UUID customerId = uuid(1);
@@ -540,7 +562,7 @@ class OrderPersistenceIntegrationTest {
     private Order order(UUID orderId, UUID customerId, List<UUID> creatorIds) {
         List<OrderItem> items = java.util.stream.IntStream.range(0, creatorIds.size())
                 .mapToObj(index -> OrderItem.create(
-                        uuidGenerator.generate(),
+                        uuidGenerator.generate(), null,
                         creatorIds.get(index),
                         uuidGenerator.generate(),
                         uuidGenerator.generate(),

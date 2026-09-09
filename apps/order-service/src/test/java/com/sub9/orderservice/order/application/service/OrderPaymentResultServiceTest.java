@@ -175,7 +175,7 @@ class OrderPaymentResultServiceTest {
     }
 
     private static OrderItem paidItem(long sequence, UUID productId, int quantity) {
-        return OrderItem.create(uuid(sequence), uuid(800), productId, uuid(sequence + 3000), null,
+        return OrderItem.create(uuid(sequence), null, uuid(800), productId, uuid(sequence + 3000), null,
                 ProductSnapshot.of("상품", "옵션", Money.won(1000), quantity), Money.won(0));
     }
 
@@ -191,7 +191,7 @@ class OrderPaymentResultServiceTest {
 
     private static OrderItem item(long sequence, UUID userCouponId) {
         return OrderItem.create(
-                uuid(sequence),
+                uuid(sequence), null,
                 uuid(sequence + 2_000),
                 uuid(sequence + 2_500),
                 uuid(sequence + 3_000),

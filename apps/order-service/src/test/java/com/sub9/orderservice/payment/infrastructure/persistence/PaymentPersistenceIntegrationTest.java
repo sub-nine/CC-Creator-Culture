@@ -346,7 +346,7 @@ class PaymentPersistenceIntegrationTest {
 
     private Payment savePayment(PaymentStatus status, long amount) {
         return transaction().execute(ignored -> {
-            OrderItem item = OrderItem.create(uuidGenerator.generate(), uuidGenerator.generate(),
+            OrderItem item = OrderItem.create(uuidGenerator.generate(), null, uuidGenerator.generate(),
                     uuidGenerator.generate(), uuidGenerator.generate(), null,
                     ProductSnapshot.of("아크릴 스탠드", "기본", Money.won(amount), 1), Money.won(0));
             Order order = Order.create(uuidGenerator.generate(), uuidGenerator.generate(),

@@ -214,7 +214,7 @@ class CouponOrderIntegrationTest {
     private Order order(UserCoupon coupon) {
         return Order.create(ids.generate(), coupon.getUserId(),
                 ShippingAddress.of("홍길동", "010-1234-5678", "06236", "서울특별시 강남구", "101호"),
-                List.of(OrderItem.create(ids.generate(), ids.generate(), ids.generate(), ids.generate(),
+                List.of(OrderItem.create(ids.generate(), null, ids.generate(), ids.generate(), ids.generate(),
                         coupon.getId(), ProductSnapshot.of("상품", "옵션", Money.won(10_000), 1),
                         Money.won(1_000))), NOW);
     }
