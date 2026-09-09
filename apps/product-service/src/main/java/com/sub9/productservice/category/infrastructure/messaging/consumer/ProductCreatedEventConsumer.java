@@ -8,18 +8,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.json.JsonMapper;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ProductCreatedEventConsumer {
     private final AddHashtagsToProductUseCase addHashtagsToProductUseCase;
+    private final JsonMapper jsonMapper;
 
     @KafkaListener(topics = KafkaTopics.PRODUCT_CREATED, groupId = "${kafka.leaderboard-group-id}")
-    public void consume(ProductCreatedEvent event, Acknowledgment ack) {
+    public void consume(String payload, Acknowledgment ack) {
         try {
-            log.info("[KAFKA] 상품 등록 이벤트 수신 - productId: {}, hashtags: {}",
-                    event.productId(), event.hashTags());
+            log.info("[KAFKA] 상품 등록 이벤트 수신 - payload: {}", payload);
+
+            ProductCreatedEvent event = jsonMapper.readValue(payload, ProductCreatedEvent.class);
 
             addHashtagsToProductUseCase.addHashtagsToProduct(event.productId(), event.hashTags());
 
