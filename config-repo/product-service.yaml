@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://${PRODUCT_DB_HOST:localhost}:${PRODUCT_DB_PORT:5432}/${PRODUCT_DB_NAME:product_db}
+    url: jdbc:postgresql://${PRODUCT_DB_HOST:localhost}:${PRODUCT_DB_PORT:5432}/${PRODUCT_DB_NAME:user_service}
     username: ${PRODUCT_DB_USERNAME}
     password: ${PRODUCT_DB_PASSWORD}
     hikari:
@@ -15,9 +15,36 @@ spring:
         jdbc:
           time_zone: UTC
 
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connect-timeout: 3000
+            read-timeout: 5000
+
   data:
     redis:
-      host: ${REDIS_HOST}
+      host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       connect-timeout: 2s
       timeout: 2s
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 26MB
+
+cloudflare:
+  r2:
+    access-key: ${R2_ACCESS_KEY}
+    secret-key: ${R2_SECRET_KEY}
+    endpoint: ${R2_ENDPOINT}
+    bucket: ${R2_BUCKET}
+
+kafka:
+  bootstrap-servers: localhost:9092
+  auto-offset-reset: latest
+  product-group-id: product-group
+  category-group-id: category-group
+
