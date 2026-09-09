@@ -35,6 +35,15 @@ dependencies {
     // UUID
     implementation 'com.github.f4b6a3:uuid-creator:6.1.1'
 
+    // Cloudflare R2
+    implementation 'software.amazon.awssdk:s3:2.54.3'
+
+    // Thumbnailator
+    implementation 'net.coobird:thumbnailator:0.4.20'
+
+    // TIKA
+    implementation 'org.apache.tika:tika-core:4.0.0'
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
