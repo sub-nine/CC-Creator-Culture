@@ -8,5 +8,6 @@ public final class KafkaTopics {
   public static final String PRODUCT_CREATED = "product.created";
   public static final String PRODUCT_VIEW_COUNT_SYNC = "product.view-count.sync";
   public static final String ORDER_PAID = "order.paid";
+  public static final String ORDER_NOTIFICATION = "order.notification";
   public static final String STOCK_RESTORE = "stock.restore";
 }

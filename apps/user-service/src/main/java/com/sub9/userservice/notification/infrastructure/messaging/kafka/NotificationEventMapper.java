@@ -1,9 +1,8 @@
 package com.sub9.userservice.notification.infrastructure.messaging.kafka;
 
-import com.sub9.common.kafka.event.OrderPaidEvent;
+import com.sub9.common.kafka.event.OrderNotificationEvent;
 import com.sub9.common.kafka.event.ProductCreatedEvent;
 import com.sub9.userservice.notification.application.dto.NotificationEventCommand;
-import com.sub9.userservice.notification.application.port.OrderNotificationLookup.OrderNotificationInfo;
 import com.sub9.userservice.notification.domain.model.EventType;
 import com.sub9.userservice.notification.domain.model.ReferenceType;
 import com.sub9.userservice.notification.domain.model.SourceService;
@@ -33,19 +32,37 @@ public class NotificationEventMapper {
         );
     }
 
-    public NotificationEventCommand fromOrderPaid(
-            OrderPaidEvent event, OrderNotificationInfo order, ConsumerRecord<String, String> record
-    ) {
-        validateRecord(record, event.orderId());
-        if (order == null) {
-            throw new IllegalStateException("Order notification information was not found");
+    public NotificationEventCommand fromOrderNotification(OrderNotificationEvent event) {
+        if (event.eventId() == null || event.referenceId() == null
+                || event.buyerId() == null || event.occurredAt() == null) {
+            throw new IllegalArgumentException("Required order notification fields are missing");
+        }
+        if (!"ORDER_SERVICE".equals(event.sourceService()) || !"ORDER".equals(event.referenceType())) {
+            throw new IllegalArgumentException("Invalid event source or reference type");
+        }
+        if (event.orderNumber() == null || event.orderNumber().isBlank()) {
+            throw new IllegalArgumentException("orderNumber is required");
         }
         return new NotificationEventCommand(
-                eventId(record), EventType.PAYMENT_PAID, SourceService.ORDER_SERVICE,
-                ReferenceType.ORDER, event.orderId(), null, order.buyerId(),
-                order.sellerUserIds(), null, null, order.orderNumber(), null, "PAID", null, null, null,
-                messageTimestamp(record)
+                event.eventId(), resolveOrderEventType(event), SourceService.ORDER_SERVICE,
+                ReferenceType.ORDER, event.referenceId(), null, event.buyerId(),
+                List.of(), null, null, event.orderNumber(), null, event.paymentStatus(),
+                event.cancellationScope(), null, null, event.occurredAt()
         );
+    }
+
+    private EventType resolveOrderEventType(OrderNotificationEvent event) {
+        if ("PAYMENT_PAID".equals(event.eventType()) && "PAID".equals(event.paymentStatus())) {
+            return EventType.PAYMENT_PAID;
+        }
+        if ("PAYMENT_FAILED".equals(event.eventType())
+                && ("FAILED".equals(event.paymentStatus()) || "EXPIRED".equals(event.paymentStatus()))) {
+            return EventType.PAYMENT_FAILED;
+        }
+        if ("ORDER_CANCELLED".equals(event.eventType()) && "FULL".equals(event.cancellationScope())) {
+            return EventType.ORDER_CANCELLED;
+        }
+        throw new IllegalArgumentException("Invalid event type, payment status or cancellation scope");
     }
 
     void validateRecord(ConsumerRecord<String, String> record, UUID aggregateId) {
