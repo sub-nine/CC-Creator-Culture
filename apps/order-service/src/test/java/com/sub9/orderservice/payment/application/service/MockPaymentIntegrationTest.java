@@ -149,7 +149,7 @@ class MockPaymentIntegrationTest {
         MockPaymentResult repeated = process(order, status);
         if (status == PaymentStatus.SUCCESS) {
             ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
-            verify(kafka).send(eq("order_paid"), eq(order.getId().toString()), payload.capture());
+            verify(kafka).send(eq("order.paid"), eq(order.getId().toString()), payload.capture());
             assertThat(mapper.readValue(payload.getValue(), OrderPaidEvent.class))
                     .isEqualTo(new OrderPaidEvent(order.getId(),
                             List.of(new OrderPaidEvent.ProductQuantity(order.getItems().getFirst().getProductId(), 2L))));
@@ -391,7 +391,7 @@ class MockPaymentIntegrationTest {
 
         process(order, PaymentStatus.SUCCESS);
 
-        verify(kafka).send(eq("order_paid"), eq(order.getId().toString()), anyString());
+        verify(kafka).send(eq("order.paid"), eq(order.getId().toString()), anyString());
         verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
     }
 
@@ -413,7 +413,7 @@ class MockPaymentIntegrationTest {
         assertThat(orderStatus(order)).isEqualTo("PAID");
         assertThat(paymentCount()).isEqualTo(1);
         assertThat(process(order, PaymentStatus.SUCCESS)).isEqualTo(result);
-        verify(kafka).send(eq("order_paid"), eq(order.getId().toString()), anyString());
+        verify(kafka).send(eq("order.paid"), eq(order.getId().toString()), anyString());
         verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
     }
 

@@ -34,7 +34,7 @@ class OrderPaidKafkaPublisherTest {
         publisher.publish(event);
 
         ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
-        verify(kafka).send(eq("order_paid"), eq(event.orderId().toString()), payload.capture());
+        verify(kafka).send(eq("order.paid"), eq(event.orderId().toString()), payload.capture());
         assertThat(mapper.readValue(payload.getValue(), OrderPaidEvent.class)).isEqualTo(event);
     }
 
