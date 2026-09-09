@@ -9,6 +9,9 @@ import com.sub9.orderservice.order.domain.model.*;
 import com.sub9.orderservice.order.domain.repository.OrderQueryRepository;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.kafka.core.KafkaTemplate;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +48,7 @@ import static org.mockito.Mockito.*;
         CouponApplicationPort.class,
         CouponUsagePort.class,
         StockPort.class,
+        KafkaTemplate.class,
         PaymentCancellationPort.class
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -74,6 +78,16 @@ class OrderPaymentResultServiceIntegrationTest {
 
     @Autowired
     private CouponUsagePort couponUsagePort;
+
+    @Autowired
+    private KafkaTemplate<String, String> kafka;
+
+    @BeforeEach
+    void setKafkaResult() {
+        when(kafka.send(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+    }
 
     @DynamicPropertySource
     static void registerDataSourceProperties(DynamicPropertyRegistry registry) {

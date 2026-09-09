@@ -66,6 +66,12 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import com.sub9.common.kafka.event.OrderPaidEvent;
+import org.mockito.ArgumentCaptor;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.mockito.Mockito.*;
 
@@ -105,6 +111,8 @@ class MockPaymentIntegrationTest {
     @MockitoBean private CouponUsagePort coupons;
     @MockitoBean private StockPort stock;
     @MockitoBean private Clock clock;
+    @MockitoBean private KafkaTemplate<String, String> kafka;
+    @Autowired private JsonMapper mapper;
 
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
@@ -115,7 +123,10 @@ class MockPaymentIntegrationTest {
 
     @BeforeEach
     void setClock() {
+        clearInvocations(kafka);
         when(clock.instant()).thenReturn(NOW);
+        when(kafka.send(anyString(), anyString(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
     }
 
     @AfterEach
@@ -135,6 +146,16 @@ class MockPaymentIntegrationTest {
         MockPaymentResult first = process(order, status);
         when(clock.instant()).thenReturn(order.getExpiresAt().plusSeconds(60));
         MockPaymentResult repeated = process(order, status);
+        if (status == PaymentStatus.SUCCESS) {
+            ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
+            verify(kafka).send(eq("order_paid"), eq(order.getId().toString()), payload.capture());
+            assertThat(mapper.readValue(payload.getValue(), OrderPaidEvent.class))
+                    .isEqualTo(new OrderPaidEvent(order.getId(),
+                            List.of(new OrderPaidEvent.ProductQuantity(order.getItems().getFirst().getProductId(), 2L))));
+            verifyNoMoreInteractions(kafka);
+        } else {
+            verifyNoInteractions(kafka);
+        }
         Payment saved = payments.findByOrderId(order.getId()).orElseThrow();
         Order savedOrder = queries.findDetailByOrderNumber(order.getOrderNumber()).orElseThrow();
 
@@ -340,6 +361,53 @@ class MockPaymentIntegrationTest {
         verifyNoMoreInteractions(coupons, stock);
     }
 
+    @Test
+    @DisplayName("결제 저장 중에는 발행하지 않고 커밋 후 다른 트랜잭션에서 결제 성공을 확인한다")
+    void when_payment_commits_event_is_sent_after_database_commit() {
+        Order order = saveOrder(100, false);
+        doAnswer(call -> {
+            Object saved = call.callRealMethod();
+            entityManager.flush();
+            verifyNoInteractions(kafka);
+            return saved;
+        }).when(payments).save(any(Payment.class));
+        when(kafka.send(anyString(), anyString(), anyString())).thenAnswer(call -> {
+            TransactionTemplate independent = new TransactionTemplate(transactionManager);
+            independent.setPropagationBehavior(
+                    org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            independent.executeWithoutResult(ignored -> {
+                assertThat(orderStatus(order)).isEqualTo("PAID");
+                assertThat(paymentCount()).isEqualTo(1);
+            });
+            return CompletableFuture.completedFuture(null);
+        });
+
+        process(order, PaymentStatus.SUCCESS);
+
+        verify(kafka).send(eq("order_paid"), eq(order.getId().toString()), anyString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("Kafka 동기 또는 비동기 발행에 실패해도 결제 성공 기록을 유지한다")
+    void when_kafka_fails_payment_remains_committed(boolean async) {
+        Order order = saveOrder(100, false);
+        CompletableFuture<SendResult<String, String>> pending = new CompletableFuture<>();
+        when(kafka.send(anyString(), anyString(), anyString())).thenAnswer(call -> {
+            if (async) return pending;
+            throw new IllegalStateException("Kafka 연결 실패");
+        });
+
+        MockPaymentResult result = process(order, PaymentStatus.SUCCESS);
+        if (async) pending.completeExceptionally(new IllegalStateException("Kafka 전송 실패"));
+
+        assertThat(result.status()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(orderStatus(order)).isEqualTo("PAID");
+        assertThat(paymentCount()).isEqualTo(1);
+        assertThat(process(order, PaymentStatus.SUCCESS)).isEqualTo(result);
+        verify(kafka).send(eq("order_paid"), eq(order.getId().toString()), anyString());
+    }
+
     private MockHttpServletRequestBuilder paymentRequest(Order order, PaymentStatus result) {
         return post("/api/v1/orders/{orderNumber}/payments", order.getOrderNumber())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -356,7 +424,7 @@ class MockPaymentIntegrationTest {
         assertThat(paymentCount()).isZero();
         assertThat(orderStatus(order)).isEqualTo("PENDING_PAYMENT");
         assertThat(queries.findDetailByOrderNumber(order.getOrderNumber()).orElseThrow().getPaidAt()).isNull();
-        verifyNoInteractions(stock);
+        verifyNoInteractions(stock, kafka);
     }
 
     private void assertBusinessError(Runnable action, OrderErrorCode expected) {
