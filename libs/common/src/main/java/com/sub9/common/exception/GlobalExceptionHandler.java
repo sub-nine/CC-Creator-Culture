@@ -120,7 +120,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException exception) {
-        return failure(CommonErrorCode.PAYLOAD_TOO_LARGE);
+        return failure(CommonErrorCode.CONTENT_TOO_LARGE);
     }
 
     @ExceptionHandler(Exception.class)

@@ -12,7 +12,7 @@ public enum CommonErrorCode implements ErrorCode {
     UNAUTHORIZED("COMMON_0007", HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
     FORBIDDEN("COMMON_0008", HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
     SERVICE_UNAVAILABLE("COMMON_0009", HttpStatus.SERVICE_UNAVAILABLE, "서비스를 일시적으로 사용할 수 없습니다."),
-    PAYLOAD_TOO_LARGE("COMMON_0010", HttpStatus.PAYLOAD_TOO_LARGE, "업로드 가능한 파일 용량을 초과했습니다.");
+    CONTENT_TOO_LARGE("COMMON_0010", HttpStatus.CONTENT_TOO_LARGE, "업로드 가능한 파일 용량을 초과했습니다.");
 
     private final String code;
     private final HttpStatus status;
