@@ -41,6 +41,7 @@ cloudflare:
     secret-key: ${R2_SECRET_KEY}
     endpoint: ${R2_ENDPOINT}
     bucket: ${R2_BUCKET}
+    public-url: ${R2_PUBLIC_URL}
 
 kafka:
   bootstrap-servers: ${KAFKA_HOST:localhost:9092}
