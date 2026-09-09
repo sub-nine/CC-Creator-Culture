@@ -18,11 +18,14 @@ public class ProductMetadataQueryAdapter implements ProductMetadataQueryPort {
 
     @Override
     public Set<UUID> findProductIdsByMetadataKeyword(String keyword, long limit) {
+        // TODO: 차후 Page<UUID> 기반 검색으로 수정 필요
+        long normalizedLimit = limit < 30 ? limit : 30;
+
         Set<UUID> productIdsByHashtagName = productMetadataQueryRepository
-                .findProductIdsByHashtagKeyword(keyword, limit);
+                .findProductIdsByHashtagKeyword(keyword, normalizedLimit);
 
         Set<UUID> productidsByCategoryNameAndDescription = productMetadataQueryRepository
-                .findProductIdsByCategoryKeyword(keyword, limit);
+                .findProductIdsByCategoryKeyword(keyword, normalizedLimit);
 
         return Stream.concat(
                 productIdsByHashtagName.stream(),

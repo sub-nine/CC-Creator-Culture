@@ -5,6 +5,7 @@ import java.util.Set;
 import java.util.UUID;
 
 public interface ProductMetadataQueryPort {
+    // TODO: 차후 Page<UUID> 기반 검색으로 수정 필요
     Set<UUID> findProductIdsByMetadataKeyword(String keyword, long limit);
 
     ProductMetadataInfo getProductMetadata(UUID productId);
