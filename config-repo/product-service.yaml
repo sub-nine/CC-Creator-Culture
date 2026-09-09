@@ -15,14 +15,6 @@ spring:
         jdbc:
           time_zone: UTC
 
-  cloud:
-    openfeign:
-      client:
-        config:
-          default:
-            connect-timeout: 3000
-            read-timeout: 5000
-
   data:
     redis:
       host: ${REDIS_HOST:localhost}
