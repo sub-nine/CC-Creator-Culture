@@ -1,33 +1,40 @@
 package com.sub9.orderservice.cart.application.service;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willThrow;
-import static org.mockito.Mockito.*;
-
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.orderservice.cart.application.dto.AddCartItemCommand;
 import com.sub9.orderservice.cart.application.dto.UpdateCartItemCommand;
-import com.sub9.orderservice.cart.application.port.CartProductPort;
+import com.sub9.orderservice.cart.application.port.out.CartProductPort;
 import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import com.sub9.orderservice.cart.domain.repository.CartRepository;
 import com.sub9.orderservice.cart.infrastructure.client.exception.CartProductClientErrorCode;
-import java.util.Optional;
-import java.util.UUID;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.*;
+
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CartService - 단위 테스트")
 class CartCommandServiceUnitTest {
-  @Mock private CartRepository cartRepository;
-  @Mock private CartProductPort cartProductPort;
-  @InjectMocks private CartCommandService cartCommandService;
+  @Mock
+  private CartRepository cartRepository;
+  @Mock
+  private CartProductPort cartProductPort;
+  @InjectMocks
+  private CartCommandService cartCommandService;
 
   private AddCartItemCommand command;
 
