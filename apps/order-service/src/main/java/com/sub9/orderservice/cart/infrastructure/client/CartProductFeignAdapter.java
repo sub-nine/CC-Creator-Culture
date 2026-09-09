@@ -3,7 +3,7 @@ package com.sub9.orderservice.cart.infrastructure.client;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.orderservice.cart.application.dto.CartProductInfo;
-import com.sub9.orderservice.cart.application.port.CartProductPort;
+import com.sub9.orderservice.cart.application.port.out.CartProductPort;
 import com.sub9.orderservice.cart.infrastructure.client.exception.CartProductClientErrorCode;
 import feign.FeignException;
 import java.util.List;
