@@ -15,6 +15,9 @@ import com.sub9.orderservice.order.domain.model.ProductSnapshot;
 import com.sub9.orderservice.order.domain.model.ShippingAddress;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
 import java.time.Instant;
+import com.sub9.common.identifier.UuidV7Generator;
+import org.springframework.context.ApplicationEventPublisher;
+import org.mockito.Spy;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,6 +39,12 @@ class OrderExpirationTransactionServiceTest {
 
     @Mock
     private CouponUsagePort couponUsagePort;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Spy
+    private UuidV7Generator uuidGenerator = new UuidV7Generator();
 
     @InjectMocks
     private OrderExpirationTransactionService expirationService;
@@ -67,7 +76,7 @@ class OrderExpirationTransactionServiceTest {
 
         assertThat(result).isEmpty();
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
-        verifyNoInteractions(couponUsagePort);
+        verifyNoInteractions(couponUsagePort, eventPublisher);
     }
 
     @Test
@@ -82,7 +91,7 @@ class OrderExpirationTransactionServiceTest {
 
         assertThat(result).isEmpty();
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
-        verifyNoInteractions(couponUsagePort);
+        verifyNoInteractions(couponUsagePort, eventPublisher);
     }
 
     @Test
@@ -92,7 +101,7 @@ class OrderExpirationTransactionServiceTest {
         when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.empty());
 
         assertThat(expirationService.expire(orderId, CREATED_AT)).isEmpty();
-        verifyNoInteractions(couponUsagePort);
+        verifyNoInteractions(couponUsagePort, eventPublisher);
     }
 
     private static Order order(long sequence, OrderItem... items) {
