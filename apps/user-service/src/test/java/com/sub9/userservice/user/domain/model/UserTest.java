@@ -30,6 +30,24 @@ class UserTest {
     }
 
     @Test
+    @DisplayName("MASTER가 생성한 MANAGER는 역할과 감사 주체를 MASTER로 기록한다")
+    void when_manager_is_created_by_master_role_and_audit_actor_are_recorded() {
+        UUID userId = uuidGenerator.generate();
+        UUID masterId = uuidGenerator.generate();
+        Instant createdAt = Instant.parse("2026-09-01T02:00:00Z");
+
+        User manager = User.createManager(
+                userId, "manager@example.com", "encoded-password", "manager",
+                "01012345678", "서울시 예시구", null, masterId, createdAt);
+
+        assertThat(manager.getRole()).isEqualTo(UserRole.MANAGER);
+        assertThat(manager.getCreatedBy()).isEqualTo(masterId);
+        assertThat(manager.getUpdatedBy()).isEqualTo(masterId);
+        assertThat(manager.getCreatedAt()).isEqualTo(createdAt);
+        assertThat(manager.getUpdatedAt()).isEqualTo(createdAt);
+    }
+
+    @Test
     @DisplayName("사용자 삭제는 행을 유지하기 위한 삭제 및 수정 감사를 함께 기록한다")
     void when_user_is_soft_deleted_deletion_and_update_audit_are_recorded() {
         UUID userId = uuidGenerator.generate();

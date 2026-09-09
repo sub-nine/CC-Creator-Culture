@@ -54,6 +54,8 @@ public class SecurityConfig {
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(PUBLIC_AUTH_PATHS)
                 .permitAll()
+                .requestMatchers("/api/v1/admin/managers")
+                .hasRole("MASTER")
                 .anyRequest()
                 .authenticated());
 
