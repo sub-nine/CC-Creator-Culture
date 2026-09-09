@@ -5,15 +5,19 @@ import java.util.Set;
 import java.util.UUID;
 
 public interface ProductMetadataQueryPort {
-  Set<UUID> findProductIdsByKeyword(String keyword);
+    Set<UUID> findProductIdsByMetadataKeyword(String keyword, long limit);
 
-  ProductMetadataInfo getProductMetadata(UUID productId);
+    ProductMetadataInfo getProductMetadata(UUID productId);
 
-  record ProductMetadataInfo(
-      List<CategoryInfo> categories,
-      List<HashtagInfo> hashtags) {}
+    record ProductMetadataInfo(
+            List<CategoryInfo> categories,
+            List<HashtagInfo> hashtags
+    ) {
+    }
 
-  record CategoryInfo(UUID categoryId, String name) {}
+    record CategoryInfo(UUID categoryId, String name) {
+    }
 
-  record HashtagInfo(UUID hashTagId, String name) {}
+    record HashtagInfo(UUID hashTagId, String name) {
+    }
 }
