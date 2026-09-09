@@ -1,111 +1,57 @@
 package com.sub9.userservice.notification.infrastructure.messaging.kafka;
 
-import com.sub9.userservice.notification.application.service.NotificationEventCoordinator;
-import com.sub9.userservice.notification.domain.model.EventType;
-import com.sub9.userservice.notification.domain.model.ReferenceType;
-import com.sub9.userservice.notification.domain.model.SourceService;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.validation.ConstraintViolation;
+import com.sub9.common.kafka.event.OrderPaidEvent;
+import com.sub9.common.kafka.event.ProductCreatedEvent;
 import com.sub9.common.kafka.topic.KafkaTopics;
-import jakarta.validation.Validator;
+import com.sub9.userservice.notification.application.port.OrderNotificationLookup;
+import com.sub9.userservice.notification.application.service.NotificationEventCoordinator;
 import lombok.RequiredArgsConstructor;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-
-import java.util.Set;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 @RequiredArgsConstructor
 public class KafkaNotificationEventConsumer {
-
-    private static final Set<EventType> PRODUCT_EVENT_TYPES = Set.of(
-            EventType.PRODUCT_CREATED,
-            EventType.PRODUCT_LOW_STOCK,
-            EventType.PRODUCT_SOLD_OUT,
-            EventType.PRODUCT_RESTOCKED
-
-    );
-    private static final Set<EventType> ORDER_EVENT_TYPES = Set.of(
-            EventType.ORDER_CREATED,
-            EventType.ORDER_CANCELLED,
-            EventType.PAYMENT_PAID,
-            EventType.PAYMENT_FAILED
-    );
-
     private final ObjectMapper objectMapper;
-    private final Validator validator;
+    private final NotificationEventMapper mapper;
     private final NotificationEventCoordinator coordinator;
-
+    private final ObjectProvider<OrderNotificationLookup> orderLookupProvider;
 
     @KafkaListener(topics = KafkaTopics.PRODUCT_CREATED)
-    public void consumeProductEvent(String payload) {
-        consume(
-                payload,
-                SourceService.PRODUCT_SERVICE,
-                ReferenceType.PRODUCT,
-                PRODUCT_EVENT_TYPES
-        );
+    public void consumeProductEvent(ConsumerRecord<String, String> record) {
+        ProductCreatedEvent event = read(record, ProductCreatedEvent.class);
+        coordinator.handle(mapper.fromProductCreated(event, record));
     }
-
 
     @KafkaListener(topics = KafkaTopics.ORDER_PAID)
-    public void consumeOrderEvent(String payload) {
-        consume(
-                payload,
-                SourceService.ORDER_SERVICE,
-                ReferenceType.ORDER,
-                ORDER_EVENT_TYPES
-        );
+    public void consumeOrderEvent(ConsumerRecord<String, String> record) {
+        OrderPaidEvent event = read(record, OrderPaidEvent.class);
+        mapper.validateRecord(record, event.orderId());
+        // The wire event has no buyer information. Never fabricate a recipient.
+        OrderNotificationLookup lookup = orderLookupProvider.getIfAvailable();
+        if (lookup == null) {
+            throw new IllegalStateException("OrderNotificationLookup adapter is not configured");
+        }
+        var order = lookup.findByOrderId(event.orderId());
+        coordinator.handle(mapper.fromOrderPaid(event, order, record));
     }
 
-    private void consume(
-            String payload,
-            SourceService expectedSource,
-            ReferenceType expectedReferenceType,
-            Set<EventType> allowedEventTypes
-    ) {
+    private <T> T read(ConsumerRecord<String, String> record, Class<T> type) {
+        if (record.value() == null || record.value().isBlank()) {
+            throw new IllegalArgumentException("Event payload is empty");
+        }
         try {
-            KafkaDomainEventPayload event = objectMapper.readValue(
-                    payload,
-                    KafkaDomainEventPayload.class
-            );
-            Set<ConstraintViolation<KafkaDomainEventPayload>> violations = validator.validate(event);
-            if (!violations.isEmpty()) {
-                throw new IllegalArgumentException("Invalid event: " + violations);
+            T event = objectMapper.readValue(record.value(), type);
+            if (event == null) {
+                throw new IllegalArgumentException("Event payload is null");
             }
-            validateTopicContract(
-                    event,
-                    expectedSource,
-                    expectedReferenceType,
-                    allowedEventTypes
-            );
-            coordinator.handle(event.toCommand());
-        } catch (JsonProcessingException exception) {
-            throw new IllegalArgumentException("Invalid event JSON", exception);
-        }
-    }
-
-    private void validateTopicContract(
-            KafkaDomainEventPayload event,
-            SourceService expectedSource,
-            ReferenceType expectedReferenceType,
-            Set<EventType> allowedEventTypes
-    ) {
-        if (event.sourceService() != expectedSource) {
-            throw new IllegalArgumentException(
-                    "Invalid sourceService for topic: " + event.sourceService()
-            );
-        }
-        if (event.referenceType() != expectedReferenceType) {
-            throw new IllegalArgumentException(
-                    "Invalid referenceType for topic: " + event.referenceType()
-            );
-        }
-        if (!allowedEventTypes.contains(event.eventType())) {
-            throw new IllegalArgumentException(
-                    "Event type is not allowed on this topic: " + event.eventType()
-            );
+            return event;
+        } catch (JacksonException exception) {
+            throw new IllegalArgumentException("Invalid event JSON: " + type.getSimpleName(), exception);
         }
     }
 }
