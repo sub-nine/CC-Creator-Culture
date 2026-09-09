@@ -568,7 +568,7 @@ class OrderCancellationIntegrationTest {
     }
 
     private OrderItem item(int quantity) {
-        return OrderItem.create(uuidGenerator.generate(), uuidGenerator.generate(), uuidGenerator.generate(),
+        return OrderItem.create(uuidGenerator.generate(), null, uuidGenerator.generate(), uuidGenerator.generate(),
                 uuidGenerator.generate(), COUPON_ID,
                 ProductSnapshot.of("상품", "옵션", Money.won(10_000), quantity), Money.won(1_000));
     }

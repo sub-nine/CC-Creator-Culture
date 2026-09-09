@@ -53,6 +53,9 @@ public class OrderItem extends BaseEntity {
             foreignKey = @ForeignKey(name = "fk_order_items_order"))
     private Order order;
 
+    @Column(name = "cart_item_id", updatable = false)
+    private UUID cartItemId;
+
     @Column(name = "creator_id", nullable = false, updatable = false)
     private UUID creatorId;
 
@@ -84,9 +87,10 @@ public class OrderItem extends BaseEntity {
     @Column(name = "status", nullable = false, length = 30)
     private OrderItemStatus status;
 
-    private OrderItem(UUID id, UUID creatorId, UUID productId, UUID skuId, UUID userCouponId,
+    private OrderItem(UUID id, UUID cartItemId, UUID creatorId, UUID productId, UUID skuId, UUID userCouponId,
             ProductSnapshot productSnapshot, Money discountAmount) {
         super(id);
+        this.cartItemId = cartItemId;
         this.creatorId = Objects.requireNonNull(creatorId, "창작자 식별자는 필수입니다.");
         this.productId = Objects.requireNonNull(productId, "상품 식별자는 필수입니다.");
         this.skuId = Objects.requireNonNull(skuId, "SKU 식별자는 필수입니다.");
@@ -98,9 +102,9 @@ public class OrderItem extends BaseEntity {
         this.status = OrderItemStatus.ORDERED;
     }
 
-    public static OrderItem create(UUID id, UUID creatorId, UUID productId, UUID skuId,
+    public static OrderItem create(UUID id, UUID cartItemId, UUID creatorId, UUID productId, UUID skuId,
             UUID userCouponId, ProductSnapshot productSnapshot, Money discountAmount) {
-        return new OrderItem(id, creatorId, productId, skuId, userCouponId, productSnapshot, discountAmount);
+        return new OrderItem(id, cartItemId, creatorId, productId, skuId, userCouponId, productSnapshot, discountAmount);
     }
 
     public UUID getOrderId() {

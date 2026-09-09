@@ -27,6 +27,7 @@ public class Notification {
     private Instant readAt;
 
     public static Notification create(
+            UUID id,
             UUID eventId,
             UUID userId,
             EventType type,
@@ -36,7 +37,7 @@ public class Notification {
             UUID referenceId
     ) {
         return new Notification(
-                UuidV7Generator.generate(),
+                id,
                 eventId,
                 userId,
                 type,

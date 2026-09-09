@@ -1,9 +1,11 @@
 package com.sub9.userservice.notification.application.exception;
 
-public class NotificationNotFoundException extends RuntimeException {
+import com.sub9.common.exception.BusinessException;
+
+public class NotificationNotFoundException extends
+        BusinessException {
 
     public NotificationNotFoundException() {
-
-        super("Notification was not found");
+        super(NotificationErrorCode.NOTIFICATION_NOT_FOUND);
     }
 }

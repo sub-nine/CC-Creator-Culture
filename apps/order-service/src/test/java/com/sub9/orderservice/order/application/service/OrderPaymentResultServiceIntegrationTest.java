@@ -163,7 +163,7 @@ class OrderPaymentResultServiceIntegrationTest {
                 ShippingAddress.of(
                         "홍길동", "010-1234-5678", "06236", "서울특별시 강남구", "101호"),
                 List.of(OrderItem.create(
-                        uuid(sequence + 1),
+                        uuid(sequence + 1), null,
                         uuid(sequence + 2_000),
                         uuid(sequence + 2_500),
                         uuid(sequence + 3_000),

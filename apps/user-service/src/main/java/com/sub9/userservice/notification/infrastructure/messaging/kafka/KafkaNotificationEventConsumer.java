@@ -7,6 +7,7 @@ import com.sub9.userservice.notification.domain.model.SourceService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolation;
+import com.sub9.common.kafka.topic.KafkaTopics;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -36,7 +37,8 @@ public class KafkaNotificationEventConsumer {
     private final Validator validator;
     private final NotificationEventCoordinator coordinator;
 
-    @KafkaListener(topics = "${app.kafka.topics.product-events}")
+
+    @KafkaListener(topics = KafkaTopics.PRODUCT_CREATED)
     public void consumeProductEvent(String payload) {
         consume(
                 payload,
@@ -46,7 +48,8 @@ public class KafkaNotificationEventConsumer {
         );
     }
 
-    @KafkaListener(topics = "${app.kafka.topics.order-events}")
+
+    @KafkaListener(topics = KafkaTopics.ORDER_PAID)
     public void consumeOrderEvent(String payload) {
         consume(
                 payload,

@@ -104,7 +104,7 @@ public class OrderCreationService {
             AppliedCoupon appliedCoupon = couponsByCartItemId.get(requestedItem.cartItemId());
             Money discount = Money.won(appliedCoupon == null ? 0 : appliedCoupon.discountAmount());
             orderItems.add(OrderItem.create(
-                    uuidGenerator.generate(),
+                    uuidGenerator.generate(), snapshot.cartItemId(),
                     snapshot.creatorId(),
                     snapshot.productId(),
                     snapshot.skuId(),

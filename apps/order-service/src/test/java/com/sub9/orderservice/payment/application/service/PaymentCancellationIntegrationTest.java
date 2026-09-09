@@ -229,10 +229,10 @@ class PaymentCancellationIntegrationTest {
             UserCoupon userCoupon = UserCoupon.issue(ids.generate(), coupon, CUSTOMER, PAID_AT.minusSeconds(30));
             userCoupon.use(CUSTOMER, orderId, PAID_AT);
             em.persist(userCoupon);
-            OrderItem first = OrderItem.create(ids.generate(), ids.generate(), ids.generate(), ids.generate(),
+            OrderItem first = OrderItem.create(ids.generate(), null, ids.generate(), ids.generate(), ids.generate(),
                     userCoupon.getId(), ProductSnapshot.of("상품", "옵션", Money.won(20000), 1),
                     Money.won(20000 - amount));
-            OrderItem second = OrderItem.create(ids.generate(), ids.generate(), ids.generate(), ids.generate(),
+            OrderItem second = OrderItem.create(ids.generate(), null, ids.generate(), ids.generate(), ids.generate(),
                     null, ProductSnapshot.of("사은품", "기본", Money.won(0), 1), Money.won(0));
             Order order = Order.create(orderId, CUSTOMER,
                     ShippingAddress.of("홍길동", "010-1234-5678", "06236", "서울시 강남구", "101호"),
