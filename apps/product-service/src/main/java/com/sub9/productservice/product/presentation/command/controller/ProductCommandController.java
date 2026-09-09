@@ -1,19 +1,24 @@
 package com.sub9.productservice.product.presentation.command.controller;
 
+import com.sub9.common.annotation.Creator;
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.common.security.AuthUser;
-import com.sub9.common.annotation.Creator;
 import com.sub9.productservice.product.application.command.service.ProductCommandService;
 import com.sub9.productservice.product.presentation.command.dto.reqeust.product.CreateProductRequest;
 import com.sub9.productservice.product.presentation.command.dto.reqeust.product.UpdateProductRequest;
 import com.sub9.productservice.product.presentation.command.dto.reqeust.product.UpdateProductStatusRequest;
+import com.sub9.productservice.product.presentation.command.mapper.UploadImageMapper;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @Creator
 @RestController
@@ -22,11 +27,17 @@ import org.springframework.web.bind.annotation.*;
 public class ProductCommandController {
   private final ProductCommandService productCommandService;
 
-  @PostMapping
+  @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<ApiResponse<Void>> createProduct(
       @AuthenticationPrincipal AuthUser authUser,
-      @Valid @RequestBody CreateProductRequest request) {
-    productCommandService.createProduct(request.toCommand(authUser.id()));
+      @Valid @RequestPart CreateProductRequest request,
+      @RequestPart(value = "images", required = false)
+          @Size(max = 5, message = "이미지는 최대 5개까지 등록할 수 있습니다.")
+          List<MultipartFile> images) {
+
+    productCommandService.createProduct(
+        request.toCommand(authUser.id()), UploadImageMapper.from(images));
+
     return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(null));
   }
 

@@ -3,9 +3,10 @@ package com.sub9.productservice.product.application.command.service;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.kafka.event.ProductCreatedEvent;
 import com.sub9.productservice.product.application.command.dto.product.CreateProductCommand;
-import com.sub9.productservice.product.application.command.dto.sku.CreateSkuCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
+import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
+import com.sub9.productservice.product.application.command.dto.sku.CreateSkuCommand;
 import com.sub9.productservice.product.application.validation.SkuValidator;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
@@ -29,8 +30,9 @@ public class ProductCommandService {
   private final SkuCommandRepository skuCommandRepository;
   private final StockCommandRepository stockCommandRepository;
   private final ApplicationEventPublisher eventPublisher;
+  private final ProductImageCommandService imageCommandService;
 
-  public void createProduct(CreateProductCommand command) {
+  public void createProduct(CreateProductCommand command, List<UploadImageCommand> images) {
     SkuValidator.validateForCreate(command.skus());
 
     Product product = Product.create(command.creatorId(), command.name(), command.content());
@@ -54,7 +56,7 @@ public class ProductCommandService {
       stockCommandRepository.save(stock);
     }
 
-    // TODO : 이미지 등록 기능은 추후 추가 09.07 ~ 09.08 예정
+    imageCommandService.uploadImages(product.getId(), images);
 
     // Category 생성 및 매핑 이벤트
     eventPublisher.publishEvent(
@@ -79,8 +81,9 @@ public class ProductCommandService {
 
     for (Sku sku : skus) {
       sku.delete(creatorId);
-      // TODO : 이미지 등록 기능 추가 시 삭제 추가 예정 09.07 ~ 09.08
     }
+
+    imageCommandService.deleteAllImages(productId);
   }
 
   public void updateProduct(UpdateProductCommand command) {

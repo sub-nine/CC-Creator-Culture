@@ -1,35 +1,54 @@
 package com.sub9.productservice.product.application.command.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.sub9.common.kafka.event.ProductCreatedEvent;
+import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.product.application.command.dto.product.CreateProductCommand;
-import com.sub9.productservice.product.application.command.dto.sku.CreateSkuCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
+import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
+import com.sub9.productservice.product.application.command.dto.sku.CreateSkuCommand;
+import com.sub9.productservice.product.application.event.ProductImageUploadedEvent;
+import com.sub9.productservice.product.application.port.ImageData;
+import com.sub9.productservice.product.application.port.ImageStoragePort;
+import com.sub9.productservice.product.domain.model.Image;
+import com.sub9.productservice.product.domain.model.ImageProcessingStatus;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import com.sub9.productservice.product.domain.model.Sku;
 import com.sub9.productservice.product.domain.model.Stock;
+import com.sub9.productservice.product.infrastructure.persistence.command.product.ImageCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.product.ProductCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.sku.SkuCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.stock.StockCommandJpaRepository;
 import com.sub9.productservice.support.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.annotation.Transactional;
+import software.amazon.awssdk.services.s3.S3Client;
 
 @Transactional
 @SpringBootTest
@@ -42,6 +61,9 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
   @Autowired StockCommandJpaRepository stockRepository;
   @Autowired ApplicationEvents applicationEvents;
   @Autowired EntityManager entityManager;
+  @Autowired ImageCommandJpaRepository imageRepository;
+  @MockitoBean ImageStoragePort imageStoragePort;
+  @MockitoBean S3Client s3Client;
 
   private final UUID creatorId = UUID.randomUUID();
   private Product dummyProduct;
@@ -89,7 +111,7 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
                   new CreateSkuCommand("불류", 15000L, false, 20)));
 
       // when
-      productCommandService.createProduct(command);
+      productCommandService.createProduct(command, List.of());
 
       // then
       Product product =
@@ -126,6 +148,77 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
     private Sku findSku(List<Sku> skus, String name) {
       return skus.stream().filter(sku -> sku.getName().equals(name)).findFirst().orElseThrow();
     }
+  }
+
+  @AfterEach
+  void clearAuthentication() {
+    SecurityContextHolder.clearContext();
+  }
+
+  @Test
+  @DisplayName("여러 SKU가 있는 상품에도 업로드한 이미지 개수만큼 순서대로 PENDING 기록을 저장한다.")
+  void createProduct_success_with_images() throws Exception {
+    // given
+    SecurityContextHolder.getContext()
+        .setAuthentication(CustomAuthenticationToken.of(creatorId, "CREATOR"));
+    given(imageStoragePort.upload(anyString(), any()))
+        .willAnswer(invocation -> invocation.getArgument(0));
+    var command =
+        new CreateProductCommand(
+            List.of("말랑이"),
+            creatorId,
+            "이미지 상품",
+            "상품 설명",
+            List.of(
+                new CreateSkuCommand("핑크", 10000L, true, 10),
+                new CreateSkuCommand("블루", 12000L, false, 10)));
+    List<UploadImageCommand> images =
+        List.of(
+            new UploadImageCommand(
+                "image/png", com.sub9.productservice.support.ImageTestFixture.imageBytes("png")),
+            new UploadImageCommand(
+                "image/jpeg", com.sub9.productservice.support.ImageTestFixture.imageBytes("jpeg")));
+
+    // when
+    productCommandService.createProduct(command, images);
+    entityManager.flush();
+    entityManager.clear();
+
+    // then
+    Product product =
+        productRepository.findAll().stream()
+            .filter(item -> item.getName().equals("이미지 상품"))
+            .findFirst()
+            .orElseThrow();
+    List<Image> saved = imageRepository.findAllByProductIdAndDeletedAtIsNull(product.getId());
+    assertThat(saved).hasSize(2).extracting(Image::getSortOrder).containsExactlyInAnyOrder(0, 1);
+    assertThat(saved)
+        .allSatisfy(
+            image -> {
+              assertThat(image.getId()).isNotNull();
+              assertThat(image.getOriginalKey()).isNotBlank();
+              assertThat(image.getProcessedKey()).isNull();
+              assertThat(image.getStatus()).isEqualTo(ImageProcessingStatus.PENDING);
+              assertThat(image.getCreatedBy()).isEqualTo(creatorId);
+              assertThat(image.getCreatedAt()).isNotNull();
+            });
+    var events = applicationEvents.stream(ProductImageUploadedEvent.class).toList();
+    assertThat(events).hasSize(2);
+    assertThat(events)
+        .allSatisfy(
+            event -> {
+              assertThat(event.productId()).isEqualTo(product.getId());
+              assertThat(saved)
+                  .anySatisfy(
+                      image -> {
+                        assertThat(event.imageId()).isEqualTo(image.getId());
+                        assertThat(event.originalKey()).isEqualTo(image.getOriginalKey());
+                      });
+            });
+    ArgumentCaptor<ImageData> data = ArgumentCaptor.forClass(ImageData.class);
+    verify(imageStoragePort, times(2)).upload(anyString(), data.capture());
+    assertThat(data.getAllValues().get(0).data()).containsExactly(images.get(0).data());
+    assertThat(data.getAllValues().get(1).data()).containsExactly(images.get(1).data());
   }
 
   @Nested
@@ -223,8 +316,29 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
   @DisplayName("상품 삭제 테스트")
   class DeleteProduct {
     @Test
-    @DisplayName("상품 삭제에 성공하면 상품, SKU를 삭제한다.")
+    @DisplayName("상품 삭제 시 상품, SKU와 이미지를 논리 삭제하고 다른 상품의 이미지는 유지한다.")
     void deleteProduct_success() {
+      // given
+      SecurityContextHolder.getContext()
+          .setAuthentication(CustomAuthenticationToken.of(creatorId, "CREATOR"));
+
+      Image pending =
+          imageRepository.save(Image.create(dummyProduct.getId(), "original/pending", null, 0));
+      Image completed = Image.create(dummyProduct.getId(), "original/completed", null, 1);
+
+      imageRepository.save(completed);
+
+      entityManager.flush();
+
+      imageRepository.completeProcessing(completed.getId(), "processed/completed", Instant.now());
+      Product other = productRepository.save(Product.create(creatorId, "다른 상품", "설명"));
+
+      Image otherImage =
+          imageRepository.save(Image.create(other.getId(), "original/other", null, 0));
+
+      entityManager.flush();
+      entityManager.clear();
+
       // when
       productCommandService.deleteProduct(creatorId, dummyProduct.getId());
 
@@ -233,6 +347,15 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
 
       // then
       assertThat(productRepository.findByIdAndDeletedAtIsNull(dummyProduct.getId())).isEmpty();
+      assertThat(imageRepository.findAllByProductIdAndDeletedAtIsNull(dummyProduct.getId()))
+          .isEmpty();
+      assertThat(imageRepository.findById(pending.getId()).orElseThrow().getDeletedAt())
+          .isNotNull();
+      Image deleted = imageRepository.findById(completed.getId()).orElseThrow();
+      assertThat(deleted.getDeletedAt()).isNotNull();
+      assertThat(deleted.getProcessedKey()).isEqualTo("processed/completed");
+      assertThat(imageRepository.findById(otherImage.getId()).orElseThrow().getDeletedAt())
+          .isNull();
       assertThat(skuRepository.findAllByProductIdAndDeletedAtIsNull(dummyProduct.getId()))
           .isEmpty();
     }

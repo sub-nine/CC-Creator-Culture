@@ -2,6 +2,10 @@ spring:
   config:
     activate:
       on-profile: test
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 26MB
   cloud:
     discovery:
       enabled: false
@@ -22,3 +26,10 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+cloudflare:
+  r2:
+    access-key: "test-access-key"
+    secret-key: "test-secret-key"
+    endpoint: "https://test.r2.cloudflarestorage.com"
+    bucket: "test-bucket"
