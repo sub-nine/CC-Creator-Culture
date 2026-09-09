@@ -28,6 +28,8 @@ import java.util.UUID;
 )
 public class HashtagProduct extends BaseEntity {
 
+    public static final UUID ACTIVE_UNIQUE_VERSION = UUID.fromString("00000000-0000-0000-0000-000000000000");
+
     @JoinColumn(name = "hashtag_id", nullable = false)
     @ManyToOne
     private Hashtag hashtag;
@@ -49,7 +51,7 @@ public class HashtagProduct extends BaseEntity {
         return HashtagProduct.builder()
                 .hashtag(hashtag)
                 .productId(productId)
-                .uniqueVersion(UUID.fromString("00000000-0000-0000-0000-000000000000"))
+                .uniqueVersion(ACTIVE_UNIQUE_VERSION)
                 .build();
     }
 
