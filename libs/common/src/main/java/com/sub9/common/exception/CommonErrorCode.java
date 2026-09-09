@@ -11,9 +11,8 @@ public enum CommonErrorCode implements ErrorCode {
     UNSUPPORTED_MEDIA_TYPE("COMMON_0006", HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 Content-Type입니다."),
     UNAUTHORIZED("COMMON_0007", HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
     FORBIDDEN("COMMON_0008", HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
-    // redis 장애 시 사용
-    SERVICE_UNAVAILABLE(
-            "COMMON_0009", HttpStatus.SERVICE_UNAVAILABLE, "서비스를 일시적으로 사용할 수 없습니다.");
+    SERVICE_UNAVAILABLE("COMMON_0009", HttpStatus.SERVICE_UNAVAILABLE, "서비스를 일시적으로 사용할 수 없습니다."),
+    PAYLOAD_TOO_LARGE("COMMON_0010", HttpStatus.PAYLOAD_TOO_LARGE, "업로드 가능한 파일 용량을 초과했습니다.");
 
     private final String code;
     private final HttpStatus status;
