@@ -1,7 +1,10 @@
 package com.sub9.gateway.auth.infrastructure.config;
 
 import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.JwtParser;
+import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import java.time.Clock;
 import javax.crypto.SecretKey;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -20,5 +23,23 @@ public class JwtConfig {
         } catch (RuntimeException exception) {
             throw new IllegalStateException(INVALID_SECRET_MESSAGE);
         }
+    }
+
+    @Bean
+    Clock clock() {
+        return Clock.systemUTC();
+    }
+
+    @Bean
+    JwtParser jwtParser(SecretKey jwtSigningKey, JwtProperties properties, Clock clock) {
+        return Jwts.parser()
+                .verifyWith(jwtSigningKey)
+                .clock(() -> java.util.Date.from(clock.instant()))
+                .clockSkewSeconds(properties.clockSkew().toSeconds())
+                .sig()
+                .clear()
+                .add(Jwts.SIG.HS256)
+                .and()
+                .build();
     }
 }
