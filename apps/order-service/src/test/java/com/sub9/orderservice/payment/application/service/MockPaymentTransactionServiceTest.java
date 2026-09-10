@@ -63,7 +63,9 @@ class MockPaymentTransactionServiceTest {
     @BeforeEach
     void setUp() {
         service = new MockPaymentTransactionService(
-                orders, payments, new OrderPaymentResultService(orders, coupons, events, ids), clock, ids);
+                orders, payments, new OrderPaymentResultService(orders, coupons, events, ids,
+                        org.mockito.Mockito.mock(com.sub9.orderservice.order.domain.repository.CartCleanupTaskRepository.class),
+                        tools.jackson.databind.json.JsonMapper.builder().build()), clock, ids);
     }
 
     @ParameterizedTest

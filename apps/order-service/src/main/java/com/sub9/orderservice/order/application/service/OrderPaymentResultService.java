@@ -3,6 +3,11 @@ package com.sub9.orderservice.order.application.service;
 import static com.sub9.orderservice.order.application.port.output.StockPort.RestoreReason.PAYMENT_FAILED;
 
 import com.sub9.common.exception.BusinessException;
+import com.sub9.common.identifier.UuidV7Generator;
+import com.sub9.orderservice.order.application.port.output.CartCleanupCommand;
+import com.sub9.orderservice.order.domain.model.CartCleanupTask;
+import com.sub9.orderservice.order.domain.repository.CartCleanupTaskRepository;
+import tools.jackson.databind.json.JsonMapper;
 import com.sub9.orderservice.order.application.port.input.PaymentResultUseCase;
 import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.StockPort.StockItem;
@@ -16,7 +21,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import com.sub9.common.kafka.event.OrderPaidEvent;
 import com.sub9.common.kafka.event.OrderNotificationEvent;
-import com.sub9.common.identifier.UuidV7Generator;
 import org.springframework.context.ApplicationEventPublisher;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -31,12 +35,16 @@ public class OrderPaymentResultService implements PaymentResultUseCase {
     private final CouponUsagePort couponUsagePort;
     private final ApplicationEventPublisher eventPublisher;
     private final UuidV7Generator uuidGenerator;
+    private final CartCleanupTaskRepository cleanupTasks;
+    private final JsonMapper jsonMapper;
 
     @Override
     @Transactional
     public void markPaid(UUID orderId, Instant processedAt) {
         Order order = findForUpdate(orderId);
         order.markPaid(processedAt);
+        CartCleanupCommand.from(order).ifPresent(command -> cleanupTasks.save(new CartCleanupTask(
+                uuidGenerator.generate(), orderId, jsonMapper.writeValueAsString(command), processedAt)));
         Map<UUID, Long> quantities = order.getItems().stream()
                 .collect(Collectors.groupingBy(
                         item -> item.getProductId(),

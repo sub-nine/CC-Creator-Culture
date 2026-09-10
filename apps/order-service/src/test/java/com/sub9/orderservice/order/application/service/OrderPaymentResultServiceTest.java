@@ -52,6 +52,11 @@ class OrderPaymentResultServiceTest {
 
     @Spy
     private UuidV7Generator uuidGenerator = new UuidV7Generator();
+    @Mock
+    private com.sub9.orderservice.order.domain.repository.CartCleanupTaskRepository cleanupTasks;
+
+    @Mock
+    private tools.jackson.databind.json.JsonMapper jsonMapper;
 
     @InjectMocks
     private OrderPaymentResultService paymentResultService;
