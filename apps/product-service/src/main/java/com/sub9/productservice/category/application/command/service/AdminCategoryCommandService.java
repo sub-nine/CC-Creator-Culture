@@ -42,6 +42,7 @@ public class AdminCategoryCommandService {
         Hashtag hashtag = hashtagCommandRepository.findById(hashtagId)
                 .orElseThrow(() -> new BusinessException(CategoryErrorCode.HASHTAG_NOT_FOUND));
 
+        // TODO: usage_count는 상품에 링크될 때만 증가해야 함 - 카테고리 수동 연결 시 증가시키는 이 로직 제거 필요
         hashtag.increaseUsageCount();
 
         categoryCommandRepository.linkCategoryHashtag(
@@ -70,6 +71,7 @@ public class AdminCategoryCommandService {
         CategoryHashtag categoryHashtag = categoryCommandRepository.findCategoryHashtagById(categoryHashtagId)
                 .orElseThrow(() -> new BusinessException(CategoryErrorCode.CATEGORY_HASHTAG_NOT_FOUND));
 
+        // TODO: usage_count는 상품에 링크될 때만 증가해야 함 - 모호한 연결 승인 시 증가시키는 이 로직 제거 필요
         categoryHashtag.getHashtag().increaseUsageCount();
         categoryHashtag.approve();
     }
