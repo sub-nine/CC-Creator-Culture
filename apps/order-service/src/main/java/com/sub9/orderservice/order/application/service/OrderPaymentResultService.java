@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import com.sub9.common.kafka.event.OrderPaidEvent;
+import com.sub9.common.kafka.event.OrderNotificationEvent;
+import com.sub9.common.identifier.UuidV7Generator;
 import org.springframework.context.ApplicationEventPublisher;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class OrderPaymentResultService implements PaymentResultUseCase {
     private final OrderRepository orderRepository;
     private final CouponUsagePort couponUsagePort;
     private final ApplicationEventPublisher eventPublisher;
+    private final UuidV7Generator uuidGenerator;
 
     @Override
     @Transactional
@@ -41,6 +44,7 @@ public class OrderPaymentResultService implements PaymentResultUseCase {
         eventPublisher.publishEvent(new OrderPaidEvent(orderId, quantities.entrySet().stream()
                 .map(entry -> new OrderPaidEvent.ProductQuantity(entry.getKey(), entry.getValue()))
                 .toList()));
+        publishNotification(order, "PAYMENT_PAID", "PAID", processedAt);
     }
 
     @Override
@@ -49,7 +53,14 @@ public class OrderPaymentResultService implements PaymentResultUseCase {
         Order order = findForUpdate(orderId);
         order.markPaymentFailed(processedAt);
         restoreCoupons(order);
+        publishNotification(order, "PAYMENT_FAILED", "FAILED", processedAt);
         return new StockRestoreCommand(orderId, stockItems(order), PAYMENT_FAILED);
+    }
+
+    private void publishNotification(Order order, String eventType, String paymentStatus, Instant processedAt) {
+        eventPublisher.publishEvent(new OrderNotificationEvent(
+                uuidGenerator.generate(), eventType, "ORDER_SERVICE", "ORDER", order.getId(),
+                order.getCustomerId(), order.getOrderNumber().toString(), paymentStatus, null, processedAt));
     }
 
     private Order findForUpdate(UUID orderId) {

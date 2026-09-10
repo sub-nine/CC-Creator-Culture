@@ -19,6 +19,7 @@ import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import com.sub9.orderservice.order.domain.model.OrderItemStatus;
 import com.sub9.orderservice.order.domain.model.OrderStatus;
 import com.sub9.orderservice.order.presentation.response.OrderQueryResponse.CreatorOrderItemDetail;
+import com.sub9.orderservice.order.presentation.response.OrderQueryResponse.ShippingAddressResponse;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -71,7 +72,8 @@ class CreatorOrderItemCommandControllerTest {
                 .andExpect(jsonPath("$.data.orderItemId").value(ORDER_ITEM_ID.toString()))
                 .andExpect(jsonPath("$.data.orderStatus").value("PROCESSING"))
                 .andExpect(jsonPath("$.data.status").value("PREPARING"))
-                .andExpect(jsonPath("$..shippingAddress").doesNotExist());
+                .andExpect(jsonPath("$.data.shippingAddress.recipientPhone").value("010-1234-5678"))
+                .andExpect(jsonPath("$.data.shippingAddress.addressLine2").value("101호"));
 
         verify(orderItemStatusService).update(USER_ID, ORDER_ITEM_ID, OrderItemStatus.PREPARING);
     }
@@ -197,6 +199,8 @@ class CreatorOrderItemCommandControllerTest {
                 1_800,
                 34_200,
                 OrderItemStatus.PREPARING,
-                Instant.parse("2026-09-04T00:00:00Z"));
+                Instant.parse("2026-09-04T00:00:00Z"),
+                new ShippingAddressResponse(
+                        "홍길동", "010-1234-5678", "06236", "서울", "101호"));
     }
 }

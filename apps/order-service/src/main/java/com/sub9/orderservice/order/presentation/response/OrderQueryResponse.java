@@ -102,7 +102,8 @@ public final class OrderQueryResponse {
             long discountAmount,
             long paymentAmount,
             OrderItemStatus status,
-            Instant createdAt
+            Instant createdAt,
+            ShippingAddressResponse shippingAddress
     ) {
         public static CreatorOrderItemDetail from(OrderItem item) {
             return new CreatorOrderItemDetail(
@@ -119,7 +120,8 @@ public final class OrderQueryResponse {
                     item.getDiscountAmount().getAmount(),
                     item.getPaymentAmount().getAmount(),
                     item.getStatus(),
-                    item.getCreatedAt());
+                    item.getCreatedAt(),
+                    ShippingAddressResponse.forCreator(item.getOrder()));
         }
     }
 
@@ -178,6 +180,16 @@ public final class OrderQueryResponse {
             String addressLine1,
             String addressLine2
     ) {
+        public static ShippingAddressResponse forCreator(Order order) {
+            ShippingAddress address = order.getShippingAddress();
+            if (order.getStatus() == OrderStatus.PAID || order.getStatus() == OrderStatus.PROCESSING) {
+                return from(address);
+            }
+            return new ShippingAddressResponse(
+                    address.getRecipientName(), "****", address.getPostalCode(),
+                    address.getAddressLine1(), "****");
+        }
+
         public static ShippingAddressResponse from(ShippingAddress address) {
             return new ShippingAddressResponse(
                     address.getRecipientName(),

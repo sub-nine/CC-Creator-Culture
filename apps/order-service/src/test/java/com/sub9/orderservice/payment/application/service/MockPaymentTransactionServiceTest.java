@@ -63,7 +63,7 @@ class MockPaymentTransactionServiceTest {
     @BeforeEach
     void setUp() {
         service = new MockPaymentTransactionService(
-                orders, payments, new OrderPaymentResultService(orders, coupons, events), clock, ids);
+                orders, payments, new OrderPaymentResultService(orders, coupons, events, ids), clock, ids);
     }
 
     @ParameterizedTest
@@ -176,7 +176,7 @@ class MockPaymentTransactionServiceTest {
         assertThat(repeated.stockRestore()).isNull();
         verify(payments, never()).save(any());
         verify(orders, never()).findByIdForUpdate(any());
-        verifyNoInteractions(coupons, clock);
+        verifyNoInteractions(coupons, clock, events);
     }
 
     @ParameterizedTest
@@ -197,7 +197,7 @@ class MockPaymentTransactionServiceTest {
         assertThat(original.getStatus()).isEqualTo(status);
         verify(payments, never()).save(any());
         verify(orders, never()).findByIdForUpdate(any());
-        verifyNoInteractions(coupons, clock);
+        verifyNoInteractions(coupons, clock, events);
     }
 
     @ParameterizedTest
