@@ -4,9 +4,10 @@ import com.querydsl.core.types.Projections;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.sub9.productservice.category.application.query.port.out.ProductMetadataQueryRepository;
 import com.sub9.productservice.category.domain.entity.QCategory;
-import com.sub9.productservice.category.domain.entity.QCategoryProduct;
+import com.sub9.productservice.category.domain.entity.QCategoryHashtag;
 import com.sub9.productservice.category.domain.entity.QHashtag;
 import com.sub9.productservice.category.domain.entity.QHashtagProduct;
+import com.sub9.productservice.category.domain.model.CategoryHashtagStatus;
 import com.sub9.productservice.category.domain.model.CategoryStatus;
 import com.sub9.productservice.category.infrastructure.persistence.query.support.QuerydslQuerySupport;
 import com.sub9.productservice.product.application.port.ProductMetadataQueryPort;
@@ -24,7 +25,7 @@ public class ProductMetadataQueryRepositoryImpl implements ProductMetadataQueryR
     private static final QCategory category = QCategory.category;
     private static final QHashtag hashtag = QHashtag.hashtag;
     private static final QHashtagProduct hashtagProduct = QHashtagProduct.hashtagProduct;
-    private static final QCategoryProduct categoryProduct = QCategoryProduct.categoryProduct;
+    private static final QCategoryHashtag categoryHashtag = QCategoryHashtag.categoryHashtag;
 
     private final JPAQueryFactory queryFactory;
 
@@ -56,12 +57,16 @@ public class ProductMetadataQueryRepositoryImpl implements ProductMetadataQueryR
             return Set.of();
         }
 
+        // p_categories_products를 직접 유지하는 대신, HashtagProduct와 MERGED된 CategoryHashtag를 조인해서 파생시킨다
         List<UUID> productIds = queryFactory
-                .select(categoryProduct.productId)
-                .from(categoryProduct)
-                .join(categoryProduct.category, category)
+                .select(hashtagProduct.productId)
+                .from(hashtagProduct)
+                .join(categoryHashtag).on(categoryHashtag.hashtag.eq(hashtagProduct.hashtag))
+                .join(categoryHashtag.category, category)
                 .where(
-                        categoryProduct.deletedAt.isNull(),
+                        hashtagProduct.deletedAt.isNull(),
+                        categoryHashtag.status.eq(CategoryHashtagStatus.MERGED),
+                        categoryHashtag.deletedAt.isNull(),
                         category.deletedAt.isNull(),
                         category.status.eq(CategoryStatus.ACTIVE),
                         QuerydslQuerySupport.containsIgnoreCase(category.name, keyword)
@@ -93,14 +98,18 @@ public class ProductMetadataQueryRepositoryImpl implements ProductMetadataQueryR
         return queryFactory
                 .select(Projections.constructor(
                         ProductMetadataQueryPort.CategoryInfo.class, category.id, category.name))
-                .from(categoryProduct)
-                .join(categoryProduct.category, category)
+                .from(hashtagProduct)
+                .join(categoryHashtag).on(categoryHashtag.hashtag.eq(hashtagProduct.hashtag))
+                .join(categoryHashtag.category, category)
                 .where(
-                        categoryProduct.productId.eq(productId),
-                        categoryProduct.deletedAt.isNull(),
+                        hashtagProduct.productId.eq(productId),
+                        hashtagProduct.deletedAt.isNull(),
+                        categoryHashtag.status.eq(CategoryHashtagStatus.MERGED),
+                        categoryHashtag.deletedAt.isNull(),
                         category.deletedAt.isNull(),
                         category.status.eq(CategoryStatus.ACTIVE)
                 )
+                .distinct()
                 .fetch();
     }
 }

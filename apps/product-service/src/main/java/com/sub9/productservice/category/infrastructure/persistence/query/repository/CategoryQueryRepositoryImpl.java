@@ -7,8 +7,8 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.sub9.productservice.category.application.query.port.out.CategoryQueryRepository;
 import com.sub9.productservice.category.domain.entity.QCategory;
 import com.sub9.productservice.category.domain.entity.QCategoryHashtag;
-import com.sub9.productservice.category.domain.entity.QCategoryProduct;
 import com.sub9.productservice.category.domain.entity.QHashtag;
+import com.sub9.productservice.category.domain.entity.QHashtagProduct;
 import com.sub9.productservice.category.domain.model.CategoryHashtagStatus;
 import com.sub9.productservice.category.domain.model.CategoryStatus;
 import com.sub9.productservice.category.infrastructure.persistence.query.support.QuerydslQuerySupport;
@@ -36,7 +36,7 @@ public class CategoryQueryRepositoryImpl implements CategoryQueryRepository {
     private static final QCategory category = QCategory.category;
     private static final QCategoryHashtag categoryHashtag = QCategoryHashtag.categoryHashtag;
     private static final QHashtag hashtag = QHashtag.hashtag;
-    private static final QCategoryProduct categoryProduct = QCategoryProduct.categoryProduct;
+    private static final QHashtagProduct hashtagProduct = QHashtagProduct.hashtagProduct;
 
     private final JPAQueryFactory queryFactory;
 
@@ -140,14 +140,20 @@ public class CategoryQueryRepositoryImpl implements CategoryQueryRepository {
             return List.of();
         }
 
+        // p_categories_products를 직접 유지하는 대신, HashtagProduct와 MERGED된 CategoryHashtag를 조인해서 파생시킨다
         Map<UUID, List<UUID>> categoryIdsByProductId = queryFactory
-                .from(categoryProduct)
+                .from(hashtagProduct)
+                .join(categoryHashtag).on(categoryHashtag.hashtag.eq(hashtagProduct.hashtag))
                 .where(
-                        categoryProduct.productId.in(productIds),
-                        categoryProduct.deletedAt.isNull(),
-                        categoryProduct.category.status.eq(CategoryStatus.ACTIVE)
+                        hashtagProduct.productId.in(productIds),
+                        hashtagProduct.deletedAt.isNull(),
+                        categoryHashtag.status.eq(CategoryHashtagStatus.MERGED),
+                        categoryHashtag.deletedAt.isNull(),
+                        categoryHashtag.category.deletedAt.isNull(),
+                        categoryHashtag.category.status.eq(CategoryStatus.ACTIVE)
                 )
-                .transform(groupBy(categoryProduct.productId).as(list(categoryProduct.category.id)));
+                .distinct()
+                .transform(groupBy(hashtagProduct.productId).as(list(categoryHashtag.category.id)));
 
         return categoryIdsByProductId.entrySet().stream()
                 .map(entry -> new ProductCategoryIdsResponse(entry.getKey(), entry.getValue()))
