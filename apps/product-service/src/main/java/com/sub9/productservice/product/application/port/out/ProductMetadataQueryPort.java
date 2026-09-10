@@ -8,6 +8,7 @@ public interface ProductMetadataQueryPort {
     // TODO: 차후 Page<UUID> 기반 검색으로 수정 필요
     Set<UUID> findProductIdsByMetadataKeyword(String keyword, long limit);
 
+    // TODO : List 형태로 바꿀 것
     ProductMetadataInfo getProductMetadata(UUID productId);
 
     record ProductMetadataInfo(
