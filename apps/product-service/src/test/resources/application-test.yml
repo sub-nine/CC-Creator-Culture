@@ -33,3 +33,8 @@ cloudflare:
     secret-key: "test-secret-key"
     endpoint: "https://test.r2.cloudflarestorage.com"
     bucket: "test-bucket"
+
+kafka:
+  # @EmbeddedKafka가 활성화된 테스트에서는 임베디드 브로커 주소로 자동 치환되고,
+  # 그렇지 않은 테스트에서는 기존 기본값을 그대로 사용한다
+  bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
