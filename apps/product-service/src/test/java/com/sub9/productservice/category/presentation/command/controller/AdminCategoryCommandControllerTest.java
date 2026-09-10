@@ -266,7 +266,7 @@ class AdminCategoryCommandControllerTest extends AbstractIntegrationTest {
             Hashtag hashtag = hashtagJpaRepository.save(Hashtag.create("스트릿"));
 
             // When & Then
-            mockMvc.perform(delete("/api/v1/hashtags/{hashtagId}", hashtag.getId())
+            mockMvc.perform(delete("/api/v1/admin/hashtags/{hashtagId}", hashtag.getId())
                             .header("X-User-Id", adminUserId)
                             .header("X-USER-Role", "MANAGER"))
                     .andExpect(status().isOk())
@@ -280,7 +280,7 @@ class AdminCategoryCommandControllerTest extends AbstractIntegrationTest {
         @DisplayName("존재하지 않는 해시태그를 삭제하려 하면 404를 반환한다")
         void deleteHashtag_notFound_returns404() throws Exception {
             // When & Then
-            mockMvc.perform(delete("/api/v1/hashtags/{hashtagId}", UUID.randomUUID())
+            mockMvc.perform(delete("/api/v1/admin/hashtags/{hashtagId}", UUID.randomUUID())
                             .header("X-User-Id", adminUserId)
                             .header("X-USER-Role", "MANAGER"))
                     .andExpect(status().isNotFound())

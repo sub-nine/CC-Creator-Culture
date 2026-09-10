@@ -94,7 +94,7 @@ public class AdminCategoryCommandController {
      * 해시태그 삭제 (MASTER, MANAGER)
      */
     @PreAuthorize("hasAnyRole('MASTER', 'MANAGER')")
-    @DeleteMapping("/api/v1/hashtags/{hashtagId}")
+    @DeleteMapping("/api/v1/admin/hashtags/{hashtagId}")
     public ApiResponse<Void> deleteHashtag(
             @PathVariable UUID hashtagId,
             @AuthenticationPrincipal AuthUser user
