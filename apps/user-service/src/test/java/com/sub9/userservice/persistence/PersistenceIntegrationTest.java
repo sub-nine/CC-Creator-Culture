@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.userservice.creator.domain.model.Creator;
 import com.sub9.userservice.creator.domain.repository.CreatorRepository;
+import com.sub9.userservice.follow.domain.model.Follow;
+import com.sub9.userservice.follow.domain.repository.FollowRepository;
 import com.sub9.userservice.user.domain.model.User;
 import com.sub9.userservice.user.domain.model.UserRole;
 import com.sub9.userservice.user.domain.repository.UserRepository;
@@ -56,6 +58,9 @@ class PersistenceIntegrationTest {
 
     @Autowired
     private CreatorRepository creatorRepository;
+
+    @Autowired
+    private FollowRepository followRepository;
 
     @Autowired
     private EntityManager entityManager;
@@ -128,6 +133,117 @@ class PersistenceIntegrationTest {
         assertThat(savedCreator.getCreatedBy()).isEqualTo(manager.getId());
         assertThat(savedCreator.getUpdatedBy()).isEqualTo(manager.getId());
         assertThat(savedCreator.getUpdatedAt()).isEqualTo(approvedAt);
+    }
+
+    @Test
+    @DisplayName("팔로우를 저장하고 삭제 관계를 잠금 조회하여 복구한다")
+    void when_deleted_follow_is_locked_and_restored_original_creation_audit_is_preserved() {
+        User customer = createUser(
+                "follow-customer@example.com", "follow-customer", "010-2111-2222",
+                UserRole.CUSTOMER);
+        User creatorUser = createUser(
+                "follow-creator@example.com", "follow-creator", "010-2333-4444",
+                UserRole.CREATOR);
+        userRepository.save(customer);
+        userRepository.save(creatorUser);
+        Creator creator = Creator.createPending(
+                uuidGenerator.generate(), creatorUser.getId(), "팔로우상점", "111-22-33333",
+                Instant.parse("2026-09-10T02:00:00Z"));
+        creatorRepository.save(creator);
+        Follow follow = Follow.create(
+                uuidGenerator.generate(), customer.getId(), creator.getId(),
+                Instant.parse("2026-09-10T04:00:00Z"));
+        follow.unfollow(customer.getId(), Instant.parse("2026-09-10T05:00:00Z"));
+        followRepository.save(follow);
+        entityManager.flush();
+        entityManager.clear();
+
+        Follow deletedFollow = followRepository.findByUserIdAndCreatorIdForUpdate(
+                customer.getId(), creator.getId()).orElseThrow();
+        deletedFollow.restore(customer.getId(), Instant.parse("2026-09-10T06:00:00Z"));
+        entityManager.flush();
+        entityManager.clear();
+
+        Follow restoredFollow = followRepository.findByUserIdAndCreatorIdForUpdate(
+                customer.getId(), creator.getId()).orElseThrow();
+        assertThat(restoredFollow.getId()).isEqualTo(follow.getId());
+        assertThat(restoredFollow.getCreatedAt())
+                .isEqualTo(Instant.parse("2026-09-10T04:00:00Z"));
+        assertThat(restoredFollow.getCreatedBy()).isEqualTo(customer.getId());
+        assertThat(restoredFollow.getUpdatedAt())
+                .isEqualTo(Instant.parse("2026-09-10T06:00:00Z"));
+        assertThat(restoredFollow.getDeletedAt()).isNull();
+        assertThat(restoredFollow.getDeletedBy()).isNull();
+    }
+
+    @Test
+    @DisplayName("동일 CUSTOMER와 Creator의 팔로우 관계를 중복 저장할 수 없다")
+    void when_duplicate_follow_is_saved_unique_constraint_rejects_it() {
+        User customer = createUser(
+                "unique-customer@example.com", "unique-customer", "010-3111-2222",
+                UserRole.CUSTOMER);
+        User creatorUser = createUser(
+                "unique-creator@example.com", "unique-creator", "010-3333-4444",
+                UserRole.CREATOR);
+        userRepository.save(customer);
+        userRepository.save(creatorUser);
+        Creator creator = Creator.createPending(
+                uuidGenerator.generate(), creatorUser.getId(), "중복확인상점", "222-33-44444",
+                Instant.parse("2026-09-10T02:00:00Z"));
+        creatorRepository.save(creator);
+        followRepository.save(Follow.create(
+                uuidGenerator.generate(), customer.getId(), creator.getId(),
+                Instant.parse("2026-09-10T04:00:00Z")));
+        entityManager.flush();
+
+        followRepository.save(Follow.create(
+                uuidGenerator.generate(), customer.getId(), creator.getId(),
+                Instant.parse("2026-09-10T05:00:00Z")));
+
+        assertThatThrownBy(entityManager::flush).isInstanceOf(PersistenceException.class);
+    }
+
+    @Test
+    @DisplayName("승인되고 삭제되지 않은 창작자만 팔로우 대상으로 조회한다")
+    void when_creator_is_approved_and_active_approved_lookup_returns_creator() {
+        User creatorUser = createUser(
+                "approved-follow@example.com", "approved-follow", "010-4111-2222",
+                UserRole.CREATOR);
+        User manager = createUser(
+                "follow-manager@example.com", "follow-manager", "010-4333-4444",
+                UserRole.MANAGER);
+        userRepository.save(creatorUser);
+        userRepository.save(manager);
+        Creator creator = Creator.createPending(
+                uuidGenerator.generate(), creatorUser.getId(), "승인팔로우상점", "333-44-55555",
+                Instant.parse("2026-09-10T02:00:00Z"));
+        creator.approve(manager.getId(), Instant.parse("2026-09-10T03:00:00Z"));
+        creatorRepository.save(creator);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(creatorRepository.findApprovedActiveById(creator.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("팔로우 테이블의 사용자 및 창작자 외래 키를 생성한다")
+    void when_follow_schema_is_created_expected_foreign_keys_exist() {
+        Integer foreignKeyCount = jdbcTemplate.queryForObject("""
+                select count(*)
+                  from information_schema.table_constraints
+                 where constraint_schema = 'private'
+                   and table_name = 'p_follows'
+                   and constraint_type = 'FOREIGN KEY'
+                   and constraint_name in (
+                       'fk_follows_user',
+                       'fk_follows_creator',
+                       'fk_follows_created_by',
+                       'fk_follows_updated_by',
+                       'fk_follows_deleted_by'
+                   )
+                """, Integer.class);
+
+        assertThat(foreignKeyCount).isEqualTo(5);
     }
 
     @Test

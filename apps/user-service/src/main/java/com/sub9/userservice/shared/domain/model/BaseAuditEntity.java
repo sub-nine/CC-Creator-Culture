@@ -65,6 +65,19 @@ public abstract class BaseAuditEntity {
         this.updatedBy = actorId;
     }
 
+    protected final void restoreDeleted(UUID actorId, Instant now) {
+        Objects.requireNonNull(actorId, "actorId must not be null");
+        if (!isDeleted()) {
+            return;
+        }
+
+        Instant restoredAt = Objects.requireNonNull(now, "now must not be null");
+        this.deletedAt = null;
+        this.deletedBy = null;
+        this.updatedAt = restoredAt;
+        this.updatedBy = actorId;
+    }
+
     public final boolean isDeleted() {
         return deletedAt != null;
     }
