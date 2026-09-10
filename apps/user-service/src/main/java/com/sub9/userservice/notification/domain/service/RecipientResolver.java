@@ -30,7 +30,7 @@ public class RecipientResolver {
             case ORDER_CANCELLED -> {
                 List<UUID> recipients = new ArrayList<>();
                 recipients.add(required(context.buyerId(), "buyerId"));
-                recipients.addAll(requiredSellers(context.sellerUserIds()));
+                recipients.addAll(context.sellerUserIds());
                 yield recipients;
             }
             case PAYMENT_PAID, PAYMENT_FAILED -> List.of(
