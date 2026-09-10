@@ -1,24 +1,34 @@
 package com.sub9.productservice.common.config;
 
+import com.sub9.common.security.CustomAccessDeniedHandler;
+import com.sub9.common.security.CustomAuthenticationEntryPoint;
 import com.sub9.productservice.common.security.UserContextFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import tools.jackson.databind.json.JsonMapper;
 
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
   @Bean
   @Order(2)
-  public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
+  public SecurityFilterChain filterChain(
+      HttpSecurity httpSecurity,
+      AccessDeniedHandler accessDeniedHandler,
+      AuthenticationEntryPoint authenticationEntryPoint)
+      throws Exception {
     // csrf 비활성화
     httpSecurity.csrf(AbstractHttpConfigurer::disable);
 
@@ -31,18 +41,42 @@ public class SecurityConfig {
     httpSecurity.addFilterBefore(
         new UserContextFilter(), UsernamePasswordAuthenticationFilter.class);
 
+    // 예외 핸들러 설정
+    httpSecurity.exceptionHandling(
+        config ->
+            config
+                .authenticationEntryPoint(authenticationEntryPoint)
+                .accessDeniedHandler(accessDeniedHandler));
+
     // URL 인가 설정
     httpSecurity.authorizeHttpRequests(
         requests ->
             requests
+                // 공통 경로
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/internal/**")
                 .permitAll()
+
+                // Product 검색
+                .requestMatchers(HttpMethod.GET, "/api/v1/products", "/api/v1/products/*")
+                .permitAll()
+
                 // TODO : 임시로 모든 요청 허용
+                //                .anyRequest()
+                //                .permitAll());
                 .anyRequest()
-                .permitAll());
-    //                                .anyRequest().authenticated());
+                .authenticated());
 
     return httpSecurity.build();
+  }
+
+  @Bean
+  public AccessDeniedHandler accessDeniedHandler(JsonMapper jsonMapper) {
+    return new CustomAccessDeniedHandler(jsonMapper);
+  }
+
+  @Bean
+  public AuthenticationEntryPoint authenticationEntryPoint(JsonMapper jsonMapper) {
+    return new CustomAuthenticationEntryPoint(jsonMapper);
   }
 
   @Bean

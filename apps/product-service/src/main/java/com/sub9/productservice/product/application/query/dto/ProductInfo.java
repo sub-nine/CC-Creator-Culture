@@ -11,4 +11,5 @@ public record ProductInfo(
     BigDecimal averageRating,
     Long reviewCount,
     Long price,
-    int quantity) {}
+    int quantity,
+    String imageKey) {}

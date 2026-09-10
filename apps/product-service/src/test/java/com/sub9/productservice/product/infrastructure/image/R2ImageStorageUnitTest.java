@@ -38,7 +38,13 @@ class R2ImageStorageUnitTest {
   void setUp() {
     storage =
         new R2ImageStorage(
-            new R2Properties("test", "test", "https://example.invalid", "test-bucket"), s3Client);
+            new R2Properties(
+                "test",
+                "test",
+                "https://example.invalid",
+                "test-bucket",
+                "https://images.example.com"),
+            s3Client);
   }
 
   @Nested

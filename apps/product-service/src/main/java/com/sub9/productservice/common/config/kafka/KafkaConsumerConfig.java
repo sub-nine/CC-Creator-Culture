@@ -37,10 +37,12 @@ public class KafkaConsumerConfig {
       DefaultErrorHandler errorHandler, JsonMapper jsonMapper) {
     ConcurrentKafkaListenerContainerFactory<String, String> listener =
         new ConcurrentKafkaListenerContainerFactory<>();
+
     listener.setConsumerFactory(consumerFactory());
     listener.setCommonErrorHandler(errorHandler);
     listener.setRecordMessageConverter(new StringJacksonJsonMessageConverter(jsonMapper));
     listener.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+
     return listener;
   }
 

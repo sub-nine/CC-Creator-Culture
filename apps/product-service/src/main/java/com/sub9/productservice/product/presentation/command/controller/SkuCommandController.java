@@ -5,7 +5,7 @@ import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.common.annotation.Creator;
 import com.sub9.productservice.product.application.command.dto.sku.DeleteSkuCommand;
 import com.sub9.productservice.product.application.command.service.SkuCommandService;
-import com.sub9.productservice.product.presentation.command.dto.reqeust.sku.UpdateSkuRequest;
+import com.sub9.productservice.product.presentation.command.dto.sku.UpdateSkuRequest;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

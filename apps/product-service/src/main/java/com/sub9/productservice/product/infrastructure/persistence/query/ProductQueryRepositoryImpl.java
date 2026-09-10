@@ -1,9 +1,11 @@
 package com.sub9.productservice.product.infrastructure.persistence.query;
 
+import static com.sub9.productservice.product.domain.model.QImage.image;
 import static com.sub9.productservice.product.domain.model.QProduct.product;
 import static com.sub9.productservice.product.domain.model.QSku.sku;
 import static com.sub9.productservice.product.domain.model.QStock.stock;
 
+import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.CaseBuilder;
@@ -17,6 +19,7 @@ import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -26,7 +29,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 @RequiredArgsConstructor
-// TODO : 추후 해시태그, 카테고리 조건 추가
 public class ProductQueryRepositoryImpl implements ProductQueryRepository {
   private final JPAQueryFactory queryFactory;
 
@@ -39,6 +41,7 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
     }
 
     List<ProductDetailInfo.SkuInfo> skus = findSkusByProductId(productId);
+    List<ProductDetailInfo.ImageInfo> images = findImagesByProductId(productId);
 
     return Optional.of(
         new ProductDetailInfo(
@@ -50,9 +53,10 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
             product.getViewCount(),
             product.getAverageRating(),
             product.getReviewCount(),
-            null,
             List.of(),
-            skus));
+            List.of(),
+            skus,
+            images));
   }
 
   @Override
@@ -79,13 +83,23 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
   }
 
   @Override
-  public Page<ProductInfo> searchProducts(String keyword, Pageable pageable) {
+  public Page<ProductInfo> searchProducts(
+      String keyword, Set<UUID> metadataProductIds, Pageable pageable) {
+    BooleanBuilder searchCondition = new BooleanBuilder();
+
+    if (keyword != null && !keyword.isBlank()) {
+      searchCondition.or(QuerydslUtils.containsIgnoreCase(product.name, keyword));
+
+      if (!metadataProductIds.isEmpty()) {
+        searchCondition.or(product.id.in(metadataProductIds));
+      }
+    }
+
     List<UUID> productIds =
         queryFactory
             .select(product.id)
             .from(product)
-            .where(
-                product.deletedAt.isNull(), QuerydslUtils.containsIgnoreCase(product.name, keyword))
+            .where(product.deletedAt.isNull(), searchCondition)
             .orderBy(productStatusOrder(), product.createdAt.desc(), product.id.desc())
             .offset(pageable.getOffset())
             .limit(pageable.getPageSize())
@@ -97,9 +111,7 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
         queryFactory
             .select(product.count())
             .from(product)
-            .where(
-                product.deletedAt.isNull(),
-                QuerydslUtils.containsIgnoreCase(product.name, keyword));
+            .where(product.deletedAt.isNull(), searchCondition);
 
     return PageableExecutionUtils.getPage(
         content,
@@ -144,12 +156,15 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
                 product.averageRating,
                 product.reviewCount,
                 sku.price,
-                stock.quantity))
+                stock.quantity,
+                image.processedKey.coalesce(image.originalKey)))
         .from(product)
         .join(sku)
         .on(sku.productId.eq(product.id), sku.isDefault.isTrue(), sku.deletedAt.isNull())
         .join(stock)
         .on(stock.skuId.eq(sku.id))
+        .leftJoin(image)
+        .on(image.productId.eq(product.id), image.sortOrder.eq(0), image.deletedAt.isNull())
         .where(product.id.in(productIds), product.deletedAt.isNull())
         .orderBy(productStatusOrder(), product.createdAt.desc(), product.id.desc())
         .fetch();
@@ -170,6 +185,20 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
         .on(stock.skuId.eq(sku.id))
         .where(sku.productId.eq(productId), sku.deletedAt.isNull())
         .orderBy(sku.isDefault.desc(), sku.createdAt.asc())
+        .fetch();
+  }
+
+  private List<ProductDetailInfo.ImageInfo> findImagesByProductId(UUID productId) {
+    return queryFactory
+        .select(
+            Projections.constructor(
+                ProductDetailInfo.ImageInfo.class,
+                image.id,
+                image.processedKey.coalesce(image.originalKey),
+                image.sortOrder))
+        .from(image)
+        .where(image.productId.eq(productId), image.deletedAt.isNull())
+        .orderBy(image.sortOrder.asc())
         .fetch();
   }
 

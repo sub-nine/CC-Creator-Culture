@@ -15,14 +15,6 @@ spring:
         jdbc:
           time_zone: UTC
 
-  cloud:
-    openfeign:
-      client:
-        config:
-          default:
-            connect-timeout: 3000
-            read-timeout: 5000
-
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -41,6 +33,7 @@ cloudflare:
     secret-key: ${R2_SECRET_KEY}
     endpoint: ${R2_ENDPOINT}
     bucket: ${R2_BUCKET}
+    public-url: ${R2_PUBLIC_URL}
 
 kafka:
   bootstrap-servers: ${KAFKA_HOST:localhost:9092}

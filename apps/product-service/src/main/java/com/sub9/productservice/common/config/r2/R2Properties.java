@@ -7,5 +7,6 @@ public record R2Properties(
     String accessKey,
     String secretKey,
     String endpoint,
-    String bucket
+    String bucket,
+    String publicUrl
 ) {}

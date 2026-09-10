@@ -2,11 +2,12 @@ package com.sub9.productservice.product.presentation.command.controller;
 
 import com.sub9.common.annotation.Creator;
 import com.sub9.common.dto.response.ApiResponse;
+import com.sub9.productservice.common.config.r2.R2Properties;
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.product.application.command.service.ProductCommandService;
-import com.sub9.productservice.product.presentation.command.dto.reqeust.product.CreateProductRequest;
-import com.sub9.productservice.product.presentation.command.dto.reqeust.product.UpdateProductRequest;
-import com.sub9.productservice.product.presentation.command.dto.reqeust.product.UpdateProductStatusRequest;
+import com.sub9.productservice.product.presentation.command.dto.product.CreateProductRequest;
+import com.sub9.productservice.product.presentation.command.dto.product.UpdateProductRequest;
+import com.sub9.productservice.product.presentation.command.dto.product.UpdateProductStatusRequest;
 import com.sub9.productservice.product.presentation.command.mapper.UploadImageMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;

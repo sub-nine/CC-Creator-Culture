@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.presentation.command.dto.reqeust.stock;
+package com.sub9.productservice.product.presentation.command.dto.stock;
 
 import com.sub9.productservice.product.application.command.dto.stock.RestoreStockCommand;
 import com.sub9.productservice.product.domain.model.StockHistoryReason;
