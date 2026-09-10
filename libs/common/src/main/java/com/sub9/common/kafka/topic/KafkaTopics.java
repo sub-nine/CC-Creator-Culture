@@ -11,4 +11,5 @@ public final class KafkaTopics {
   public static final String ORDER_NOTIFICATION = "order.notification";
   public static final String ORDER_PAID = "order_paid";
   public static final String STOCK_RESTORE = "stock.restore";
+  public static final String HASHTAG_CREATED = "hashtag.created";
 }

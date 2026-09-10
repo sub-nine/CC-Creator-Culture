@@ -1,6 +1,5 @@
-package com.sub9.orderservice.cart.application.port;
+package com.sub9.orderservice.cart.application.port.out;
 
-import com.sub9.orderservice.cart.application.dto.CartItemInfo;
 import com.sub9.orderservice.cart.application.dto.CartProductInfo;
 
 import java.util.List;

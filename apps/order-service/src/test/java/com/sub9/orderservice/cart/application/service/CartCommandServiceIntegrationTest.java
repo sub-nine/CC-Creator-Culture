@@ -3,7 +3,7 @@ package com.sub9.orderservice.cart.application.service;
 import com.sub9.orderservice.cart.application.dto.AddCartItemCommand;
 import com.sub9.orderservice.cart.application.dto.DeleteCartItemCommand;
 import com.sub9.orderservice.cart.application.dto.UpdateCartItemCommand;
-import com.sub9.orderservice.cart.application.port.CartProductPort;
+import com.sub9.orderservice.cart.application.port.out.CartProductPort;
 import com.sub9.orderservice.cart.domain.model.Cart;
 import com.sub9.orderservice.cart.infrastructure.persistence.CartJpaRepository;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
@@ -33,14 +33,22 @@ import static org.mockito.Mockito.verify;
 @SpringBootTest
 @DisplayName("CartService - 통합 테스트")
 class CartCommandServiceIntegrationTest extends AbstractIntegrationTest {
-  @Autowired private CartCommandService cartCommandService;
-  @Autowired private CartJpaRepository cartRepository;
-  @Autowired private EntityManager entityManager;
-  @MockitoBean private CartProductPort cartProductPort;
-  @MockitoBean private CouponApplicationPort couponApplicationPort;
-  @MockitoBean private CouponUsagePort couponUsagePort;
-  @MockitoBean private StockPort stockPort;
-  @MockitoBean PaymentCancellationPort paymentCancellationPort;
+  @Autowired
+  private CartCommandService cartCommandService;
+  @Autowired
+  private CartJpaRepository cartRepository;
+  @Autowired
+  private EntityManager entityManager;
+  @MockitoBean
+  private CartProductPort cartProductPort;
+  @MockitoBean
+  private CouponApplicationPort couponApplicationPort;
+  @MockitoBean
+  private CouponUsagePort couponUsagePort;
+  @MockitoBean
+  private StockPort stockPort;
+  @MockitoBean
+  PaymentCancellationPort paymentCancellationPort;
 
   private UUID userId;
   private UUID skuId;
@@ -71,6 +79,7 @@ class CartCommandServiceIntegrationTest extends AbstractIntegrationTest {
               .filter(cart -> cart.getUserId().equals(userId))
               .findFirst()
               .orElseThrow();
+
       assertThat(saved.getId()).isNotNull();
       assertThat(saved.getUserId()).isEqualTo(userId);
       assertThat(saved.getSkuId()).isEqualTo(skuId);
@@ -89,17 +98,20 @@ class CartCommandServiceIntegrationTest extends AbstractIntegrationTest {
     void updateCartItem_success(int quantity) {
       // given
       Cart target = cartRepository.save(Cart.create(UUID.randomUUID(), userId, skuId, 2));
+
       entityManager.flush();
       entityManager.clear();
 
       // when
       cartCommandService.updateCartItem(
           new UpdateCartItemCommand(userId, target.getId(), quantity));
+
       entityManager.flush();
       entityManager.clear();
 
       // then
       Cart updated = cartRepository.findById(target.getId()).orElseThrow();
+
       assertThat(updated.getQuantity()).isEqualTo(quantity);
       assertThat(updated.getUserId()).isEqualTo(userId);
       assertThat(updated.getSkuId()).isEqualTo(skuId);
@@ -119,14 +131,17 @@ class CartCommandServiceIntegrationTest extends AbstractIntegrationTest {
       Cart unselected =
           cartRepository.save(Cart.create(UUID.randomUUID(), userId, UUID.randomUUID(), 1));
       Cart other = cartRepository.save(Cart.create(UUID.randomUUID(), UUID.randomUUID(), skuId, 4));
+
       DeleteCartItemCommand command =
           new DeleteCartItemCommand(
               userId, List.of(first.getId(), second.getId(), other.getId(), UUID.randomUUID()));
+
       entityManager.flush();
       entityManager.clear();
 
       // when
       cartCommandService.removeCartItem(command);
+
       entityManager.flush();
       entityManager.clear();
 
