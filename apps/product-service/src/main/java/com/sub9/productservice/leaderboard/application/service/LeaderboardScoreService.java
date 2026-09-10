@@ -16,6 +16,7 @@ import com.sub9.productservice.leaderboard.domain.service.LeaderboardScoreDistri
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ public class LeaderboardScoreService implements RecordOrderScoreUseCase, RecordP
     private final LeaderboardScoreDistributionDomainService leaderboardScoreDistributionDomainService;
 
     @Override
+    @Transactional(readOnly = true)
     public void recordOrderScore(UUID orderId, List<ProductQuantity> productQuantities) {
         // ProductQuantity에 대한 점수 일반화
         List<SourceScore> productOrderScores = productQuantities.stream().map((quantity) ->
@@ -49,6 +51,7 @@ public class LeaderboardScoreService implements RecordOrderScoreUseCase, RecordP
     }
 
     @Override
+    @Transactional(readOnly = true)
     public void recordProductViewScore(UUID eventId, List<ProductViewCount> productViewCounts) {
         // ProductViewCount에 대한 점수 일반화
         List<SourceScore> productViewScores = productViewCounts.stream().map((viewCount) ->

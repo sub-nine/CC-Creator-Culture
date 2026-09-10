@@ -1,5 +1,6 @@
 package com.sub9.productservice.category.infrastructure.persistence.query.repository;
 
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Projections;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -18,9 +19,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
-import static com.querydsl.core.group.GroupBy.groupBy;
-import static com.querydsl.core.group.GroupBy.list;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -80,13 +79,22 @@ public class HashtagQueryRepositoryImpl implements HashtagQueryRepository {
             return List.of();
         }
 
-        Map<UUID, List<UUID>> hashtagIdsByProductId = queryFactory
+        // QueryDSL의 GroupBy.transform()은 이 프로젝트의 Hibernate 버전과 바이너리 호환이 안 돼서(ScrollableResults API 변경)
+        // 직접 fetch한 뒤 자바 스트림으로 그룹핑한다
+        List<Tuple> rows = queryFactory
+                .select(hashtagProduct.productId, hashtagProduct.hashtag.id)
                 .from(hashtagProduct)
                 .where(
                         hashtagProduct.productId.in(productIds),
                         hashtagProduct.deletedAt.isNull()
                 )
-                .transform(groupBy(hashtagProduct.productId).as(list(hashtagProduct.hashtag.id)));
+                .fetch();
+
+        Map<UUID, List<UUID>> hashtagIdsByProductId = rows.stream()
+                .collect(Collectors.groupingBy(
+                        row -> row.get(hashtagProduct.productId),
+                        Collectors.mapping(row -> row.get(hashtagProduct.hashtag.id), Collectors.toList())
+                ));
 
         return hashtagIdsByProductId.entrySet().stream()
                 .map(entry -> new ProductHashtagIdsResponse(entry.getKey(), entry.getValue()))

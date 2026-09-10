@@ -1,5 +1,6 @@
 package com.sub9.productservice.category.infrastructure.persistence.query.repository;
 
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQuery;
@@ -25,9 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-
-import static com.querydsl.core.group.GroupBy.groupBy;
-import static com.querydsl.core.group.GroupBy.list;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -141,7 +140,10 @@ public class CategoryQueryRepositoryImpl implements CategoryQueryRepository {
         }
 
         // p_categories_products를 직접 유지하는 대신, HashtagProduct와 MERGED된 CategoryHashtag를 조인해서 파생시킨다
-        Map<UUID, List<UUID>> categoryIdsByProductId = queryFactory
+        // QueryDSL의 GroupBy.transform()은 이 프로젝트의 Hibernate 버전과 바이너리 호환이 안 돼서(ScrollableResults API 변경)
+        // 직접 fetch한 뒤 자바 스트림으로 그룹핑한다
+        List<Tuple> rows = queryFactory
+                .select(hashtagProduct.productId, categoryHashtag.category.id)
                 .from(hashtagProduct)
                 .join(categoryHashtag).on(categoryHashtag.hashtag.eq(hashtagProduct.hashtag))
                 .where(
@@ -153,7 +155,13 @@ public class CategoryQueryRepositoryImpl implements CategoryQueryRepository {
                         categoryHashtag.category.status.eq(CategoryStatus.ACTIVE)
                 )
                 .distinct()
-                .transform(groupBy(hashtagProduct.productId).as(list(categoryHashtag.category.id)));
+                .fetch();
+
+        Map<UUID, List<UUID>> categoryIdsByProductId = rows.stream()
+                .collect(Collectors.groupingBy(
+                        row -> row.get(hashtagProduct.productId),
+                        Collectors.mapping(row -> row.get(categoryHashtag.category.id), Collectors.toList())
+                ));
 
         return categoryIdsByProductId.entrySet().stream()
                 .map(entry -> new ProductCategoryIdsResponse(entry.getKey(), entry.getValue()))
