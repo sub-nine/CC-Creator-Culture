@@ -2,6 +2,13 @@ server:
   port: ${GATEWAY_PORT:8080}
 
 spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      connect-timeout: 2s
+      timeout: 2s
+
   cloud:
     gateway:
       server:
@@ -19,3 +26,8 @@ spring:
               uri: lb://order-service
               predicates:
                 - Path=/api/v1/orders/**,/api/v1/creator/order-items/**,/api/v1/admin/orders/**,/api/v1/cart/**,/api/v1/coupons/**,/api/v1/user-coupons/**
+
+auth:
+  jwt:
+    secret: ${JWT_SECRET}
+    clock-skew: 60s
