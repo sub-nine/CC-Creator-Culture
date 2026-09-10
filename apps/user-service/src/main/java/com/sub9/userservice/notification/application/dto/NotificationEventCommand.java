@@ -6,6 +6,7 @@ import com.sub9.userservice.notification.domain.model.ReferenceType;
 import com.sub9.userservice.notification.domain.model.SourceService;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -17,7 +18,7 @@ public record NotificationEventCommand(
         UUID referenceId,
         UUID creatorId,
         UUID buyerId,
-        UUID sellerId,
+        List<UUID> sellerUserIds,
         UUID followedUserId,
         String productName,
         String orderNumber,
@@ -36,6 +37,7 @@ public record NotificationEventCommand(
         Objects.requireNonNull(referenceType, "referenceType must not be null");
         Objects.requireNonNull(referenceId, "referenceId must not be null");
         Objects.requireNonNull(occurredAt, "occurredAt must not be null");
+        sellerUserIds = sellerUserIds == null ? List.of() : List.copyOf(sellerUserIds);
     }
 
     public NotificationContext toContext() {
@@ -46,7 +48,7 @@ public record NotificationEventCommand(
                 referenceId,
                 creatorId,
                 buyerId,
-                sellerId,
+                sellerUserIds,
                 followedUserId,
                 productName,
                 orderNumber,

@@ -1,6 +1,7 @@
 package com.sub9.userservice.notification.domain.model;
 
 import java.util.UUID;
+import java.util.List;
 
 public record NotificationContext(
         UUID eventId,
@@ -9,7 +10,7 @@ public record NotificationContext(
         UUID referenceId,
         UUID creatorId,
         UUID buyerId,
-        UUID sellerId,
+        List<UUID> sellerUserIds,
         UUID followedUserId,
         String productName,
         String orderNumber,
@@ -19,4 +20,8 @@ public record NotificationContext(
         String productStatus,
         Boolean firstPublished
 ) {
+    public NotificationContext {
+        // For cancellations, supply only the sellers affected by this cancellation.
+        sellerUserIds = sellerUserIds == null ? List.of() : List.copyOf(sellerUserIds);
+    }
 }
