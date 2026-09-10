@@ -15,6 +15,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -109,9 +110,36 @@ public class Creator extends BaseAuditEntity {
         return new Creator(id, userId, creatorName, businessRegistrationNumber, now);
     }
 
+    public void approve(UUID adminId, Instant now) {
+        ensurePending();
+        UUID actorId = requireUuidV7(adminId, "adminId");
+        Instant approvedInstant = Objects.requireNonNull(now, "now must not be null");
+
+        this.approvalStatus = ApprovalStatus.APPROVED;
+        this.approvedBy = actorId;
+        this.approvedAt = LocalDateTime.ofInstant(approvedInstant, ZoneOffset.UTC);
+        assignCreatedBy(actorId);
+        recordUpdate(actorId, approvedInstant);
+    }
+
+    public void reject(UUID adminId, Instant now) {
+        ensurePending();
+        UUID actorId = requireUuidV7(adminId, "adminId");
+        Instant rejectedAt = Objects.requireNonNull(now, "now must not be null");
+
+        this.approvalStatus = ApprovalStatus.REJECTED;
+        recordUpdate(actorId, rejectedAt);
+    }
+
     public void softDelete(UUID actorId, Instant now) {
         // 행을 남겨 계정과의 연결 및 변경 이력을 유지한다.
         markDeleted(actorId, now);
+    }
+
+    private void ensurePending() {
+        if (approvalStatus != ApprovalStatus.PENDING) {
+            throw new IllegalStateException("Only pending creators can be reviewed");
+        }
     }
 
     private static UUID requireUuidV7(UUID id, String fieldName) {

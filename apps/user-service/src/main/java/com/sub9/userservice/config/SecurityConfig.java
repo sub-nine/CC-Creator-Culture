@@ -3,6 +3,7 @@ package com.sub9.userservice.config;
 import com.sub9.common.security.CustomAccessDeniedHandler;
 import com.sub9.common.security.CustomAuthenticationEntryPoint;
 import com.sub9.userservice.auth.infrastructure.security.GatewayHeaderAuthenticationFilter;
+import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -56,6 +57,8 @@ public class SecurityConfig {
                 .permitAll()
                 .requestMatchers("/api/v1/admin/managers")
                 .hasRole("MASTER")
+                .requestMatchers(HttpMethod.PATCH, "/api/v1/admin/creators/*/approval")
+                .hasAnyRole("MASTER", "MANAGER")
                 .anyRequest()
                 .authenticated());
 
