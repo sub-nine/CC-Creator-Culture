@@ -77,6 +77,43 @@ class SecurityFilterChainIntegrationTest {
     }
 
     @Test
+    @DisplayName("MASTER가 쿠폰 생성을 요청하면 인증 사용자를 컨트롤러에 전달한다")
+    void when_master_creates_coupon_authenticated_user_is_forwarded() throws Exception {
+        mockMvc.perform(couponCreationRequest("MASTER"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(USER_ID.toString()));
+    }
+
+    @Test
+    @DisplayName("MANAGER가 쿠폰 생성을 요청하면 인증 사용자를 컨트롤러에 전달한다")
+    void when_manager_creates_coupon_authenticated_user_is_forwarded() throws Exception {
+        mockMvc.perform(couponCreationRequest("MANAGER"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(USER_ID.toString()));
+    }
+
+    @Test
+    @DisplayName("CUSTOMER 또는 CREATOR가 쿠폰 생성을 요청하면 COMMON_0008과 403을 반환한다")
+    void when_non_admin_creates_coupon_forbidden_response_is_returned() throws Exception {
+        mockMvc.perform(couponCreationRequest("CUSTOMER"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.FORBIDDEN.code()));
+
+        mockMvc.perform(couponCreationRequest("CREATOR"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.FORBIDDEN.code()));
+    }
+
+    @Test
+    @DisplayName("내부 인증 헤더 없이 쿠폰 생성을 요청하면 COMMON_0007과 401을 반환한다")
+    void when_coupon_is_created_without_authentication_headers_unauthorized_response_is_returned()
+            throws Exception {
+        mockMvc.perform(post("/api/v1/coupons"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.UNAUTHORIZED.code()));
+    }
+
+    @Test
     @DisplayName("local과 dev의 Actuator 요청에는 전용 체인만 적용한다")
     void local과_dev의_actuator_요청에는_전용_체인만_적용한다() throws Exception {
         assertThat(filterChainProxy.getFilters("/actuator/health"))
@@ -98,6 +135,12 @@ class SecurityFilterChainIntegrationTest {
                 .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, role);
     }
 
+    private MockHttpServletRequestBuilder couponCreationRequest(String role) {
+        return post("/api/v1/coupons")
+                .header(GatewayHeaderAuthenticationFilter.USER_ID_HEADER, USER_ID)
+                .header(GatewayHeaderAuthenticationFilter.USER_ROLE_HEADER, role);
+    }
+
     @RestController
     static class TestOrderController {
 
@@ -108,6 +151,11 @@ class SecurityFilterChainIntegrationTest {
 
         @PostMapping("/api/v1/orders")
         String createOrder(@AuthenticationPrincipal GatewayAuthenticationPrincipal principal) {
+            return principal.userId().toString();
+        }
+
+        @PostMapping("/api/v1/coupons")
+        String createCoupon(@AuthenticationPrincipal GatewayAuthenticationPrincipal principal) {
             return principal.userId().toString();
         }
     }
