@@ -8,7 +8,9 @@ import org.springframework.kafka.test.context.EmbeddedKafka;
         partitions = 1,
         topics = {
                 KafkaTopics.HASHTAG_CREATED,
-                KafkaTopics.PRODUCT_CREATED
+                KafkaTopics.PRODUCT_CREATED,
+                KafkaTopics.ORDER_PAID,
+                KafkaTopics.PRODUCT_VIEW_COUNT_SYNC
         }
 )
 public abstract class AbstractKafkaIntegrationTest extends AbstractIntegrationTest {

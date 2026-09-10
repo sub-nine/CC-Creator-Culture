@@ -1,5 +1,6 @@
 package com.sub9.productservice.category.infrastructure.persistence.query.repository;
 
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQuery;
@@ -7,8 +8,8 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.sub9.productservice.category.application.query.port.out.CategoryQueryRepository;
 import com.sub9.productservice.category.domain.entity.QCategory;
 import com.sub9.productservice.category.domain.entity.QCategoryHashtag;
-import com.sub9.productservice.category.domain.entity.QCategoryProduct;
 import com.sub9.productservice.category.domain.entity.QHashtag;
+import com.sub9.productservice.category.domain.entity.QHashtagProduct;
 import com.sub9.productservice.category.domain.model.CategoryHashtagStatus;
 import com.sub9.productservice.category.domain.model.CategoryStatus;
 import com.sub9.productservice.category.infrastructure.persistence.query.support.QuerydslQuerySupport;
@@ -25,9 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-
-import static com.querydsl.core.group.GroupBy.groupBy;
-import static com.querydsl.core.group.GroupBy.list;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -36,7 +35,7 @@ public class CategoryQueryRepositoryImpl implements CategoryQueryRepository {
     private static final QCategory category = QCategory.category;
     private static final QCategoryHashtag categoryHashtag = QCategoryHashtag.categoryHashtag;
     private static final QHashtag hashtag = QHashtag.hashtag;
-    private static final QCategoryProduct categoryProduct = QCategoryProduct.categoryProduct;
+    private static final QHashtagProduct hashtagProduct = QHashtagProduct.hashtagProduct;
 
     private final JPAQueryFactory queryFactory;
 
@@ -140,14 +139,29 @@ public class CategoryQueryRepositoryImpl implements CategoryQueryRepository {
             return List.of();
         }
 
-        Map<UUID, List<UUID>> categoryIdsByProductId = queryFactory
-                .from(categoryProduct)
+        // p_categories_products를 직접 유지하는 대신, HashtagProduct와 MERGED된 CategoryHashtag를 조인해서 파생시킨다
+        // QueryDSL의 GroupBy.transform()은 이 프로젝트의 Hibernate 버전과 바이너리 호환이 안 돼서(ScrollableResults API 변경)
+        // 직접 fetch한 뒤 자바 스트림으로 그룹핑한다
+        List<Tuple> rows = queryFactory
+                .select(hashtagProduct.productId, categoryHashtag.category.id)
+                .from(hashtagProduct)
+                .join(categoryHashtag).on(categoryHashtag.hashtag.eq(hashtagProduct.hashtag))
                 .where(
-                        categoryProduct.productId.in(productIds),
-                        categoryProduct.deletedAt.isNull(),
-                        categoryProduct.category.status.eq(CategoryStatus.ACTIVE)
+                        hashtagProduct.productId.in(productIds),
+                        hashtagProduct.deletedAt.isNull(),
+                        categoryHashtag.status.eq(CategoryHashtagStatus.MERGED),
+                        categoryHashtag.deletedAt.isNull(),
+                        categoryHashtag.category.deletedAt.isNull(),
+                        categoryHashtag.category.status.eq(CategoryStatus.ACTIVE)
                 )
-                .transform(groupBy(categoryProduct.productId).as(list(categoryProduct.category.id)));
+                .distinct()
+                .fetch();
+
+        Map<UUID, List<UUID>> categoryIdsByProductId = rows.stream()
+                .collect(Collectors.groupingBy(
+                        row -> row.get(hashtagProduct.productId),
+                        Collectors.mapping(row -> row.get(categoryHashtag.category.id), Collectors.toList())
+                ));
 
         return categoryIdsByProductId.entrySet().stream()
                 .map(entry -> new ProductCategoryIdsResponse(entry.getKey(), entry.getValue()))

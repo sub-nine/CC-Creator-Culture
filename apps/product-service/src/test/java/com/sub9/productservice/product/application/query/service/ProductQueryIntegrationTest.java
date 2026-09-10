@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.sub9.productservice.category.domain.entity.Category;
-import com.sub9.productservice.category.domain.entity.CategoryProduct;
+import com.sub9.productservice.category.domain.entity.CategoryHashtag;
 import com.sub9.productservice.category.domain.entity.Hashtag;
 import com.sub9.productservice.category.domain.entity.HashtagProduct;
+import com.sub9.productservice.category.domain.model.CategoryHashtagMatchType;
+import com.sub9.productservice.category.domain.model.CategoryHashtagStatus;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
@@ -189,7 +191,8 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
 
     entityManager.persist(category);
     entityManager.persist(hashtag);
-    entityManager.persist(CategoryProduct.create(category, dummyProduct.getId()));
+    entityManager.persist(CategoryHashtag.create(
+        category, hashtag, CategoryHashtagMatchType.MANUAL, CategoryHashtagStatus.MERGED, 0.0));
     entityManager.persist(HashtagProduct.create(hashtag, dummyProduct.getId()));
 
     Product otherProduct = productRepository.save(Product.create(creatorId, "티셔츠", "설명"));
@@ -210,9 +213,9 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
         productQueryService.searchProducts("여름", PageRequest.of(1, 1));
 
     // then
-    assertThat(categoryResponses.getContent())
-        .extracting(ProductInfo::productId)
-        .containsExactly(dummyProduct.getId());
+    // dummyProduct와 otherProduct 모두 "여름 추천" 해시태그를 공유하고, 그 해시태그가 "여름 의류" 카테고리에 MERGED돼있으므로
+    // 카테고리 키워드 검색에도 둘 다 매칭된다
+    assertThat(categoryResponses.getTotalElements()).isEqualTo(2);
     assertThat(hashtagResponses.getTotalElements()).isEqualTo(2);
     assertThat(responses.getTotalElements()).isEqualTo(2);
     assertThat(nextResponses.getTotalElements()).isEqualTo(2);
@@ -230,7 +233,8 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
     Hashtag hashtag = Hashtag.create("여름");
     entityManager.persist(category);
     entityManager.persist(hashtag);
-    entityManager.persist(CategoryProduct.create(category, dummyProduct.getId()));
+    entityManager.persist(CategoryHashtag.create(
+        category, hashtag, CategoryHashtagMatchType.MANUAL, CategoryHashtagStatus.MERGED, 0.0));
     entityManager.persist(HashtagProduct.create(hashtag, dummyProduct.getId()));
 
     Image originalImage = Image.create(dummyProduct.getId(), "original/detail.png", null, 1);

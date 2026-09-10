@@ -49,6 +49,10 @@ public class CategoryCommandService implements AddHashtagsToProductUseCase, Link
 
         List<Hashtag> hashtags = upsertResults.stream().map(HashtagUpsertResult::hashtag).toList();
 
+        // TODO: 상품 연결(link)과 usage_count 증가는 항상 한 쌍으로 일어나야 하는 불변식인데
+        //  지금은 application 서비스에서 따로따로 호출하고 있음 - Hashtag/HashtagProduct 도메인 모델에 캡슐화 필요.
+        //  아직 없는 상품-해시태그 연결 해제(unlink) 기능을 추가할 때도, usage_count 감소가 항상 같이 일어나도록
+        //  똑같이 캡슐화해서 구현해야 함(따로 호출하는 형태로 만들면 안 됨)
         // Hashtag마다 상품과의 링크를 upsert하고, 실제로 새로 링크된 경우에만 usage_count 증가
         hashtags.stream()
                 .filter(hashtag -> hashtagProductCommandRepository.linkIfAbsent(hashtag.getId(), productId))
@@ -108,6 +112,7 @@ public class CategoryCommandService implements AddHashtagsToProductUseCase, Link
                 CategoryHashtag.create(newCategory, hashtag, CategoryHashtagMatchType.PROMOTED, CategoryHashtagStatus.MERGED, 0.0)
         );
 
+        // TODO: usage_count는 상품에 링크될 때만 증가해야 함 - 카테고리 승격 시 증가시키는 이 로직 제거 필요
         hashtagCommandRepository.increaseUsageCount(hashtag.getId());
     }
 
@@ -123,6 +128,7 @@ public class CategoryCommandService implements AddHashtagsToProductUseCase, Link
                 CategoryHashtag.create(category, hashtag, CategoryHashtagMatchType.ALGORITHM, status, similarity)
         );
 
+        // TODO: usage_count는 상품에 링크될 때만 증가해야 함 - 카테고리 병합(MERGED) 시 증가시키는 이 로직 제거 필요
         if (status == CategoryHashtagStatus.MERGED) {
             hashtagCommandRepository.increaseUsageCount(hashtag.getId());
         }
