@@ -9,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 
@@ -18,14 +17,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProductSyncViewsEventConsumer {
     private final RecordProductViewScoreUseCase recordProductViewScoreUseCase;
-    private final JsonMapper jsonMapper;
 
     @KafkaListener(topics = KafkaTopics.PRODUCT_VIEW_COUNT_SYNC, groupId = "${kafka.leaderboard-group-id}")
-    public void consume(String payload, Acknowledgment ack) {
+    public void consume(ProductViewSyncEvent event, Acknowledgment ack) {
         try {
-            log.info("[KAFKA] 조회수 동기화 이벤트 수신 - payload: {}", payload);
-
-            ProductViewSyncEvent event = jsonMapper.readValue(payload, ProductViewSyncEvent.class);
+            log.info("[KAFKA] 조회수 동기화 이벤트 수신 - event: {}", event);
 
             List<ProductViewCount> productViewCounts = event.productViewCounts().stream()
                     .map((productViewCount -> new ProductViewCount(

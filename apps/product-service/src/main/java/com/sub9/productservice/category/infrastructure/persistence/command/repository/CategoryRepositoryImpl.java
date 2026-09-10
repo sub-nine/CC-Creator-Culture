@@ -3,11 +3,13 @@ package com.sub9.productservice.category.infrastructure.persistence.command.repo
 import com.sub9.productservice.category.application.command.port.out.CategoryCommandRepository;
 import com.sub9.productservice.category.domain.entity.Category;
 import com.sub9.productservice.category.domain.entity.CategoryHashtag;
-import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.CategoryHashtagCommandJpaRepository;
+import com.sub9.productservice.category.domain.model.CategoryStatus;
+import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.CategoryHashtagJpaRepository;
 import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.CategoryJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,7 +18,7 @@ import java.util.UUID;
 public class CategoryRepositoryImpl implements CategoryCommandRepository {
 
     private final CategoryJpaRepository categoryJpaRepository;
-    private final CategoryHashtagCommandJpaRepository categoryHashtagCommandJpaRepository;
+    private final CategoryHashtagJpaRepository categoryHashtagJpaRepository;
 
     @Override
     public Category save(Category category) {
@@ -29,17 +31,22 @@ public class CategoryRepositoryImpl implements CategoryCommandRepository {
     }
 
     @Override
+    public List<Category> findAllActive() {
+        return categoryJpaRepository.findAllByStatusAndDeletedAtIsNull(CategoryStatus.ACTIVE);
+    }
+
+    @Override
     public Optional<CategoryHashtag> findCategoryHashtagById(UUID categoryHashtagId) {
-        return categoryHashtagCommandJpaRepository.findByIdAndDeletedAtIsNull(categoryHashtagId);
+        return categoryHashtagJpaRepository.findByIdAndDeletedAtIsNull(categoryHashtagId);
     }
 
     @Override
     public void linkCategoryHashtag(CategoryHashtag categoryHashtag) {
-        categoryHashtagCommandJpaRepository.save(categoryHashtag);
+        categoryHashtagJpaRepository.save(categoryHashtag);
     }
 
     @Override
     public Optional<CategoryHashtag> findCategoryHashtagByCategoryIdAndHashtagId(UUID categoryId, UUID hashtagId) {
-        return categoryHashtagCommandJpaRepository.findByCategory_IdAndHashtag_IdAndDeletedAtIsNull(categoryId, hashtagId);
+        return categoryHashtagJpaRepository.findByCategory_IdAndHashtag_IdAndDeletedAtIsNull(categoryId, hashtagId);
     }
 }

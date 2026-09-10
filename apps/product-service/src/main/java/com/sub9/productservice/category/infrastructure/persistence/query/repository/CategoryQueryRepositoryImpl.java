@@ -105,7 +105,7 @@ public class CategoryQueryRepositoryImpl implements CategoryQueryRepository {
     @Override
     public List<HashtagResponse> findHashtagsByCategoryId(UUID categoryId) {
         return queryFactory
-                .select(Projections.constructor(HashtagResponse.class, hashtag.id, hashtag.name))
+                .select(Projections.constructor(HashtagResponse.class, hashtag.id, hashtag.name, hashtag.usageCount))
                 .from(categoryHashtag)
                 .join(categoryHashtag.hashtag, hashtag)
                 .where(mergedInCategory(categoryId))
@@ -116,7 +116,7 @@ public class CategoryQueryRepositoryImpl implements CategoryQueryRepository {
     @Override
     public Page<HashtagResponse> findHashtagsByCategoryId(UUID categoryId, Pageable pageable) {
         List<HashtagResponse> content = queryFactory
-                .select(Projections.constructor(HashtagResponse.class, hashtag.id, hashtag.name))
+                .select(Projections.constructor(HashtagResponse.class, hashtag.id, hashtag.name, hashtag.usageCount))
                 .from(categoryHashtag)
                 .join(categoryHashtag.hashtag, hashtag)
                 .where(mergedInCategory(categoryId))

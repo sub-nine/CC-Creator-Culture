@@ -1,6 +1,6 @@
 package com.sub9.productservice.category.presentation.query.dto;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 public record MergeRequestResponse(
@@ -10,6 +10,6 @@ public record MergeRequestResponse(
         UUID hashtagId,
         String hashtagName,
         String status,
-        LocalDateTime createdAt
+        Instant createdAt
 ) {
 }

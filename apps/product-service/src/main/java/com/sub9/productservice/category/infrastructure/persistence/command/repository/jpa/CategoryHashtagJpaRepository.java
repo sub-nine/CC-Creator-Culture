@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface CategoryHashtagCommandJpaRepository extends JpaRepository<CategoryHashtag, UUID> {
+public interface CategoryHashtagJpaRepository extends JpaRepository<CategoryHashtag, UUID> {
     Optional<CategoryHashtag> findByCategory_IdAndHashtag_IdAndDeletedAtIsNull(UUID categoryId, UUID hashtagId);
 
     Optional<CategoryHashtag> findByIdAndDeletedAtIsNull(UUID categoryHashtagId);
