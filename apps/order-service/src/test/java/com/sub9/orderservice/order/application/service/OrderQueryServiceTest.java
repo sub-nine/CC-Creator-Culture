@@ -196,6 +196,38 @@ class OrderQueryServiceTest {
         assertThat(result.paymentAmount()).isEqualTo(19_000L);
     }
 
+    @ParameterizedTest
+    @EnumSource(value = OrderStatus.class, names = {"PAID", "PROCESSING", "COMPLETED", "CANCELED"})
+    @DisplayName("창작자 배송지는 주문 상태에 따라 마스킹하며 원본과 소비자 응답을 보존한다")
+    void when_creator_queries_shipping_address_status_policy_is_applied(OrderStatus status) {
+        for (String detail : new String[]{"101동 1001호", null, ""}) {
+            OrderItem item = item(71, CREATOR_ID);
+            Order order = order(70, CUSTOMER_ID, status, item);
+            ShippingAddress original = ShippingAddress.of(
+                    "홍길동", "010-1234-5678", "06236", "서울", detail);
+            ReflectionTestUtils.setField(order, "shippingAddress", original);
+            when(orderQueryRepository.findItemDetailById(item.getId())).thenReturn(Optional.of(item));
+            when(orderQueryRepository.findDetailByOrderNumber(order.getOrderNumber()))
+                    .thenReturn(Optional.of(order));
+
+            var address = orderQueryService.getCreatorOrderItem(CREATOR_ID, item.getId()).shippingAddress();
+
+            boolean fullAddress = status == OrderStatus.PAID || status == OrderStatus.PROCESSING;
+            assertThat(address.recipientName()).isEqualTo("홍길동");
+            assertThat(address.postalCode()).isEqualTo("06236");
+            assertThat(address.addressLine1()).isEqualTo("서울");
+            assertThat(address.recipientPhone()).isEqualTo(fullAddress ? "010-1234-5678" : "****");
+            assertThat(address.addressLine2()).isEqualTo(fullAddress ? detail : "****");
+            assertThat(order.getShippingAddress()).isSameAs(original);
+            assertThat(original.getRecipientPhone()).isEqualTo("010-1234-5678");
+            assertThat(original.getAddressLine2()).isEqualTo(detail);
+            var customerAddress = orderQueryService.getCustomerOrder(
+                    CUSTOMER_ID, order.getOrderNumber()).shippingAddress();
+            assertThat(customerAddress.recipientPhone()).isEqualTo("010-1234-5678");
+            assertThat(customerAddress.addressLine2()).isEqualTo(detail);
+        }
+    }
+
     @Test
     @DisplayName("창작자가 타인에게 배정된 주문 상품 상세를 조회하면 접근을 거부한다")
     void when_creator_queries_another_creator_item_access_is_denied() {
