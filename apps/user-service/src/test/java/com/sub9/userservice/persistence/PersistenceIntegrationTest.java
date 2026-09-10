@@ -12,6 +12,7 @@ import com.sub9.userservice.user.domain.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceException;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -85,6 +86,48 @@ class PersistenceIntegrationTest {
         assertThat(savedCreator.getApprovalStatus().name()).isEqualTo("PENDING");
         assertThat(savedCreator.getCreatedBy()).isNull();
         assertThat(savedCreator.getUpdatedBy()).isEqualTo(user.getId());
+    }
+
+    @Test
+    @DisplayName("잠금 조회한 PENDING 창작자의 승인 및 감사 정보를 저장한다")
+    void when_locked_pending_creator_is_approved_approval_and_audit_are_persisted() {
+        User creatorUser = createUser(
+                "approval-creator@example.com",
+                "approval-creator",
+                "010-1111-3333",
+                UserRole.CREATOR);
+        User manager = createUser(
+                "approval-manager@example.com",
+                "approval-manager",
+                "010-1111-4444",
+                UserRole.MANAGER);
+        userRepository.save(creatorUser);
+        userRepository.save(manager);
+        Creator creator = Creator.createPending(
+                uuidGenerator.generate(),
+                creatorUser.getId(),
+                "승인대상상점",
+                "987-65-43210",
+                Instant.parse("2026-09-01T02:00:00Z"));
+        creatorRepository.save(creator);
+        entityManager.flush();
+        entityManager.clear();
+
+        Instant approvedAt = Instant.parse("2026-09-10T02:00:00Z");
+        Creator lockedCreator = creatorRepository.findActiveByIdForUpdate(creator.getId())
+                .orElseThrow();
+        lockedCreator.approve(manager.getId(), approvedAt);
+        entityManager.flush();
+        entityManager.clear();
+
+        Creator savedCreator = creatorRepository.findActiveById(creator.getId()).orElseThrow();
+        assertThat(savedCreator.getApprovalStatus().name()).isEqualTo("APPROVED");
+        assertThat(savedCreator.getApprovedBy()).isEqualTo(manager.getId());
+        assertThat(savedCreator.getApprovedAt())
+                .isEqualTo(LocalDateTime.parse("2026-09-10T02:00:00"));
+        assertThat(savedCreator.getCreatedBy()).isEqualTo(manager.getId());
+        assertThat(savedCreator.getUpdatedBy()).isEqualTo(manager.getId());
+        assertThat(savedCreator.getUpdatedAt()).isEqualTo(approvedAt);
     }
 
     @Test

@@ -29,6 +29,11 @@ public class CreatorRepositoryImpl implements CreatorRepository {
     }
 
     @Override
+    public Optional<Creator> findActiveByIdForUpdate(UUID creatorId) {
+        return creatorJpaRepository.findActiveByIdForUpdate(creatorId);
+    }
+
+    @Override
     public Optional<Creator> findActiveByUserId(UUID userId) {
         return creatorJpaRepository.findByUserIdAndDeletedAtIsNull(userId);
     }

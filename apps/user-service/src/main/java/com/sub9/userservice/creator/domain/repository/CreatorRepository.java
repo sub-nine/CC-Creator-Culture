@@ -12,6 +12,8 @@ public interface CreatorRepository {
 
     Optional<Creator> findActiveById(UUID creatorId);
 
+    Optional<Creator> findActiveByIdForUpdate(UUID creatorId);
+
     Optional<Creator> findActiveByUserId(UUID userId);
 
     // 삭제된 창작자 정보의 고유 값도 재사용할 수 없으므로 전체 행을 검사한다.

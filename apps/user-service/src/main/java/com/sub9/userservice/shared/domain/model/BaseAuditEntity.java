@@ -43,6 +43,15 @@ public abstract class BaseAuditEntity {
         this.updatedAt = createdAt;
     }
 
+    protected final void assignCreatedBy(UUID actorId) {
+        this.createdBy = Objects.requireNonNull(actorId, "actorId must not be null");
+    }
+
+    protected final void recordUpdate(UUID actorId, Instant now) {
+        this.updatedBy = Objects.requireNonNull(actorId, "actorId must not be null");
+        this.updatedAt = Objects.requireNonNull(now, "now must not be null");
+    }
+
     protected final void markDeleted(UUID actorId, Instant now) {
         Objects.requireNonNull(actorId, "actorId must not be null");
         if (isDeleted()) {

@@ -53,6 +53,11 @@ public class SecurityConfig {
                 new GatewayHeaderAuthenticationFilter(orderAuthenticationEntryPoint),
                 UsernamePasswordAuthenticationFilter.class);
         http.authorizeHttpRequests(authorize -> authorize
+                .requestMatchers(HttpMethod.POST, "/api/v1/coupons")
+                .hasAnyRole(
+                        GatewayAuthenticationPrincipal.Role.MASTER.name(),
+                        GatewayAuthenticationPrincipal.Role.MANAGER.name()
+                )
                 .requestMatchers(HttpMethod.POST, "/api/v1/orders", "/api/v1/orders/{orderNumber}/cancel")
                 .hasRole(GatewayAuthenticationPrincipal.Role.CUSTOMER.name())
                 .requestMatchers(HttpMethod.POST, "/api/v1/orders/{orderNumber}/payments")
