@@ -56,17 +56,8 @@ public class SecurityConfig {
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/internal/**")
                 .permitAll()
 
-                // Product
-                .requestMatchers(HttpMethod.GET, "/api/v1/products", "/api/v1/products/*")
-                .permitAll()
-
-                // Category
-                .requestMatchers("/api/v1/hashtags/**", "/api/v1/categories/**")
-                .permitAll()
-
                 .anyRequest()
-                .authenticated());
-
+                .permitAll());
     return httpSecurity.build();
   }
 
