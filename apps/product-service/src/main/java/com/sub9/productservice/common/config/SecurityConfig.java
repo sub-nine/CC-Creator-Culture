@@ -56,16 +56,8 @@ public class SecurityConfig {
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/internal/**")
                 .permitAll()
 
-                // Product 검색
-                .requestMatchers(HttpMethod.GET, "/api/v1/products", "/api/v1/products/*")
-                .permitAll()
-
-                // TODO : 임시로 모든 요청 허용
-                //                .anyRequest()
-                //                .permitAll());
                 .anyRequest()
-                .authenticated());
-
+                .permitAll());
     return httpSecurity.build();
   }
 
