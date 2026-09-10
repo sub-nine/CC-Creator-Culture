@@ -45,6 +45,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
+import com.sub9.common.kafka.event.OrderNotificationEvent;
+import org.springframework.kafka.core.KafkaTemplate;
+import tools.jackson.databind.json.JsonMapper;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -124,6 +127,12 @@ class OrderCancellationIntegrationTest {
     @Autowired
     private CouponUsagePort couponUsagePort;
 
+    @MockitoBean
+    private KafkaTemplate<String, String> kafka;
+
+    @Autowired
+    private JsonMapper mapper;
+
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -139,6 +148,9 @@ class OrderCancellationIntegrationTest {
 
     @BeforeEach
     void preparePaymentProbe() {
+        clearInvocations(kafka);
+        when(kafka.send(anyString(), anyString(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
         // 실제 Payment 스키마 대신 호출자의 DB 트랜잭션 참여만 확인하는 테스트 전용 기록입니다.
         jdbcTemplate.execute("create table if not exists payment_cancellation_probe (command_id uuid primary key)");
     }
@@ -176,6 +188,12 @@ class OrderCancellationIntegrationTest {
         assertThat(response.get("data").get("orderNumber").asString()).isEqualTo(order.getOrderNumber().toString());
         assertThat(response.get("data").get("status").asString()).isEqualTo("CANCELED");
         Instant canceledAt = Instant.parse(response.get("data").get("canceledAt").asString());
+        var payload = ArgumentCaptor.forClass(String.class);
+        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), payload.capture());
+        var event = mapper.readValue(payload.getValue(), OrderNotificationEvent.class);
+        assertThat(event.eventId().version()).isEqualTo(7);
+        assertThat(event).isEqualTo(new OrderNotificationEvent(event.eventId(), "ORDER_CANCELLED", "ORDER_SERVICE",
+                "ORDER", order.getId(), CUSTOMER_ID, order.getOrderNumber().toString(), null, "FULL", canceledAt));
         Order restored = restored(order);
         assertThat(restored.getCanceledAt())
                 .isCloseTo(canceledAt, within(1, ChronoUnit.MICROS));
@@ -219,6 +237,7 @@ class OrderCancellationIntegrationTest {
                 .isEqualTo(jsonCodec.encodeResponse(ErrorResponse.from(CommonErrorCode.INTERNAL_SERVER_ERROR)));
         verify(paymentPort, times(1)).cancel(eq(order.getId()), any(), any());
         verifyNoInteractions(stockPort, couponUsagePort);
+        verify(kafka, never()).send(anyString(), anyString(), anyString());
     }
 
     @Test

@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.sub9.common.kafka.event.OrderPaidEvent;
-import java.util.List;
+import com.sub9.common.kafka.event.OrderNotificationEvent;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.DisplayName;
@@ -16,14 +16,16 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import tools.jackson.databind.json.JsonMapper;
 
-@DisplayName("주문 결제 완료 이벤트 Kafka 발행")
-class OrderPaidKafkaPublisherTest {
+@DisplayName("주문 알림 이벤트 Kafka 발행")
+class OrderNotificationKafkaPublisherTest {
 
     private final KafkaTemplate<String, String> kafka = mock(KafkaTemplate.class);
     private final JsonMapper mapper = new JsonMapper();
-    private final OrderPaidKafkaPublisher publisher = new OrderPaidKafkaPublisher(kafka, mapper);
-    private final OrderPaidEvent event = new OrderPaidEvent(UUID.randomUUID(),
-            List.of(new OrderPaidEvent.ProductQuantity(UUID.randomUUID(), 5L)));
+    private final OrderNotificationKafkaPublisher publisher = new OrderNotificationKafkaPublisher(kafka, mapper);
+    private final OrderNotificationEvent event = new OrderNotificationEvent(
+        UUID.randomUUID(), "PAYMENT_PAID",
+        "ORDER_SERVICE", "ORDER", UUID.randomUUID(), UUID.randomUUID(),
+        "ORD-TEST", "PAID", null, Instant.parse("2026-09-09T00:00:00Z"));
 
     @Test
     @DisplayName("지정된 토픽과 주문 ID 키로 이벤트 JSON을 발행한다")
@@ -34,8 +36,8 @@ class OrderPaidKafkaPublisherTest {
         publisher.publish(event);
 
         ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
-        verify(kafka).send(eq("order.paid"), eq(event.orderId().toString()), payload.capture());
-        assertThat(mapper.readValue(payload.getValue(), OrderPaidEvent.class)).isEqualTo(event);
+        verify(kafka).send(eq("order.notification"), eq(event.referenceId().toString()), payload.capture());
+        assertThat(mapper.readValue(payload.getValue(), OrderNotificationEvent.class)).isEqualTo(event);
     }
 
     @Test
@@ -66,7 +68,7 @@ class OrderPaidKafkaPublisherTest {
         JsonMapper brokenMapper = mock(JsonMapper.class);
         when(brokenMapper.writeValueAsString(event)).thenThrow(new IllegalArgumentException("invalid JSON"));
 
-        assertThatCode(() -> new OrderPaidKafkaPublisher(kafka, brokenMapper).publish(event))
+        assertThatCode(() -> new OrderNotificationKafkaPublisher(kafka, brokenMapper).publish(event))
                 .doesNotThrowAnyException();
         verifyNoInteractions(kafka);
     }

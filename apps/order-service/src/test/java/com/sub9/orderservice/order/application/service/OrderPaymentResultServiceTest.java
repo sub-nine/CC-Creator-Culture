@@ -21,6 +21,9 @@ import com.sub9.orderservice.order.domain.repository.OrderRepository;
 import java.time.Instant;
 import java.util.List;
 import com.sub9.common.kafka.event.OrderPaidEvent;
+import com.sub9.common.kafka.event.OrderNotificationEvent;
+import com.sub9.common.identifier.UuidV7Generator;
+import org.mockito.Spy;
 import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.ArgumentCaptor;
 import java.util.Optional;
@@ -47,6 +50,9 @@ class OrderPaymentResultServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Spy
+    private UuidV7Generator uuidGenerator = new UuidV7Generator();
+
     @InjectMocks
     private OrderPaymentResultService paymentResultService;
 
@@ -61,6 +67,7 @@ class OrderPaymentResultServiceTest {
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(order.getPaidAt()).isEqualTo(processedAt);
+        assertNotification(order, "PAYMENT_PAID", "PAID", processedAt);
         verifyNoInteractions(couponUsagePort);
     }
 
@@ -83,7 +90,7 @@ class OrderPaymentResultServiceTest {
                         tuple(uuid(3_021), 2),
                         tuple(uuid(3_022), 2));
         verify(couponUsagePort).restore(order.getId(), List.of(userCouponId));
-        verifyNoInteractions(eventPublisher);
+        assertNotification(order, "PAYMENT_FAILED", "FAILED", order.getExpiresAt().minusSeconds(1));
     }
 
     @Test
@@ -172,6 +179,17 @@ class OrderPaymentResultServiceTest {
         assertOrderError(() -> paymentResultService.markPaid(order.getId(), CREATED_AT.plusSeconds(2)),
                 OrderErrorCode.INVALID_ORDER_STATUS);
         verifyNoInteractions(eventPublisher);
+    }
+
+    private void assertNotification(Order order, String eventType, String status, Instant occurredAt) {
+        var captured = ArgumentCaptor.forClass(OrderNotificationEvent.class);
+        verify(eventPublisher).publishEvent(captured.capture());
+        OrderNotificationEvent event = captured.getValue();
+        assertThat(event.eventId()).isNotNull();
+        assertThat(event.eventId().version()).isEqualTo(7);
+        assertThat(event).isEqualTo(new OrderNotificationEvent(event.eventId(), eventType,
+                "ORDER_SERVICE", "ORDER", order.getId(), order.getCustomerId(),
+                order.getOrderNumber().toString(), status, null, occurredAt));
     }
 
     private static OrderItem paidItem(long sequence, UUID productId, int quantity) {

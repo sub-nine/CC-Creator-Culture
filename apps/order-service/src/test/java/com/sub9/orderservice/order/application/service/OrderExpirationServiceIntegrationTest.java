@@ -8,6 +8,10 @@ import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.domain.model.*;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.mockito.ArgumentCaptor;
+import java.util.concurrent.CompletableFuture;
+import static org.mockito.ArgumentMatchers.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +26,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.Instant;
+import com.sub9.common.kafka.event.OrderNotificationEvent;
+import org.springframework.kafka.core.KafkaTemplate;
+import tools.jackson.databind.json.JsonMapper;
 import java.util.List;
 import java.util.UUID;
 
@@ -65,6 +72,12 @@ class OrderExpirationServiceIntegrationTest {
     @Autowired
     private OrderRepository orderRepository;
 
+    @MockitoBean
+    private KafkaTemplate<String, String> kafka;
+
+    @Autowired
+    private JsonMapper mapper;
+
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -76,6 +89,13 @@ class OrderExpirationServiceIntegrationTest {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
+    }
+
+    @BeforeEach
+    void prepareKafka() {
+        clearInvocations(kafka);
+        when(kafka.send(anyString(), anyString(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
     }
 
     @AfterEach
@@ -110,6 +130,14 @@ class OrderExpirationServiceIntegrationTest {
 
         var result = expirationService.expire(order.getId(), order.getExpiresAt());
 
+        assertThat(expirationService.expire(order.getId(), order.getExpiresAt().plusSeconds(1))).isEmpty();
+        var payload = ArgumentCaptor.forClass(String.class);
+        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), payload.capture());
+        var event = mapper.readValue(payload.getValue(), OrderNotificationEvent.class);
+        assertThat(event.eventId().version()).isEqualTo(7);
+        assertThat(event).isEqualTo(new OrderNotificationEvent(event.eventId(), "PAYMENT_FAILED", "ORDER_SERVICE",
+                "ORDER", order.getId(), order.getCustomerId(), order.getOrderNumber().toString(),
+                "EXPIRED", null, order.getExpiresAt()));
         assertThat(result).isPresent();
         assertThat(status(order.getId())).isEqualTo(OrderStatus.EXPIRED.name());
         verify(couponUsagePort).restore(order.getId(), List.of(USER_COUPON_ID));
@@ -129,6 +157,7 @@ class OrderExpirationServiceIntegrationTest {
                 .hasMessage("쿠폰 복구 실패");
 
         assertThat(status(order.getId())).isEqualTo(OrderStatus.PENDING_PAYMENT.name());
+        verify(kafka, never()).send(anyString(), anyString(), anyString());
     }
 
     private String status(UUID orderId) {
