@@ -1,17 +1,27 @@
 package com.sub9.productservice.product.application.command.service;
 
 import com.github.f4b6a3.uuid.UuidCreator;
+import com.sub9.common.exception.BusinessException;
+import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
 import com.sub9.productservice.product.application.event.ProductImageUploadedEvent;
-import com.sub9.productservice.product.application.port.ImageData;
-import com.sub9.productservice.product.application.port.ImageProcessorPort;
-import com.sub9.productservice.product.application.port.ImageStoragePort;
+import com.sub9.productservice.product.application.port.in.image.ProductImageCommandUseCase;
+import com.sub9.productservice.product.application.port.out.image.ImageData;
+import com.sub9.productservice.product.application.port.out.image.ImageProcessorPort;
+import com.sub9.productservice.product.application.port.out.image.ImageStoragePort;
+import com.sub9.productservice.product.application.support.ImageStorageRollbackCleaner;
 import com.sub9.productservice.product.application.validation.ImageValidator;
+import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Image;
+import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.repository.ImageCommandRepository;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
+import com.sub9.productservice.product.domain.repository.ProductCommandRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -23,17 +33,22 @@ import org.springframework.util.CollectionUtils;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class ProductImageCommandService {
+public class ProductImageCommandService implements ProductImageCommandUseCase {
   private static final String ORIGINAL_KEY_FORMAT = "products/%s/images/original/%s";
   private static final String PROCESSED_KEY_FORMAT = "products/%s/images/processed/%s";
 
+  private final ImageStorageRollbackCleaner imageStorageRollbackCleaner;
   private final ImageCommandRepository imageCommandRepository;
+  private final ProductCommandRepository productCommandRepository;
   private final ApplicationEventPublisher eventPublisher;
   private final ImageProcessorPort imageProcessorPort;
   private final ImageStoragePort imageStoragePort;
 
   public void uploadImages(UUID productId, List<UploadImageCommand> images) {
     if (CollectionUtils.isEmpty(images)) return;
+
+    List<String> uploadedKeys = new ArrayList<>();
+    imageStorageRollbackCleaner.registerRollbackCleanup(uploadedKeys);
 
     List<String> mediaTypes =
         images.stream().map(image -> ImageValidator.resolveMediaType(image.data())).toList();
@@ -51,6 +66,8 @@ public class ProductImageCommandService {
 
       imageStoragePort.upload(originalKey, new ImageData(mediaType, command.data()));
 
+      uploadedKeys.add(originalKey);
+
       eventPublisher.publishEvent(
           new ProductImageUploadedEvent(
               UuidCreator.getTimeOrderedEpoch(),
@@ -60,29 +77,39 @@ public class ProductImageCommandService {
     }
   }
 
-  // TODO : 리사이징 실패 시 재시도 또는 처리 로직 필요
-  public void resizeImage(UUID imageId, UUID productId, String originalKey) {
-    String processedKey = PROCESSED_KEY_FORMAT.formatted(productId, imageId);
 
-    ImageData originalImageData = imageStoragePort.download(originalKey);
-    ImageData resizedImageData = imageProcessorPort.resize(originalImageData);
-
-    imageStoragePort.upload(processedKey, resizedImageData);
-
-    boolean updated = imageCommandRepository.completeProcessing(imageId, processedKey);
-
-    if (!updated) {
-      log.warn("[FAIL] 리사이징 이미지 업데이트 실패 imageId={}, processedKey={}", imageId, processedKey);
-    }
-  }
 
   public void deleteAllImages(UUID productId) {
     List<Image> images = imageCommandRepository.findAllByProductIdAndDeletedAtIsNull(productId);
-    for (Image image : images) image.delete();
+    imageCommandRepository.deleteAll(images);
   }
 
-  public void deleteExpiredImages(Instant instant) {
-    // TODO : 추후 DeletedAt 기준 일주일이 지나면 스케쥴러로 삭제처리
-    throw new UnsupportedOperationException("개발 중 입니다.");
+  // 트랜잭션 오래 점유할 수도 있을 것 같음
+  public void deleteExpiredImages(Instant now) {
+    Instant cutoff = now.minus(7, ChronoUnit.DAYS);
+
+    List<Image> expiredImages = imageCommandRepository.findExpiredImages(cutoff);
+
+    for (Image image : expiredImages) {
+      try {
+        imageStoragePort.delete(image.getProcessedKey());
+
+        if (image.getOriginalKey() != null) {
+          imageStoragePort.delete(image.getOriginalKey());
+        }
+
+        imageCommandRepository.hardDeleteById(image.getId());
+      } catch (Exception e) {
+        log.warn("[WARN] 만료 이미지 정리 실패, imageId = {}", image.getId(), e);
+      }
+    }
   }
+
+  // ============================== Helper Method ====================================
+  private Product findByProductId(UUID productId) {
+    return productCommandRepository
+        .findByIdForUpdate(productId)
+        .orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
+  }
+
 }

@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.application.port;
+package com.sub9.productservice.product.application.port.out;
 
 
 public interface ImageProcessorPort {
