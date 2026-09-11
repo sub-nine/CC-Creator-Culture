@@ -4,7 +4,7 @@ import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.common.kafka.topic.KafkaTopics;
 import com.sub9.productservice.product.application.event.ProductImageUploadedEvent;
-import com.sub9.productservice.product.application.port.ProductImageUploadedPublisher;
+import com.sub9.productservice.product.application.port.out.image.ProductImageUploadedEventPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -17,7 +17,7 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ProductImageUploadedKafkaPublisher implements ProductImageUploadedPublisher {
+public class ProductImageUploadedKafkaPublisher implements ProductImageUploadedEventPort {
   private final KafkaTemplate<String, String> kafkaTemplate;
   private final JsonMapper jsonMapper;
 

@@ -1,13 +1,13 @@
-package com.sub9.productservice.product.application.command.service;
+package com.sub9.productservice.product.application.command.service.image;
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import com.sub9.common.exception.BusinessException;
-import com.sub9.common.exception.CommonErrorCode;
+import com.sub9.productservice.product.application.command.dto.product.DeleteProductImageCommand;
+import com.sub9.productservice.product.application.command.dto.product.UpdateImageSortOrderCommand;
 import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
 import com.sub9.productservice.product.application.event.ProductImageUploadedEvent;
 import com.sub9.productservice.product.application.port.in.image.ProductImageCommandUseCase;
 import com.sub9.productservice.product.application.port.out.image.ImageData;
-import com.sub9.productservice.product.application.port.out.image.ImageProcessorPort;
 import com.sub9.productservice.product.application.port.out.image.ImageStoragePort;
 import com.sub9.productservice.product.application.support.ImageStorageRollbackCleaner;
 import com.sub9.productservice.product.application.validation.ImageValidator;
@@ -15,13 +15,10 @@ import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Image;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.repository.ImageCommandRepository;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-
 import com.sub9.productservice.product.domain.repository.ProductCommandRepository;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -35,13 +32,11 @@ import org.springframework.util.CollectionUtils;
 @RequiredArgsConstructor
 public class ProductImageCommandService implements ProductImageCommandUseCase {
   private static final String ORIGINAL_KEY_FORMAT = "products/%s/images/original/%s";
-  private static final String PROCESSED_KEY_FORMAT = "products/%s/images/processed/%s";
 
   private final ImageStorageRollbackCleaner imageStorageRollbackCleaner;
-  private final ImageCommandRepository imageCommandRepository;
   private final ProductCommandRepository productCommandRepository;
+  private final ImageCommandRepository imageCommandRepository;
   private final ApplicationEventPublisher eventPublisher;
-  private final ImageProcessorPort imageProcessorPort;
   private final ImageStoragePort imageStoragePort;
 
   public void uploadImages(UUID productId, List<UploadImageCommand> images) {
@@ -77,39 +72,48 @@ public class ProductImageCommandService implements ProductImageCommandUseCase {
     }
   }
 
+  @Override
+  public void updateSortOrder(UpdateImageSortOrderCommand command) {
+    validateOwner(command.productId(), command.creatorId());
 
+    List<Image> images =
+        imageCommandRepository.findAllByProductIdAndDeletedAtIsNull(command.productId());
 
-  public void deleteAllImages(UUID productId) {
-    List<Image> images = imageCommandRepository.findAllByProductIdAndDeletedAtIsNull(productId);
-    imageCommandRepository.deleteAll(images);
-  }
+    Map<UUID, Image> imageMap =
+        images.stream().collect(Collectors.toMap(Image::getId, Function.identity()));
 
-  // 트랜잭션 오래 점유할 수도 있을 것 같음
-  public void deleteExpiredImages(Instant now) {
-    Instant cutoff = now.minus(7, ChronoUnit.DAYS);
+    // 중복 제거
+    Set<UUID> requestedImageIds = new HashSet<>(command.imageIds());
 
-    List<Image> expiredImages = imageCommandRepository.findExpiredImages(cutoff);
+    // 실제 이미지와 개수 일치 검증 및 ID 값들이 동일한지 체크
+    if (command.imageIds().size() != requestedImageIds.size()
+        || !imageMap.keySet().equals(requestedImageIds)) {
+      throw new BusinessException(ProductErrorCode.INVALID_PRODUCT_IMAGE_INFO);
+    }
 
-    for (Image image : expiredImages) {
-      try {
-        imageStoragePort.delete(image.getProcessedKey());
-
-        if (image.getOriginalKey() != null) {
-          imageStoragePort.delete(image.getOriginalKey());
-        }
-
-        imageCommandRepository.hardDeleteById(image.getId());
-      } catch (Exception e) {
-        log.warn("[WARN] 만료 이미지 정리 실패, imageId = {}", image.getId(), e);
-      }
+    for (int sortOrder = 0; sortOrder < command.imageIds().size(); sortOrder++) {
+      Image image = imageMap.get(command.imageIds().get(sortOrder));
+      image.updateSortOrder(sortOrder);
     }
   }
 
-  // ============================== Helper Method ====================================
-  private Product findByProductId(UUID productId) {
-    return productCommandRepository
-        .findByIdForUpdate(productId)
-        .orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
+  @Override
+  public void delete(DeleteProductImageCommand command) {
+    validateOwner(command.productId(), command.creatorId());
+
+    boolean deleted =
+        imageCommandRepository.softDelete(
+            command.imageId(), command.productId(), command.creatorId());
+
+    if (!deleted) throw new BusinessException(ProductErrorCode.PRODUCT_IMAGE_NOT_FOUND);
   }
 
+  private void validateOwner(UUID productId, UUID creatorId) {
+    Product product =
+        productCommandRepository
+            .findByIdForUpdate(productId)
+            .orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
+
+    product.validateOwner(creatorId);
+  }
 }
