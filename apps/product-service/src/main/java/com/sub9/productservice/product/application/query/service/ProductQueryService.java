@@ -1,9 +1,8 @@
 package com.sub9.productservice.product.application.query.service;
 
 import com.sub9.common.exception.BusinessException;
-import com.sub9.productservice.common.config.r2.R2Properties;
 import com.sub9.productservice.product.application.event.ProductViewedEvent;
-import com.sub9.productservice.product.application.port.ProductMetadataQueryPort;
+import com.sub9.productservice.product.application.port.out.image.ProductMetadataQueryPort;
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
 import com.sub9.productservice.product.application.query.dto.SkuInfo;
@@ -19,8 +18,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 @RequiredArgsConstructor

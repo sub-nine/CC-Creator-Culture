@@ -7,6 +7,7 @@ import com.sub9.productservice.product.application.command.dto.product.UpdatePro
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
 import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
 import com.sub9.productservice.product.application.command.dto.sku.CreateSkuCommand;
+import com.sub9.productservice.product.application.port.in.image.ProductImageCommandUseCase;
 import com.sub9.productservice.product.application.validation.SkuValidator;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
@@ -15,6 +16,7 @@ import com.sub9.productservice.product.domain.model.Stock;
 import com.sub9.productservice.product.domain.repository.ProductCommandRepository;
 import com.sub9.productservice.product.domain.repository.SkuCommandRepository;
 import com.sub9.productservice.product.domain.repository.StockCommandRepository;
+import com.sub9.productservice.product.presentation.command.dto.product.CreateProductResponse;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -30,9 +32,9 @@ public class ProductCommandService {
   private final SkuCommandRepository skuCommandRepository;
   private final StockCommandRepository stockCommandRepository;
   private final ApplicationEventPublisher eventPublisher;
-  private final ProductImageCommandService imageCommandService;
+  private final ProductImageCommandUseCase productImageCommandUseCase;
 
-  public void createProduct(CreateProductCommand command, List<UploadImageCommand> images) {
+  public CreateProductResponse createProduct(CreateProductCommand command, List<UploadImageCommand> images) {
     SkuValidator.validateForCreate(command.skus());
 
     Product product = Product.create(command.creatorId(), command.name(), command.content());
@@ -56,7 +58,7 @@ public class ProductCommandService {
       stockCommandRepository.save(stock);
     }
 
-    imageCommandService.uploadImages(product.getId(), images);
+    productImageCommandUseCase.uploadImages(productId, images);
 
     // Category 생성 및 매핑 이벤트
     eventPublisher.publishEvent(
@@ -66,6 +68,8 @@ public class ProductCommandService {
             savedProduct.getName(),
             savedProduct.getContent(),
             command.hashTags()));
+
+    return new CreateProductResponse(productId);
   }
 
   public void deleteProduct(UUID creatorId, UUID productId) {
@@ -82,8 +86,6 @@ public class ProductCommandService {
     for (Sku sku : skus) {
       sku.delete(creatorId);
     }
-
-    imageCommandService.deleteAllImages(productId);
   }
 
   public void updateProduct(UpdateProductCommand command) {

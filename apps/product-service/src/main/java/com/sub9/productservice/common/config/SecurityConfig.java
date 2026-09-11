@@ -1,5 +1,7 @@
 package com.sub9.productservice.common.config;
 
+import com.sub9.common.security.CustomAccessDeniedHandler;
+import com.sub9.common.security.CustomAuthenticationEntryPoint;
 import com.sub9.productservice.common.security.UserContextFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,8 +12,11 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import tools.jackson.databind.json.JsonMapper;
 
 @Configuration
 @EnableMethodSecurity
@@ -46,10 +51,6 @@ public class SecurityConfig {
     httpSecurity.authorizeHttpRequests(
         requests ->
             requests
-                // 공통 경로
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/internal/**")
-                .permitAll()
-
                 .anyRequest()
                 .permitAll());
     return httpSecurity.build();

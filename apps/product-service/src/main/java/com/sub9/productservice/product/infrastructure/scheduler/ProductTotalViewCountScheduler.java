@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 public class ProductTotalViewCountScheduler {
   private final ProductViewCountCommandService viewCountCommandService;
 
-  @Scheduled(cron = "0 0 0 * * *", zone = "UTC")
+  @Scheduled(cron = "0 0 0 * * *", zone = "UTC") // 매일 자정 실행
   public void execute() {
     viewCountCommandService.syncTotalViewCounts();
   }

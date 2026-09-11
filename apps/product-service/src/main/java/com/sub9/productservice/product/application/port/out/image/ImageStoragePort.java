@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.application.port.out;
+package com.sub9.productservice.product.application.port.out.image;
 
 
 public interface ImageStoragePort {
