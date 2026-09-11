@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
 import com.sub9.common.exception.BusinessException;
-import com.sub9.productservice.product.application.port.ProductMetadataQueryPort;
+import com.sub9.productservice.product.application.port.out.image.ProductMetadataQueryPort;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
 import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import com.sub9.productservice.product.application.query.repository.ProductQueryRepository;

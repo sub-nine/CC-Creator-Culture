@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.support;
+package com.sub9.productservice.product.presentation.support;
 
 import lombok.experimental.UtilityClass;
 import org.springframework.util.StringUtils;

@@ -14,6 +14,7 @@ import com.sub9.productservice.product.application.command.dto.product.CreatePro
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
 import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
+import com.sub9.productservice.product.application.port.in.image.ProductImageCommandUseCase;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
@@ -37,9 +38,7 @@ import org.springframework.context.ApplicationEventPublisher;
 class ProductCommandServiceUnitTest {
   @Mock private ProductCommandRepository productCommandRepository;
   @Mock private SkuCommandRepository skuCommandRepository;
-  @Mock private StockCommandRepository stockCommandRepository;
-  @Mock private ApplicationEventPublisher eventPublisher;
-  @Mock private ProductImageCommandService imageCommandService;
+  @Mock private ProductImageCommandUseCase imageCommandService;
   @InjectMocks private ProductCommandService productCommandService;
 
   private final UUID creatorId = UUID.randomUUID();

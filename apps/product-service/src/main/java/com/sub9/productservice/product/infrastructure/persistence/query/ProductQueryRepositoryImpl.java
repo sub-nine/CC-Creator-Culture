@@ -8,7 +8,9 @@ import static com.sub9.productservice.product.domain.model.QStock.stock;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.CaseBuilder;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
@@ -17,6 +19,7 @@ import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import com.sub9.productservice.product.application.query.repository.ProductQueryRepository;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
+import com.sub9.productservice.product.domain.model.QImage;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -164,7 +167,9 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
         .join(stock)
         .on(stock.skuId.eq(sku.id))
         .leftJoin(image)
-        .on(image.productId.eq(product.id), image.sortOrder.eq(0), image.deletedAt.isNull())
+        .on(image.productId.eq(product.id),
+            image.deletedAt.isNull(),
+            imageSortOrderEqMin())
         .where(product.id.in(productIds), product.deletedAt.isNull())
         .orderBy(productStatusOrder(), product.createdAt.desc(), product.id.desc())
         .fetch();
@@ -201,6 +206,20 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
         .orderBy(image.sortOrder.asc())
         .fetch();
   }
+
+  private BooleanExpression imageSortOrderEqMin() {
+    QImage subImage = new QImage("subImage");
+
+    return image.sortOrder.eq(
+        JPAExpressions
+            .select(subImage.sortOrder.min())
+            .from(subImage)
+            .where(
+                subImage.productId.eq(product.id),
+                subImage.deletedAt.isNull()));
+  }
+
+
 
   private OrderSpecifier<Integer> productStatusOrder() {
     return new CaseBuilder()

@@ -6,7 +6,6 @@ import com.sub9.productservice.common.security.UserContextFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -52,10 +51,6 @@ public class SecurityConfig {
     httpSecurity.authorizeHttpRequests(
         requests ->
             requests
-                // 공통 경로
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/internal/**")
-                .permitAll()
-
                 .anyRequest()
                 .permitAll());
     return httpSecurity.build();

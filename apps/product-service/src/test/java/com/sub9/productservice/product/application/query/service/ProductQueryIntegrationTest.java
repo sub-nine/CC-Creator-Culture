@@ -191,8 +191,9 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
 
     entityManager.persist(category);
     entityManager.persist(hashtag);
-    entityManager.persist(CategoryHashtag.create(
-        category, hashtag, CategoryHashtagMatchType.MANUAL, CategoryHashtagStatus.MERGED, 0.0));
+    entityManager.persist(
+        CategoryHashtag.create(
+            category, hashtag, CategoryHashtagMatchType.MANUAL, CategoryHashtagStatus.MERGED, 0.0));
     entityManager.persist(HashtagProduct.create(hashtag, dummyProduct.getId()));
 
     Product otherProduct = productRepository.save(Product.create(creatorId, "티셔츠", "설명"));
@@ -233,18 +234,21 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
     Hashtag hashtag = Hashtag.create("여름");
     entityManager.persist(category);
     entityManager.persist(hashtag);
-    entityManager.persist(CategoryHashtag.create(
-        category, hashtag, CategoryHashtagMatchType.MANUAL, CategoryHashtagStatus.MERGED, 0.0));
+    entityManager.persist(
+        CategoryHashtag.create(
+            category, hashtag, CategoryHashtagMatchType.MANUAL, CategoryHashtagStatus.MERGED, 0.0));
     entityManager.persist(HashtagProduct.create(hashtag, dummyProduct.getId()));
 
     Image originalImage = Image.create(dummyProduct.getId(), "original/detail.png", null, 1);
     Image processedImage =
         Image.create(dummyProduct.getId(), "original/main.png", "processed/main.webp", 0);
     Image deletedImage = Image.create(dummyProduct.getId(), "original/deleted.png", null, 2);
-    deletedImage.delete();
+
     entityManager.persist(originalImage);
     entityManager.persist(processedImage);
     entityManager.persist(deletedImage);
+    entityManager.flush();
+    entityManager.remove(deletedImage);
     entityManager.flush();
     entityManager.clear();
 

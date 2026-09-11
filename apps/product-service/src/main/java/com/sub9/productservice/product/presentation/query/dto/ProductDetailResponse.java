@@ -2,7 +2,7 @@ package com.sub9.productservice.product.presentation.query.dto;
 
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
 import com.sub9.productservice.product.domain.model.ProductStatus;
-import com.sub9.productservice.product.support.ImageUrlUtils;
+import com.sub9.productservice.product.presentation.support.ImageUrlUtils;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

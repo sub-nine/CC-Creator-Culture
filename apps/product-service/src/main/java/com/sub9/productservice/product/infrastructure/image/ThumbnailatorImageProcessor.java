@@ -2,8 +2,8 @@ package com.sub9.productservice.product.infrastructure.image;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
-import com.sub9.productservice.product.application.port.ImageData;
-import com.sub9.productservice.product.application.port.ImageProcessorPort;
+import com.sub9.productservice.product.application.port.out.image.ImageData;
+import com.sub9.productservice.product.application.port.out.image.ImageProcessorPort;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
