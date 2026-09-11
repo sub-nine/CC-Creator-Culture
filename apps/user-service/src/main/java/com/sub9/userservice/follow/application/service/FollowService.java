@@ -7,11 +7,14 @@ import com.sub9.userservice.follow.domain.exception.FollowErrorCode;
 import com.sub9.userservice.follow.domain.model.Follow;
 import com.sub9.userservice.follow.domain.repository.FollowRepository;
 import com.sub9.userservice.follow.presentation.response.FollowStatusResponse;
+import com.sub9.userservice.follow.presentation.response.FollowPageResponse;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,6 +55,26 @@ public class FollowService {
 
         follow.unfollow(userId, clock.instant());
         followRepository.flush();
+    }
+
+    @Transactional(readOnly = true)
+    public FollowStatusResponse getFollowStatus(UUID userId, UUID creatorId) {
+        creatorRepository.findApprovedActiveById(creatorId)
+                .orElseThrow(() -> new BusinessException(FollowErrorCode.FOLLOW_TARGET_NOT_FOUND));
+
+        boolean following = followRepository.existsActiveByUserIdAndCreatorId(userId, creatorId);
+        return new FollowStatusResponse(creatorId, following);
+    }
+
+    @Transactional(readOnly = true)
+    public FollowPageResponse getFollowedCreators(UUID userId, int page, int size) {
+        PageRequest pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(
+                        Sort.Order.desc("createdAt"),
+                        Sort.Order.desc("id")));
+        return FollowPageResponse.from(followRepository.findActiveByUserId(userId, pageable));
     }
 
     private Follow restore(Follow follow, UUID userId, Instant now) {

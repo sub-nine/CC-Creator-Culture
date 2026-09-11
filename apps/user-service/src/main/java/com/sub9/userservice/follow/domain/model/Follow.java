@@ -90,6 +90,10 @@ public class Follow extends BaseAuditEntity {
         return new Follow(id, userId, creatorId, now);
     }
 
+    public String getCreatorName() {
+        return creator.getCreatorName();
+    }
+
     public void unfollow(UUID actorId, Instant now) {
         if (isDeleted()) {
             throw new IllegalStateException("Only active follows can be unfollowed");

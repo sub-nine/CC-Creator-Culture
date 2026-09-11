@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -15,6 +16,9 @@ import com.sub9.userservice.config.SecurityConfig;
 import com.sub9.userservice.follow.application.service.FollowService;
 import com.sub9.userservice.follow.domain.exception.FollowErrorCode;
 import com.sub9.userservice.follow.presentation.response.FollowStatusResponse;
+import com.sub9.userservice.follow.presentation.response.FollowPageResponse;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -116,6 +120,64 @@ class FollowControllerTest {
                         post("/api/v1/follows/not-a-uuid"), "CUSTOMER"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("COMMON_0002"));
+    }
+
+    @Test
+    @DisplayName("CUSTOMER가 팔로우 여부를 조회하면 현재 상태를 반환한다")
+    void when_customer_reads_follow_status_current_status_is_returned() throws Exception {
+        when(followService.getFollowStatus(USER_ID, CREATOR_ID))
+                .thenReturn(new FollowStatusResponse(CREATOR_ID, true));
+
+        mockMvc.perform(withGatewayHeaders(get(followPath()), "CUSTOMER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.creatorId").value(CREATOR_ID.toString()))
+                .andExpect(jsonPath("$.data.following").value(true));
+    }
+
+    @Test
+    @DisplayName("CUSTOMER가 팔로우 목록을 조회하면 기본 페이지 값과 목록을 반환한다")
+    void when_customer_reads_follows_default_page_response_is_returned() throws Exception {
+        Instant followedAt = Instant.parse("2026-09-10T07:00:00Z");
+        FollowPageResponse response = new FollowPageResponse(
+                List.of(new FollowPageResponse.Item(CREATOR_ID, "트렌드샵", followedAt)),
+                0, 20, 1, 1, true, true);
+        when(followService.getFollowedCreators(USER_ID, 0, 20)).thenReturn(response);
+
+        mockMvc.perform(withGatewayHeaders(get("/api/v1/follows"), "CUSTOMER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].creatorId").value(CREATOR_ID.toString()))
+                .andExpect(jsonPath("$.data.content[0].creatorName").value("트렌드샵"))
+                .andExpect(jsonPath("$.data.content[0].followedAt").value(followedAt.toString()))
+                .andExpect(jsonPath("$.data.page").value(0))
+                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.totalPages").value(1))
+                .andExpect(jsonPath("$.data.first").value(true))
+                .andExpect(jsonPath("$.data.last").value(true));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"CREATOR", "MANAGER", "MASTER"})
+    @DisplayName("CUSTOMER가 아닌 사용자가 팔로우 목록을 조회하면 403을 반환한다")
+    void when_non_customer_reads_follows_forbidden_response_is_returned(String role)
+            throws Exception {
+        mockMvc.perform(withGatewayHeaders(get("/api/v1/follows"), role))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("COMMON_0008"));
+    }
+
+    @Test
+    @DisplayName("음수 페이지로 팔로우 목록을 조회하면 400을 반환한다")
+    void when_page_is_negative_follow_list_returns_bad_request() throws Exception {
+        mockMvc.perform(withGatewayHeaders(get("/api/v1/follows?page=-1"), "CUSTOMER"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("페이지 크기가 최대값을 초과하면 400을 반환한다")
+    void when_size_exceeds_maximum_follow_list_returns_bad_request() throws Exception {
+        mockMvc.perform(withGatewayHeaders(get("/api/v1/follows?size=101"), "CUSTOMER"))
+                .andExpect(status().isBadRequest());
     }
 
     private String followPath() {

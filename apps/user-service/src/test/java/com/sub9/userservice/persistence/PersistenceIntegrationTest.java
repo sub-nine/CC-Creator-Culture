@@ -20,6 +20,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -223,6 +225,76 @@ class PersistenceIntegrationTest {
         entityManager.clear();
 
         assertThat(creatorRepository.findApprovedActiveById(creator.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("활성 팔로우와 승인된 창작자만 고정 정렬로 페이지 조회한다")
+    void when_followed_creators_are_read_only_active_approved_creators_are_sorted() {
+        User customer = createUser(
+                "page-customer@example.com", "page-customer", "010-5111-1111",
+                UserRole.CUSTOMER);
+        User manager = createUser(
+                "page-manager@example.com", "page-manager", "010-5222-2222",
+                UserRole.MANAGER);
+        User firstCreatorUser = createUser(
+                "page-first@example.com", "page-first", "010-5333-3333",
+                UserRole.CREATOR);
+        User secondCreatorUser = createUser(
+                "page-second@example.com", "page-second", "010-5444-4444",
+                UserRole.CREATOR);
+        User pendingCreatorUser = createUser(
+                "page-pending@example.com", "page-pending", "010-5555-5555",
+                UserRole.CREATOR);
+        userRepository.save(customer);
+        userRepository.save(manager);
+        userRepository.save(firstCreatorUser);
+        userRepository.save(secondCreatorUser);
+        userRepository.save(pendingCreatorUser);
+
+        Creator firstCreator = Creator.createPending(
+                uuidGenerator.generate(), firstCreatorUser.getId(), "첫번째상점", "411-11-11111",
+                Instant.parse("2026-09-10T01:00:00Z"));
+        Creator secondCreator = Creator.createPending(
+                uuidGenerator.generate(), secondCreatorUser.getId(), "두번째상점", "422-22-22222",
+                Instant.parse("2026-09-10T01:00:00Z"));
+        Creator pendingCreator = Creator.createPending(
+                uuidGenerator.generate(), pendingCreatorUser.getId(), "대기상점", "433-33-33333",
+                Instant.parse("2026-09-10T01:00:00Z"));
+        firstCreator.approve(manager.getId(), Instant.parse("2026-09-10T02:00:00Z"));
+        secondCreator.approve(manager.getId(), Instant.parse("2026-09-10T02:00:00Z"));
+        creatorRepository.save(firstCreator);
+        creatorRepository.save(secondCreator);
+        creatorRepository.save(pendingCreator);
+
+        followRepository.save(Follow.create(
+                uuidGenerator.generate(), customer.getId(), firstCreator.getId(),
+                Instant.parse("2026-09-10T03:00:00Z")));
+        followRepository.save(Follow.create(
+                uuidGenerator.generate(), customer.getId(), secondCreator.getId(),
+                Instant.parse("2026-09-10T04:00:00Z")));
+        followRepository.save(Follow.create(
+                uuidGenerator.generate(), customer.getId(), pendingCreator.getId(),
+                Instant.parse("2026-09-10T05:00:00Z")));
+        entityManager.flush();
+        entityManager.clear();
+
+        var result = followRepository.findActiveByUserId(
+                customer.getId(),
+                PageRequest.of(
+                        0,
+                        1,
+                        Sort.by(
+                                Sort.Order.desc("createdAt"),
+                                Sort.Order.desc("id"))));
+
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getTotalPages()).isEqualTo(2);
+        assertThat(result.getContent()).singleElement().satisfies(follow -> {
+            assertThat(follow.getCreatorId()).isEqualTo(secondCreator.getId());
+            assertThat(follow.getCreatorName()).isEqualTo("두번째상점");
+        });
+        assertThat(followRepository.existsActiveByUserIdAndCreatorId(
+                customer.getId(), secondCreator.getId())).isTrue();
     }
 
     @Test

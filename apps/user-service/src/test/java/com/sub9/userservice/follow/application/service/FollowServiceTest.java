@@ -14,6 +14,7 @@ import com.sub9.userservice.creator.domain.repository.CreatorRepository;
 import com.sub9.userservice.follow.domain.exception.FollowErrorCode;
 import com.sub9.userservice.follow.domain.model.Follow;
 import com.sub9.userservice.follow.domain.repository.FollowRepository;
+import java.util.List;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -27,6 +28,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("팔로우·언팔로우 서비스")
@@ -168,6 +172,79 @@ class FollowServiceTest {
         assertFollowError(
                 () -> followService.unfollow(userId, creatorId),
                 FollowErrorCode.FOLLOW_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("활성 관계가 있으면 팔로우 여부 조회에서 true를 반환한다")
+    void when_active_follow_exists_follow_status_returns_true() {
+        UUID userId = uuidGenerator.generate();
+        UUID creatorId = uuidGenerator.generate();
+        givenApprovedCreator(creatorId);
+        when(followRepository.existsActiveByUserIdAndCreatorId(userId, creatorId))
+                .thenReturn(true);
+
+        var response = followService.getFollowStatus(userId, creatorId);
+
+        assertThat(response.creatorId()).isEqualTo(creatorId);
+        assertThat(response.following()).isTrue();
+    }
+
+    @Test
+    @DisplayName("활성 관계가 없으면 팔로우 여부 조회에서 false를 반환한다")
+    void when_active_follow_does_not_exist_follow_status_returns_false() {
+        UUID userId = uuidGenerator.generate();
+        UUID creatorId = uuidGenerator.generate();
+        givenApprovedCreator(creatorId);
+        when(followRepository.existsActiveByUserIdAndCreatorId(userId, creatorId))
+                .thenReturn(false);
+
+        var response = followService.getFollowStatus(userId, creatorId);
+
+        assertThat(response.creatorId()).isEqualTo(creatorId);
+        assertThat(response.following()).isFalse();
+    }
+
+    @Test
+    @DisplayName("팔로우 가능한 Creator가 없으면 팔로우 여부 조회에서 대상 없음 오류를 반환한다")
+    void when_approved_active_creator_does_not_exist_follow_status_returns_not_found() {
+        UUID userId = uuidGenerator.generate();
+        UUID creatorId = uuidGenerator.generate();
+        when(creatorRepository.findApprovedActiveById(creatorId)).thenReturn(Optional.empty());
+
+        assertFollowError(
+                () -> followService.getFollowStatus(userId, creatorId),
+                FollowErrorCode.FOLLOW_TARGET_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("팔로우 목록을 조회하면 고정 정렬과 페이지 정보로 응답한다")
+    void when_customer_reads_followed_creators_sorted_page_response_is_returned() {
+        UUID userId = uuidGenerator.generate();
+        UUID creatorId = uuidGenerator.generate();
+        Follow follow = mock(Follow.class);
+        when(follow.getCreatorId()).thenReturn(creatorId);
+        when(follow.getCreatorName()).thenReturn("트렌드샵");
+        when(follow.getCreatedAt()).thenReturn(NOW);
+        when(followRepository.findActiveByUserId(any(), any()))
+                .thenReturn(new PageImpl<>(List.of(follow)));
+
+        var response = followService.getFollowedCreators(userId, 0, 20);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(followRepository).findActiveByUserId(org.mockito.ArgumentMatchers.eq(userId), pageableCaptor.capture());
+        Pageable pageable = pageableCaptor.getValue();
+        assertThat(pageable.getPageNumber()).isZero();
+        assertThat(pageable.getPageSize()).isEqualTo(20);
+        assertThat(pageable.getSort().getOrderFor("createdAt").getDirection())
+                .isEqualTo(Sort.Direction.DESC);
+        assertThat(pageable.getSort().getOrderFor("id").getDirection())
+                .isEqualTo(Sort.Direction.DESC);
+        assertThat(response.content()).singleElement().satisfies(item -> {
+            assertThat(item.creatorId()).isEqualTo(creatorId);
+            assertThat(item.creatorName()).isEqualTo("트렌드샵");
+            assertThat(item.followedAt()).isEqualTo(NOW);
+        });
+        assertThat(response.totalElements()).isEqualTo(1);
     }
 
     private void givenApprovedCreator(UUID creatorId) {
