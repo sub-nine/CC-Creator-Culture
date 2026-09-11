@@ -7,8 +7,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
-import com.sub9.productservice.product.application.command.service.ProductImageCommandService;
 import com.sub9.productservice.product.application.event.ProductImageUploadedEvent;
+import com.sub9.productservice.product.application.port.in.image.ProductImageProcessingUseCase;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,7 +21,7 @@ import org.springframework.kafka.support.Acknowledgment;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ProductImageUploadedEventListner - 단위 테스트")
 class ProductImageUploadedEventListnerUnitTest {
-  @Mock ProductImageCommandService imageService;
+  @Mock ProductImageProcessingUseCase imageService;
   @Mock Acknowledgment ack;
   @InjectMocks ProductImageUploadedEventListner listener;
 

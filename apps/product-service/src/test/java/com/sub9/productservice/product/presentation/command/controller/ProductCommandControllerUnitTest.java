@@ -3,6 +3,7 @@ package com.sub9.productservice.product.presentation.command.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -22,6 +23,7 @@ import com.sub9.productservice.product.application.command.dto.product.UpdatePro
 import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
 import com.sub9.productservice.product.application.command.service.ProductCommandService;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.product.presentation.command.dto.product.CreateProductResponse;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.HashMap;
 import java.util.List;
@@ -61,6 +63,12 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
     @Test
     @DisplayName("창작자의 ID로 상품을 등록하고 201을 반환한다")
     void when_request_is_valid_create_product_returns_created() throws Exception {
+      // given
+      UUID productId = UUID.randomUUID();
+      given(productCommandService.createProduct(any(), anyList()))
+          .willReturn(new CreateProductResponse(productId));
+
+      // when & then
       mockMvc
           .perform(
               multipart(endPoint)
@@ -75,8 +83,8 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
                       new MockMultipartFile("images", "blue.jpg", "image/jpeg", new byte[] {3, 4}))
                   .with(authUser(authUser)))
           .andExpect(status().isCreated())
-          .andExpect(jsonPath("$.message").value("요청 성공"))
-          .andExpect(jsonPath("$.data").doesNotExist());
+          .andExpect(jsonPath("$.message").value("상품 등록에 성공했습니다."))
+          .andExpect(jsonPath("$.data.productId").value(productId.toString()));
 
       ArgumentCaptor<CreateProductCommand> commandCaptor =
           ArgumentCaptor.forClass(CreateProductCommand.class);
@@ -208,7 +216,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(jsonMapper.writeValueAsString(request)))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.message").value("요청 성공"))
+          .andExpect(jsonPath("$.message").value("상품 수정에 성공했습니다."))
           .andExpect(jsonPath("$.data").doesNotExist());
 
       verify(productCommandService).updateProduct(command);
@@ -256,7 +264,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(jsonMapper.writeValueAsString(request)))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.message").value("요청 성공"))
+          .andExpect(jsonPath("$.message").value("상품 상태 변경에 성공했습니다."))
           .andExpect(jsonPath("$.data").doesNotExist());
 
       verify(productCommandService).updateStatusProduct(command);
@@ -313,7 +321,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
       mockMvc
           .perform(delete(endPoint + "/{productId}", productId).with(authUser(authUser)))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.message").value("요청 성공"))
+          .andExpect(jsonPath("$.message").value("상품 삭제에 성공했습니다."))
           .andExpect(jsonPath("$.data").doesNotExist());
 
       verify(productCommandService).deleteProduct(authUser.id(), productId);
