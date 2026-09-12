@@ -15,10 +15,6 @@ docs
 work
 outputs
 deploy/**
-!deploy/aws/
-!deploy/aws/database/
-!deploy/aws/database/certs/
-!deploy/aws/database/certs/rds-global-bundle.pem
 docker
 compose.yaml
 compose.apps.yaml
