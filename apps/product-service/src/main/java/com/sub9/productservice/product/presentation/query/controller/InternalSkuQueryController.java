@@ -1,7 +1,7 @@
 package com.sub9.productservice.product.presentation.query.controller;
 
+import com.sub9.productservice.product.application.port.in.product.CartProductQueryUseCase;
 import com.sub9.productservice.product.application.query.dto.SkuInfo;
-import com.sub9.productservice.product.application.query.service.ProductQueryService;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
@@ -13,16 +13,16 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @RequestMapping("/internal/v1/skus")
 public class InternalSkuQueryController {
-  private final ProductQueryService productQueryService;
+  private final CartProductQueryUseCase cartProductQueryUseCase;
 
   @PostMapping
   public List<SkuInfo> getCartItemProducts(
       @RequestBody @NotNull @Size(max = 70) List<@NotNull UUID> skuIds) {
-    return productQueryService.getCartItemProducts(skuIds);
+    return cartProductQueryUseCase.getCartItemProducts(skuIds);
   }
 
   @GetMapping("/{skuId}/validation")
   public void validateSkuForCart(@PathVariable UUID skuId) {
-    productQueryService.validateSkuForCart(skuId);
+    cartProductQueryUseCase.validateSkuForCart(skuId);
   }
 }

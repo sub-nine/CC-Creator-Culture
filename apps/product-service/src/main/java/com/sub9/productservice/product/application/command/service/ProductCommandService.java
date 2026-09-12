@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.application.command.service.product;
+package com.sub9.productservice.product.application.command.service;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.kafka.event.ProductCreatedEvent;
@@ -15,9 +15,9 @@ import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.Sku;
 import com.sub9.productservice.product.domain.model.Stock;
-import com.sub9.productservice.product.domain.repository.ProductCommandRepository;
-import com.sub9.productservice.product.domain.repository.SkuCommandRepository;
-import com.sub9.productservice.product.domain.repository.StockCommandRepository;
+import com.sub9.productservice.product.domain.repository.ProductRepository;
+import com.sub9.productservice.product.domain.repository.SkuRepository;
+import com.sub9.productservice.product.domain.repository.StockRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -29,9 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 @RequiredArgsConstructor
 public class ProductCommandService implements ProductCommandUseCase, AdminProductStatusUseCase {
-  private final ProductCommandRepository productCommandRepository;
-  private final SkuCommandRepository skuCommandRepository;
-  private final StockCommandRepository stockCommandRepository;
+  private final ProductRepository productRepository;
+  private final SkuRepository skuRepository;
+  private final StockRepository stockRepository;
   private final ApplicationEventPublisher eventPublisher;
   private final ProductImageCommandUseCase productImageCommandUseCase;
 
@@ -40,7 +40,7 @@ public class ProductCommandService implements ProductCommandUseCase, AdminProduc
     SkuValidator.validateForCreate(command.skus());
 
     Product product = Product.create(command.creatorId(), command.name(), command.content());
-    Product savedProduct = productCommandRepository.save(product);
+    Product savedProduct = productRepository.save(product);
 
     UUID productId = savedProduct.getId();
 
@@ -54,10 +54,10 @@ public class ProductCommandService implements ProductCommandUseCase, AdminProduc
               skuCommand.price(),
               hasOneSku || skuCommand.isDefault());
 
-      skuCommandRepository.save(sku);
+      skuRepository.save(sku);
 
       Stock stock = Stock.create(sku.getId(), skuCommand.quantity());
-      stockCommandRepository.save(stock);
+      stockRepository.save(stock);
     }
 
     productImageCommandUseCase.uploadImages(productId, images);
@@ -95,14 +95,14 @@ public class ProductCommandService implements ProductCommandUseCase, AdminProduc
   @Override
   public void deleteProduct(UUID creatorId, UUID productId) {
     Product product =
-        productCommandRepository
+        productRepository
             .findByIdForUpdate(productId)
             .orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
 
     product.validateOwner(creatorId);
     product.delete(creatorId);
 
-    List<Sku> skus = skuCommandRepository.findAllByProductIdAndDeletedAtIsNull(productId);
+    List<Sku> skus = skuRepository.findAllByProductIdAndDeletedAtIsNull(productId);
 
     for (Sku sku : skus) {
       sku.delete(creatorId);
@@ -111,7 +111,7 @@ public class ProductCommandService implements ProductCommandUseCase, AdminProduc
 
   // ============================== Helper Method ====================================
   private Product findByProductId(UUID productId) {
-    return productCommandRepository
+    return productRepository
         .findByIdAndDeletedAtIsNull(productId)
         .orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
   }

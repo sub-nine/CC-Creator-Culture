@@ -3,7 +3,7 @@ package com.sub9.productservice.product.presentation.query.controller;
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.common.config.r2.R2Properties;
 import com.sub9.productservice.common.security.AuthUser;
-import com.sub9.productservice.product.application.query.service.ProductQueryService;
+import com.sub9.productservice.product.application.port.in.product.ProductQueryUseCase;
 import com.sub9.productservice.product.presentation.query.dto.ProductDetailResponse;
 import com.sub9.productservice.product.presentation.query.dto.ProductResponse;
 import java.util.UUID;
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/products")
 public class ProductQueryController {
-  private final ProductQueryService productQueryService;
+  private final ProductQueryUseCase productQueryUseCase;
   private final R2Properties r2Properties;
 
   @GetMapping
@@ -30,7 +30,7 @@ public class ProductQueryController {
       @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
     Page<ProductResponse> response =
-        productQueryService
+        productQueryUseCase
             .searchProducts(keyword, pageable)
             .map(info -> ProductResponse.of(info, r2Properties.publicUrl()));
     return ApiResponse.success(response);
@@ -40,7 +40,7 @@ public class ProductQueryController {
   public ApiResponse<ProductDetailResponse> getProductDetail(
       @AuthenticationPrincipal AuthUser authUser, @PathVariable UUID productId) {
     UUID visitorId = authUser != null ? authUser.id() : null;
-    var response = productQueryService.getProductDetail(productId, visitorId);
+    var response = productQueryUseCase.getProductDetail(productId, visitorId);
 
     return ApiResponse.success(ProductDetailResponse.of(response, r2Properties.publicUrl()));
   }

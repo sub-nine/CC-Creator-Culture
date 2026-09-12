@@ -1,7 +1,7 @@
 package com.sub9.productservice.product.infrastructure.persistence.command.sku;
 
 import com.sub9.productservice.product.domain.model.Sku;
-import com.sub9.productservice.product.domain.repository.SkuCommandRepository;
+import com.sub9.productservice.product.domain.repository.SkuRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @Repository
 @RequiredArgsConstructor
-public class SkuCommandRepositoryImpl implements SkuCommandRepository {
+public class SkuRepositoryImpl implements SkuRepository {
   private final SkuCommandJpaRepository skuCommandJpaRepository;
 
   @Override

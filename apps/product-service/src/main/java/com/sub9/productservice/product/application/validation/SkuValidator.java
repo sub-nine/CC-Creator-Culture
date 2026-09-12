@@ -8,7 +8,7 @@ import lombok.experimental.UtilityClass;
 import org.springframework.util.CollectionUtils;
 
 @UtilityClass
-public class SkyPolicy {
+public class SkuValidator {
   public void validateForCreate(List<CreateSkuCommand> skuCommands) {
     if (CollectionUtils.isEmpty(skuCommands)) {
       throw new BusinessException(ProductErrorCode.SKU_REQUIRED);

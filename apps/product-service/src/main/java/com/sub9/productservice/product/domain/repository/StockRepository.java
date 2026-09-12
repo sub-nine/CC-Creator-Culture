@@ -4,7 +4,7 @@ import com.sub9.productservice.product.domain.model.Stock;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface StockCommandRepository {
+public interface StockRepository {
   Stock save(Stock stock);
 
   Optional<Stock> findById(UUID uuid);

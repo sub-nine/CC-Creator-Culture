@@ -1,13 +1,13 @@
 package com.sub9.productservice.product.infrastructure.persistence.command.stock;
 
 import com.sub9.productservice.product.domain.model.StockHistory;
-import com.sub9.productservice.product.domain.repository.StockHistoryCommandRepository;
+import com.sub9.productservice.product.domain.repository.StockHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 @Repository
 @RequiredArgsConstructor
-public class StockHistoryCommandRepositoryImpl implements StockHistoryCommandRepository {
+public class StockHistoryRepositoryImpl implements StockHistoryRepository {
   private final StockHistoryCommandJpaRepository jpaRepository;
 
   @Override
