@@ -3,6 +3,7 @@ package com.sub9.productservice.common.config.kafka;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
@@ -21,10 +22,16 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class KafkaConsumerConfig {
   private final KafkaProperties kafkaProperties;
+  private final ObjectProvider<org.springframework.boot.kafka.autoconfigure.KafkaProperties>
+      springKafkaProperties;
 
   @Bean
   public ConsumerFactory<String, String> consumerFactory() {
     Map<String, Object> config = new HashMap<>();
+    var springKafka = springKafkaProperties.getIfAvailable();
+    if (springKafka != null) {
+      config.putAll(springKafka.buildConsumerProperties());
+    }
     config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.bootstrapServers());
     config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
     config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
