@@ -8,9 +8,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.sub9.productservice.common.config.r2.R2Properties;
+import com.sub9.productservice.product.application.port.in.product.ProductQueryUseCase;
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
-import com.sub9.productservice.product.application.query.service.ProductQueryService;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.math.BigDecimal;
@@ -31,7 +31,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @DisplayName("ProductQueryController - 단위 테스트")
 @WebMvcTest(ProductQueryController.class)
 class ProductQueryControllerUnitTest extends AbstractControllerTest {
-  @MockitoBean ProductQueryService productQueryService;
+  @MockitoBean ProductQueryUseCase productQueryUseCase;
   @MockitoBean R2Properties r2Properties;
 
   private final UUID productId = UUID.randomUUID();
@@ -55,7 +55,7 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
             "products/thumbnail.webp");
 
     given(r2Properties.publicUrl()).willReturn("https://images.example.com");
-    given(productQueryService.searchProducts(eq(keyword), any(Pageable.class)))
+    given(productQueryUseCase.searchProducts(eq(keyword), any(Pageable.class)))
         .willReturn(new PageImpl<>(List.of(response), pageable, 1));
 
     // when & then
@@ -76,7 +76,7 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
                 .value("https://images.example.com/products/thumbnail.webp"))
         .andExpect(jsonPath("$.data.totalElements").value(1));
 
-    verify(productQueryService).searchProducts(keyword, pageable);
+    verify(productQueryUseCase).searchProducts(keyword, pageable);
   }
 
   @ParameterizedTest
@@ -87,7 +87,7 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
     ProductInfo response =
         new ProductInfo(productId, "말랑이", ProductStatus.ACTIVE, null, 0L, 10000L, 10, imageKey);
 
-    given(productQueryService.searchProducts(eq("말랑"), any(Pageable.class)))
+    given(productQueryUseCase.searchProducts(eq("말랑"), any(Pageable.class)))
         .willReturn(new PageImpl<>(List.of(response)));
 
     // when & then
@@ -118,7 +118,7 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
             List.of(new ProductDetailInfo.ImageInfo(UUID.randomUUID(), "products/detail.webp", 0)));
 
     given(r2Properties.publicUrl()).willReturn("https://images.example.com");
-    given(productQueryService.getProductDetail(eq(productId), any())).willReturn(response);
+    given(productQueryUseCase.getProductDetail(eq(productId), any())).willReturn(response);
 
     // when & then
     mockMvc
@@ -134,6 +134,6 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
         .andExpect(jsonPath("$.data.images[0].sortOrder").value(0))
         .andExpect(jsonPath("$.data.images[0].imageKey").doesNotExist());
 
-    verify(productQueryService).getProductDetail(productId, null);
+    verify(productQueryUseCase).getProductDetail(productId, null);
   }
 }

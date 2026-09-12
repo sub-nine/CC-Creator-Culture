@@ -1,14 +1,12 @@
-package com.sub9.productservice.product.application.command.service;
+package com.sub9.productservice.product.application.command.service.view;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
-import com.sub9.productservice.product.application.port.ProductViewCountPublisher;
+import com.sub9.productservice.product.application.port.out.product.ProductViewCountPublisher;
+import com.sub9.productservice.product.application.port.out.product.ProductViewRepository;
 import com.sub9.productservice.product.application.query.dto.ProductViewCount;
-import com.sub9.productservice.product.domain.repository.ProductCommandRepository;
-import com.sub9.productservice.product.domain.repository.ProductDailyViewCommandRepository;
-import com.sub9.productservice.product.application.port.ProductViewRepository;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -21,14 +19,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 
-@DisplayName("ProductViewCountCommandService - 단위 테스트")
+@DisplayName("ProductViewCountPublishService - 단위 테스트")
 @ExtendWith(MockitoExtension.class)
-class ProductViewCountCommandServiceUnitTest {
-  @Mock private ProductDailyViewCommandRepository productDailyViewCommandRepository;
+class ProductViewCountPublishServiceUnitTest {
   @Mock private ProductViewCountPublisher productViewCountPublisher;
-  @Mock private ProductCommandRepository productCommandRepository;
   @Mock private ProductViewRepository productViewRepository;
-  @InjectMocks private ProductViewCountCommandService productViewCountCommandService;
+  @InjectMocks private ProductViewCountPublishService productViewCountPublishService;
 
   @Nested
   @DisplayName("조회수 발행 실패 테스트")
@@ -45,11 +41,10 @@ class ProductViewCountCommandServiceUnitTest {
       given(productViewCountPublisher.publish(any())).willReturn(publishResult);
 
       // when
-      productViewCountCommandService.syncViewCounts();
+      productViewCountPublishService.syncViewCounts();
       publishResult.completeExceptionally(new IllegalStateException("Kafka 발행 실패"));
 
       // then
-      verify(productViewRepository, never()).deleteAllViewCount();
       verify(productViewRepository, never()).deleteAllViewCount();
     }
 
@@ -61,7 +56,7 @@ class ProductViewCountCommandServiceUnitTest {
           .willThrow(new DataAccessResourceFailureException("Redis 연결 실패"));
 
       // when & then
-      assertThatThrownBy(() -> productViewCountCommandService.syncViewCounts())
+      assertThatThrownBy(() -> productViewCountPublishService.syncViewCounts())
           .isInstanceOf(DataAccessResourceFailureException.class);
 
       verifyNoInteractions(productViewCountPublisher);

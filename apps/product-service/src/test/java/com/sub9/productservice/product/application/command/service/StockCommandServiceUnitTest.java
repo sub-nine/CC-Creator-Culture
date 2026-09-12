@@ -11,11 +11,11 @@ import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.product.application.command.dto.stock.AdjustStockCommand;
 import com.sub9.productservice.product.application.command.dto.stock.DeductStockCommand;
 import com.sub9.productservice.product.application.command.dto.stock.RestoreStockCommand;
-import com.sub9.productservice.product.application.query.repository.ProductQueryRepository;
+import com.sub9.productservice.product.application.port.out.product.ProductQueryRepository;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.StockHistoryReason;
-import com.sub9.productservice.product.domain.repository.StockCommandRepository;
-import com.sub9.productservice.product.domain.repository.StockHistoryCommandRepository;
+import com.sub9.productservice.product.domain.repository.StockHistoryRepository;
+import com.sub9.productservice.product.domain.repository.StockRepository;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -29,8 +29,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("StockCommandService - 단위 테스트")
 class StockCommandServiceUnitTest {
-  @Mock private StockCommandRepository stockCommandRepository;
-  @Mock private StockHistoryCommandRepository stockHistoryCommandRepository;
+  @Mock private StockRepository stockRepository;
+  @Mock private StockHistoryRepository stockHistoryRepository;
   @Mock private ProductQueryRepository productQueryRepository;
   @InjectMocks private StockCommandService stockCommandService;
 
@@ -52,7 +52,7 @@ class StockCommandServiceUnitTest {
       assertThatThrownBy(() -> stockCommandService.adjust(command))
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.PRODUCT_ACCESS_DENIED.message());
-      verifyNoInteractions(stockCommandRepository, stockHistoryCommandRepository);
+      verifyNoInteractions(stockRepository, stockHistoryRepository);
     }
 
     @Test
@@ -66,7 +66,7 @@ class StockCommandServiceUnitTest {
       assertThatThrownBy(() -> stockCommandService.adjust(command))
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.INVALID_STOCK_ADJUSTMENT.message());
-      verifyNoInteractions(stockCommandRepository, stockHistoryCommandRepository);
+      verifyNoInteractions(stockRepository, stockHistoryRepository);
     }
 
     @Test
@@ -76,13 +76,13 @@ class StockCommandServiceUnitTest {
       AdjustStockCommand command = new AdjustStockCommand(creatorId, skuId, -11);
 
       given(productQueryRepository.existsSkuOwnedByCreatorId(creatorId, skuId)).willReturn(true);
-      given(stockCommandRepository.adjustStock(skuId, -11)).willReturn(false);
+      given(stockRepository.adjustStock(skuId, -11)).willReturn(false);
 
       // when & then
       assertThatThrownBy(() -> stockCommandService.adjust(command))
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.INSUFFICIENT_STOCK.message());
-      verifyNoInteractions(stockHistoryCommandRepository);
+      verifyNoInteractions(stockHistoryRepository);
     }
   }
 
@@ -101,14 +101,14 @@ class StockCommandServiceUnitTest {
                   new DeductStockCommand.Item(skuId, 11),
                   new DeductStockCommand.Item(nextSkuId, 2)));
 
-      given(stockHistoryCommandRepository.insertIfAbsent(any())).willReturn(true);
-      given(stockCommandRepository.decreaseStock(skuId, 11)).willReturn(false);
+      given(stockHistoryRepository.insertIfAbsent(any())).willReturn(true);
+      given(stockRepository.decreaseStock(skuId, 11)).willReturn(false);
 
       // when & then
       assertThatThrownBy(() -> stockCommandService.deduct(command))
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.INSUFFICIENT_STOCK.message());
-      verify(stockCommandRepository, never()).decreaseStock(nextSkuId, 2);
+      verify(stockRepository, never()).decreaseStock(nextSkuId, 2);
     }
   }
 
@@ -128,14 +128,14 @@ class StockCommandServiceUnitTest {
                   new RestoreStockCommand.Item(nextSkuId, 2)),
               StockHistoryReason.ORDER_CANCEL);
 
-      given(stockHistoryCommandRepository.insertIfAbsent(any())).willReturn(true);
-      given(stockCommandRepository.increaseStock(skuId, 3)).willReturn(false);
+      given(stockHistoryRepository.insertIfAbsent(any())).willReturn(true);
+      given(stockRepository.increaseStock(skuId, 3)).willReturn(false);
 
       // when & then
       assertThatThrownBy(() -> stockCommandService.restore(command))
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.SKU_NOT_FOUND.message());
-      verify(stockCommandRepository, never()).increaseStock(nextSkuId, 2);
+      verify(stockRepository, never()).increaseStock(nextSkuId, 2);
     }
   }
 }

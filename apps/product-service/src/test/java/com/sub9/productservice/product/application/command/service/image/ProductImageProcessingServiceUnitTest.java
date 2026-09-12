@@ -3,14 +3,11 @@ package com.sub9.productservice.product.application.command.service.image;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
-import com.sub9.productservice.product.application.command.dto.product.*;
 import com.sub9.productservice.product.application.port.out.image.*;
 import com.sub9.productservice.product.application.support.ImageStorageRollbackCleaner;
-import com.sub9.productservice.product.domain.model.*;
 import com.sub9.productservice.product.domain.repository.*;
 import java.util.*;
 import org.junit.jupiter.api.*;
@@ -21,7 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ProductImageProcessingService - 단위 테스트")
 class ProductImageProcessingServiceUnitTest {
-  @Mock ImageCommandRepository imageCommandRepository;
+  @Mock ImageRepository imageRepository;
   @Mock ImageStoragePort imageStoragePort;
   @Mock ImageProcessorPort imageProcessorPort;
   @Mock ImageStorageRollbackCleaner imageStorageRollbackCleaner;
@@ -39,7 +36,7 @@ class ProductImageProcessingServiceUnitTest {
 
     given(imageStoragePort.download("original/image")).willReturn(original);
     given(imageProcessorPort.resize(original)).willReturn(processed);
-    given(imageCommandRepository.completeProcessing(eq(imageId), anyString())).willReturn(false);
+    given(imageRepository.completeProcessing(eq(imageId), anyString())).willReturn(false);
 
     // when & then
     assertThatThrownBy(() -> imageService.resizeImage(imageId, productId, "original/image"))
