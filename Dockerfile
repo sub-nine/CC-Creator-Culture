@@ -23,6 +23,4 @@ USER spring:spring
 ENTRYPOINT ["java", "-jar", "app.jar"]
 
 FROM service AS config-server
-USER root
-COPY --chown=spring:spring config-repo /config-repo
-USER spring:spring
+ENV XDG_CONFIG_HOME=/tmp/jgit

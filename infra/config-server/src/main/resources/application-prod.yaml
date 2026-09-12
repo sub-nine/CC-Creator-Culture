@@ -2,15 +2,6 @@ server:
   shutdown: graceful
 
 spring:
-  config:
-    activate:
-      on-profile: prod
-  cloud:
-    config:
-      server:
-        native:
-          search-locations: file:${CONFIG_REPO_PATH:/config-repo}
-
   lifecycle:
     timeout-per-shutdown-phase: 30s
 

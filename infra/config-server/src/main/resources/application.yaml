@@ -14,7 +14,7 @@ spring:
         - native
 
       prod:
-        - native
+        - git
 
 management:
   endpoints:

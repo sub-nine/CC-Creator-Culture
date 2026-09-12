@@ -354,6 +354,7 @@ write_release_env() {
 
   {
     printf 'CANDIDATE_SHA=%s\n' "$candidate_sha"
+    printf 'CONFIG_SHA=%s\n' "$config_sha"
     printf 'DEV_DOMAIN=%s\n' "$DEV_DOMAIN"
     printf 'ENABLE_MESSAGING_PROFILE=%s\n' "$ENABLE_MESSAGING_PROFILE"
     printf 'ENABLE_OBSERVABILITY_PROFILE=%s\n' "$ENABLE_OBSERVABILITY_PROFILE"

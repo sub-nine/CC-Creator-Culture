@@ -452,6 +452,7 @@ run_deploy "$manifest" "$success_state" > "$TEST_ROOT/success.out" 2>&1
 unset PROM_ATTEMPT_FILE PROM_READY_AFTER LEGACY_POSTGRES_RUNNING
 
 assert_file_line "CANDIDATE_SHA=$NEW_SHA" "$success_state/runtime/current.env"
+assert_file_line "CONFIG_SHA=$NEW_SHA" "$success_state/runtime/current.env"
 assert_file_line "CANDIDATE_SHA=$OLD_SHA" "$success_state/runtime/previous.env"
 assert_file_mode 600 "$success_state/runtime/current.env"
 assert_file_mode 600 "$success_state/releases/$NEW_SHA/source/deploy/compose.dev.yml"

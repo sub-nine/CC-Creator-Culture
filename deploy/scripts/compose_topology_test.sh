@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 export CANDIDATE_SHA=test
+export CONFIG_SHA=1111111111111111111111111111111111111111
 export DEV_DOMAIN=dev.example.com
 export USER_DB_ADMIN_PASSWORD=user-admin
 export PRODUCT_DB_ADMIN_PASSWORD=product-admin
@@ -61,6 +62,12 @@ jq -e '
       and ($root.services[$item.app].depends_on | has($item.container))
       and ($root.services[$item.app].environment[$item.url_key] == ("jdbc:postgresql://" + $item.container + ":5432/" + $item.database))
   )
+' <<<"$deploy_config" >/dev/null
+
+jq -e --arg sha "$CONFIG_SHA" '
+  .services["config-server"].environment.SPRING_PROFILES_ACTIVE == "git"
+  and .services["config-server"].environment.CONFIG_GIT_DEFAULT_LABEL == $sha
+  and all(.services | to_entries[] | select(.key == "gateway" or .key == "user-service" or .key == "product-service" or .key == "order-service"); .value.environment.SPRING_CLOUD_CONFIG_LABEL == $sha)
 ' <<<"$deploy_config" >/dev/null
 
 local_config="$(docker compose \
