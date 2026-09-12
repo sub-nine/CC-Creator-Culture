@@ -1,0 +1,21 @@
+server:
+  port: ${ORDER_SERVICE_PORT:8083}
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${ORDER_DB_HOST}:${ORDER_DB_PORT:5432}/${ORDER_DB_NAME}?sslmode=verify-full&sslrootcert=${DB_SSLROOTCERT:/app/certs/global-bundle.pem}
+    username: ${ORDER_DB_USERNAME}
+    password: ${ORDER_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    security:
+      protocol: SASL_SSL
+    properties:
+      "[sasl.mechanism]": ${KAFKA_SASL_MECHANISM:SCRAM-SHA-512}
+      "[sasl.jaas.config]": ${KAFKA_SASL_JAAS_CONFIG:org.apache.kafka.common.security.scram.ScramLoginModule required username="${KAFKA_USERNAME}" password="${KAFKA_PASSWORD}";}

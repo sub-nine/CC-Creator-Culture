@@ -13,6 +13,8 @@ FROM runtime-base AS service
 ARG JAR_FILE
 COPY --chown=spring:spring ${JAR_FILE} /app/app.jar
 
+COPY --chown=spring:spring deploy/aws/database/certs/rds-global-bundle.pem /app/certs/global-bundle.pem
+
 USER spring:spring
 ENTRYPOINT ["java", "-jar", "app.jar"]
 
