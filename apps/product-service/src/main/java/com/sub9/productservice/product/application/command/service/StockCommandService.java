@@ -1,9 +1,11 @@
-package com.sub9.productservice.product.application.command.service;
+package com.sub9.productservice.product.application.command.service.stock;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.product.application.command.dto.stock.AdjustStockCommand;
 import com.sub9.productservice.product.application.command.dto.stock.DeductStockCommand;
 import com.sub9.productservice.product.application.command.dto.stock.RestoreStockCommand;
+import com.sub9.productservice.product.application.port.in.stock.AdjusStockUseCase;
+import com.sub9.productservice.product.application.port.in.stock.OrderStockUseCase;
 import com.sub9.productservice.product.application.query.repository.ProductQueryRepository;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.StockHistory;
@@ -17,11 +19,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class StockCommandService {
+public class StockCommandService implements AdjusStockUseCase, OrderStockUseCase {
   private final StockHistoryCommandRepository stockHistoryCommandRepository;
   private final StockCommandRepository stockCommandRepository;
   private final ProductQueryRepository productQueryRepository;
 
+  @Override
   public void adjust(AdjustStockCommand command) {
     if (!productQueryRepository.existsSkuOwnedByCreatorId(command.creatorId(), command.skuId())) {
       throw new BusinessException(ProductErrorCode.PRODUCT_ACCESS_DENIED);
@@ -40,6 +43,7 @@ public class StockCommandService {
             null, command.skuId(), command.quantity(), StockHistoryReason.CREATOR_ADJUSTMENT));
   }
 
+  @Override
   public void deduct(DeductStockCommand command) {
     for (var item : command.items()) {
       var history =
@@ -54,6 +58,7 @@ public class StockCommandService {
     }
   }
 
+  @Override
   public void restore(RestoreStockCommand command) {
     for (var item : command.items()) {
       var history =

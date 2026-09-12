@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.application.command.service;
+package com.sub9.productservice.product.application.command.service.product;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.kafka.event.ProductCreatedEvent;
@@ -8,6 +8,8 @@ import com.sub9.productservice.product.application.command.dto.product.UpdatePro
 import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
 import com.sub9.productservice.product.application.command.dto.sku.CreateSkuCommand;
 import com.sub9.productservice.product.application.port.in.image.ProductImageCommandUseCase;
+import com.sub9.productservice.product.application.port.in.product.AdminProductStatusUseCase;
+import com.sub9.productservice.product.application.port.in.product.ProductCommandUseCase;
 import com.sub9.productservice.product.application.validation.SkuValidator;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
@@ -16,7 +18,6 @@ import com.sub9.productservice.product.domain.model.Stock;
 import com.sub9.productservice.product.domain.repository.ProductCommandRepository;
 import com.sub9.productservice.product.domain.repository.SkuCommandRepository;
 import com.sub9.productservice.product.domain.repository.StockCommandRepository;
-import com.sub9.productservice.product.presentation.command.dto.product.CreateProductResponse;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -27,14 +28,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class ProductCommandService {
+public class ProductCommandService implements ProductCommandUseCase, AdminProductStatusUseCase {
   private final ProductCommandRepository productCommandRepository;
   private final SkuCommandRepository skuCommandRepository;
   private final StockCommandRepository stockCommandRepository;
   private final ApplicationEventPublisher eventPublisher;
   private final ProductImageCommandUseCase productImageCommandUseCase;
 
-  public CreateProductResponse createProduct(CreateProductCommand command, List<UploadImageCommand> images) {
+  @Override
+  public UUID createProduct(CreateProductCommand command, List<UploadImageCommand> images) {
     SkuValidator.validateForCreate(command.skus());
 
     Product product = Product.create(command.creatorId(), command.name(), command.content());
@@ -69,9 +71,28 @@ public class ProductCommandService {
             savedProduct.getContent(),
             command.hashTags()));
 
-    return new CreateProductResponse(productId);
+    return productId;
   }
 
+  @Override
+  public void updateProduct(UpdateProductCommand command) {
+    Product product = findByProductId(command.productId());
+    product.validateOwner(command.creatorId());
+    product.update(command.name(), command.content());
+  }
+
+  @Override
+  public void updateStatusProduct(UpdateProductStatusCommand command) {
+    Product product = findByProductId(command.productId());
+    if (command.isCreator()) {
+      product.validateOwner(command.userId());
+      product.updateStatusByCreator(command.productStatus());
+      return;
+    }
+    product.updateStatusByAdmin(command.productStatus());
+  }
+
+  @Override
   public void deleteProduct(UUID creatorId, UUID productId) {
     Product product =
         productCommandRepository
@@ -86,22 +107,6 @@ public class ProductCommandService {
     for (Sku sku : skus) {
       sku.delete(creatorId);
     }
-  }
-
-  public void updateProduct(UpdateProductCommand command) {
-    Product product = findByProductId(command.productId());
-    product.validateOwner(command.creatorId());
-    product.update(command.name(), command.content());
-  }
-
-  public void updateStatusProduct(UpdateProductStatusCommand command) {
-    Product product = findByProductId(command.productId());
-    if (command.isCreator()) {
-      product.validateOwner(command.userId());
-      product.updateStatusByCreator(command.productStatus());
-      return;
-    }
-    product.updateStatusByAdmin(command.productStatus());
   }
 
   // ============================== Helper Method ====================================

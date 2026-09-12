@@ -1,8 +1,9 @@
-package com.sub9.productservice.product.application.command.service;
+package com.sub9.productservice.product.application.command.service.sku;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.product.application.command.dto.sku.DeleteSkuCommand;
 import com.sub9.productservice.product.application.command.dto.sku.UpdateSkuCommand;
+import com.sub9.productservice.product.application.port.in.sku.SkuCommandUseCase;
 import com.sub9.productservice.product.application.validation.SkuValidator;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
@@ -17,10 +18,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class SkuCommandService {
+public class SkuCommandService implements SkuCommandUseCase {
   private final ProductCommandRepository productCommandRepository;
   private final SkuCommandRepository skuCommandRepository;
 
+  @Override
   public void updateSku(UpdateSkuCommand command) {
     Product product = findByProductId(command.productId());
     product.validateOwner(command.creatorId());
@@ -40,6 +42,7 @@ public class SkuCommandService {
     sku.update(command.name(), command.price(), command.isDefault());
   }
 
+  @Override
   public void deleteSku(DeleteSkuCommand command) {
     Product product = findByProductId(command.productId());
     product.validateOwner(command.creatorId());
