@@ -11,7 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.product.application.command.dto.stock.DeductStockCommand;
 import com.sub9.productservice.product.application.command.dto.stock.RestoreStockCommand;
-import com.sub9.productservice.product.application.command.service.StockCommandService;
+import com.sub9.productservice.product.application.port.in.stock.OrderStockUseCase;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.StockHistoryReason;
 import com.sub9.productservice.support.AbstractControllerTest;
@@ -29,7 +29,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @WebMvcTest(InternalStockCommandController.class)
 @DisplayName("InternalStockCommandController - 단위 테스트")
 class InternalStockCommandControllerUnitTest extends AbstractControllerTest {
-  @MockitoBean StockCommandService stockCommandService;
+  @MockitoBean OrderStockUseCase orderStockUseCase;
 
   private final UUID orderId = UUID.randomUUID();
   private final UUID skuId = UUID.randomUUID();
@@ -63,7 +63,7 @@ class InternalStockCommandControllerUnitTest extends AbstractControllerTest {
           .perform(
               post(endPoint + "/deduct").contentType(MediaType.APPLICATION_JSON).content(request()))
           .andExpect(status().isOk());
-      verify(stockCommandService).deduct(command);
+      verify(orderStockUseCase).deduct(command);
     }
 
     @Test
@@ -71,7 +71,7 @@ class InternalStockCommandControllerUnitTest extends AbstractControllerTest {
     void deduct_fails_when_service_rejects_request() throws Exception {
       // given
       ProductErrorCode errorCode = ProductErrorCode.INSUFFICIENT_STOCK;
-      willThrow(new BusinessException(errorCode)).given(stockCommandService).deduct(any());
+      willThrow(new BusinessException(errorCode)).given(orderStockUseCase).deduct(any());
 
       // when & then
       mockMvc
@@ -104,7 +104,7 @@ class InternalStockCommandControllerUnitTest extends AbstractControllerTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(request()))
           .andExpect(status().isOk());
-      verify(stockCommandService).restore(command);
+      verify(orderStockUseCase).restore(command);
     }
 
     @Test
@@ -112,7 +112,7 @@ class InternalStockCommandControllerUnitTest extends AbstractControllerTest {
     void restore_fails_when_service_rejects_request() throws Exception {
       // given
       ProductErrorCode errorCode = ProductErrorCode.SKU_NOT_FOUND;
-      willThrow(new BusinessException(errorCode)).given(stockCommandService).restore(any());
+      willThrow(new BusinessException(errorCode)).given(orderStockUseCase).restore(any());
 
       // when & then
       mockMvc
@@ -145,7 +145,7 @@ class InternalStockCommandControllerUnitTest extends AbstractControllerTest {
                   .content(invalidRequest))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errorCode").value("COMMON_0003"));
-      verifyNoInteractions(stockCommandService);
+      verifyNoInteractions(orderStockUseCase);
     }
 
     @ParameterizedTest
@@ -164,7 +164,7 @@ class InternalStockCommandControllerUnitTest extends AbstractControllerTest {
                   .content(invalidRequest))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errorCode").value("COMMON_0003"));
-      verifyNoInteractions(stockCommandService);
+      verifyNoInteractions(orderStockUseCase);
     }
 
     @ParameterizedTest
@@ -182,7 +182,7 @@ class InternalStockCommandControllerUnitTest extends AbstractControllerTest {
                   .content(invalidRequest))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errorCode").value("COMMON_0003"));
-      verifyNoInteractions(stockCommandService);
+      verifyNoInteractions(orderStockUseCase);
     }
 
     @ParameterizedTest
@@ -200,7 +200,7 @@ class InternalStockCommandControllerUnitTest extends AbstractControllerTest {
                   .content(invalidRequest))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errorCode").value("COMMON_0003"));
-      verifyNoInteractions(stockCommandService);
+      verifyNoInteractions(orderStockUseCase);
     }
 
     @Test
@@ -217,7 +217,7 @@ class InternalStockCommandControllerUnitTest extends AbstractControllerTest {
                   .content(invalidRequest))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errorCode").value("COMMON_0003"));
-      verifyNoInteractions(stockCommandService);
+      verifyNoInteractions(orderStockUseCase);
     }
   }
 }

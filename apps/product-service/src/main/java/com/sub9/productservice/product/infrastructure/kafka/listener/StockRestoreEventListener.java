@@ -4,6 +4,7 @@ import com.sub9.common.kafka.event.StockRestoreEvent;
 import com.sub9.common.kafka.topic.KafkaTopics;
 import com.sub9.productservice.product.application.command.dto.stock.RestoreStockCommand;
 import com.sub9.productservice.product.application.command.service.StockCommandService;
+import com.sub9.productservice.product.application.port.in.stock.OrderStockUseCase;
 import com.sub9.productservice.product.domain.model.StockHistoryReason;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +16,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class StockRestoreEventListener {
-  private final StockCommandService stockCommandService;
+  private final OrderStockUseCase orderStockUseCase;
 
   @KafkaListener(topics = KafkaTopics.STOCK_RESTORE, groupId = "${kafka.product-group-id}")
   public void handleStockRestoreEvent(StockRestoreEvent event, Acknowledgment ack) {
@@ -28,7 +29,7 @@ public class StockRestoreEventListener {
                   .toList(),
               StockHistoryReason.valueOf(event.reason()));
 
-      stockCommandService.restore(command);
+     orderStockUseCase.restore(command);
 
       ack.acknowledge();
     } catch (Exception e) {

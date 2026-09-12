@@ -14,8 +14,8 @@ import com.sub9.productservice.product.application.validation.ImageValidator;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Image;
 import com.sub9.productservice.product.domain.model.Product;
-import com.sub9.productservice.product.domain.repository.ImageCommandRepository;
-import com.sub9.productservice.product.domain.repository.ProductCommandRepository;
+import com.sub9.productservice.product.domain.repository.ImageRepository;
+import com.sub9.productservice.product.domain.repository.ProductRepository;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -34,8 +34,8 @@ public class ProductImageCommandService implements ProductImageCommandUseCase {
   private static final String ORIGINAL_KEY_FORMAT = "products/%s/images/original/%s";
 
   private final ImageStorageRollbackCleaner imageStorageRollbackCleaner;
-  private final ProductCommandRepository productCommandRepository;
-  private final ImageCommandRepository imageCommandRepository;
+  private final ProductRepository productRepository;
+  private final ImageRepository imageRepository;
   private final ApplicationEventPublisher eventPublisher;
   private final ImageStoragePort imageStoragePort;
 
@@ -57,7 +57,7 @@ public class ProductImageCommandService implements ProductImageCommandUseCase {
       String originalKey = ORIGINAL_KEY_FORMAT.formatted(productId, imageId);
 
       Image image =
-          imageCommandRepository.save(Image.create(productId, originalKey, null, sortOrder));
+          imageRepository.save(Image.create(productId, originalKey, null, sortOrder));
 
       imageStoragePort.upload(originalKey, new ImageData(mediaType, command.data()));
 
@@ -77,7 +77,7 @@ public class ProductImageCommandService implements ProductImageCommandUseCase {
     validateOwner(command.productId(), command.creatorId());
 
     List<Image> images =
-        imageCommandRepository.findAllByProductIdAndDeletedAtIsNull(command.productId());
+        imageRepository.findAllByProductIdAndDeletedAtIsNull(command.productId());
 
     Map<UUID, Image> imageMap =
         images.stream().collect(Collectors.toMap(Image::getId, Function.identity()));
@@ -102,7 +102,7 @@ public class ProductImageCommandService implements ProductImageCommandUseCase {
     validateOwner(command.productId(), command.creatorId());
 
     boolean deleted =
-        imageCommandRepository.softDelete(
+        imageRepository.softDelete(
             command.imageId(), command.productId(), command.creatorId());
 
     if (!deleted) throw new BusinessException(ProductErrorCode.PRODUCT_IMAGE_NOT_FOUND);
@@ -110,7 +110,7 @@ public class ProductImageCommandService implements ProductImageCommandUseCase {
 
   private void validateOwner(UUID productId, UUID creatorId) {
     Product product =
-        productCommandRepository
+        productRepository
             .findByIdForUpdate(productId)
             .orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
 

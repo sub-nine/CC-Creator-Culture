@@ -4,7 +4,7 @@ import com.sub9.productservice.product.domain.model.Product;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface ProductCommandRepository {
+public interface ProductRepository {
   Product save(Product product);
 
   Optional<Product> findByIdAndDeletedAtIsNull(UUID productId);

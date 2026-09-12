@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.application.port.out.image;
+package com.sub9.productservice.product.application.port.out.product;
 
 import java.util.List;
 import java.util.Set;

@@ -12,7 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.product.application.command.dto.stock.AdjustStockCommand;
-import com.sub9.productservice.product.application.command.service.StockCommandService;
+import com.sub9.productservice.product.application.port.in.stock.AdjustStockUseCase;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.UUID;
@@ -26,7 +26,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @WebMvcTest(StockCommandController.class)
 @DisplayName("StockCommandController - 단위 테스트")
 class StockCommandControllerUnitTest extends AbstractControllerTest {
-  @MockitoBean StockCommandService stockCommandService;
+  @MockitoBean AdjustStockUseCase adjustStockUseCase;
   private final UUID creatorId = UUID.randomUUID();
   private final UUID skuId = UUID.randomUUID();
   private final String endPoint = "/api/v1/skus/{skuId}/stock/adjustments";
@@ -51,7 +51,7 @@ class StockCommandControllerUnitTest extends AbstractControllerTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.message").value("상품 수량이 변경되었습니다."))
           .andExpect(jsonPath("$.data").doesNotExist());
-      verify(stockCommandService).adjust(command);
+      verify(adjustStockUseCase).adjust(command);
     }
 
     @Test
@@ -60,7 +60,7 @@ class StockCommandControllerUnitTest extends AbstractControllerTest {
       // given
       ProductErrorCode errorCode = ProductErrorCode.INSUFFICIENT_STOCK;
       int quantity = -11;
-      willThrow(new BusinessException(errorCode)).given(stockCommandService).adjust(any());
+      willThrow(new BusinessException(errorCode)).given(adjustStockUseCase).adjust(any());
 
       // when & then
       mockMvc
@@ -84,7 +84,7 @@ class StockCommandControllerUnitTest extends AbstractControllerTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content("{\"quantity\":5}"))
           .andExpect(status().isForbidden());
-      verifyNoInteractions(stockCommandService);
+      verifyNoInteractions(adjustStockUseCase);
     }
   }
 }

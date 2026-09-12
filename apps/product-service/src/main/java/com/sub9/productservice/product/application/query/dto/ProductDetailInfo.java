@@ -1,6 +1,6 @@
 package com.sub9.productservice.product.application.query.dto;
 
-import com.sub9.productservice.product.application.port.out.image.ProductMetadataQueryPort;
+import com.sub9.productservice.product.application.port.out.product.ProductMetadataQueryPort;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import java.math.BigDecimal;
 import java.util.List;

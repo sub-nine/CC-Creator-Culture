@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sub9.common.exception.BusinessException;
-import com.sub9.productservice.product.application.query.service.ProductQueryService;
+import com.sub9.productservice.product.application.port.in.product.CartProductQueryUseCase;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.UUID;
@@ -20,7 +20,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @WebMvcTest(InternalSkuQueryController.class)
 @DisplayName("InternalSkuQueryController - 장바구니 등록 검증 단위 테스트")
 class InternalSkuValidationControllerUnitTest extends AbstractControllerTest {
-  @MockitoBean ProductQueryService productQueryService;
+  @MockitoBean CartProductQueryUseCase cartProductQueryUseCase;
 
   private final UUID skuId = UUID.randomUUID();
   private final String endPoint = "/internal/v1/skus/{skuId}/validation";
@@ -33,7 +33,7 @@ class InternalSkuValidationControllerUnitTest extends AbstractControllerTest {
         .perform(get(endPoint, skuId))
         .andExpect(status().isOk())
         .andExpect(content().string(""));
-    verify(productQueryService).validateSkuForCart(skuId);
+    verify(cartProductQueryUseCase).validateSkuForCart(skuId);
   }
 
   @Test
@@ -41,7 +41,7 @@ class InternalSkuValidationControllerUnitTest extends AbstractControllerTest {
   void validateSkuForCart_fails_when_sku_is_sold_out() throws Exception {
     // given
     willThrow(new BusinessException(ProductErrorCode.SKU_SOLD_OUT))
-        .given(productQueryService)
+        .given(cartProductQueryUseCase)
         .validateSkuForCart(skuId);
 
     // when & then
@@ -49,6 +49,6 @@ class InternalSkuValidationControllerUnitTest extends AbstractControllerTest {
         .perform(get(endPoint, skuId))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.errorCode").value(ProductErrorCode.SKU_SOLD_OUT.code()));
-    verify(productQueryService).validateSkuForCart(skuId);
+    verify(cartProductQueryUseCase).validateSkuForCart(skuId);
   }
 }

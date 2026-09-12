@@ -1,10 +1,10 @@
 package com.sub9.productservice.product.presentation.command.controller;
 
+import com.sub9.common.annotation.Creator;
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.common.security.AuthUser;
-import com.sub9.common.annotation.Creator;
 import com.sub9.productservice.product.application.command.dto.sku.DeleteSkuCommand;
-import com.sub9.productservice.product.application.command.service.SkuCommandService;
+import com.sub9.productservice.product.application.port.in.sku.SkuCommandUseCase;
 import com.sub9.productservice.product.presentation.command.dto.sku.UpdateSkuRequest;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/products")
 public class SkuCommandController {
-  private final SkuCommandService skuCommandService;
+  private final SkuCommandUseCase skuCommandUseCase;
 
   @PatchMapping("/{productId}/skus/{skuId}")
   public ApiResponse<Void> updateSku(
@@ -25,7 +25,7 @@ public class SkuCommandController {
       @PathVariable UUID productId,
       @PathVariable UUID skuId,
       @Valid @RequestBody UpdateSkuRequest request) {
-    skuCommandService.updateSku(request.toCommand(authUser.id(), productId, skuId));
+    skuCommandUseCase.updateSku(request.toCommand(authUser.id(), productId, skuId));
     return ApiResponse.success(null);
   }
 
@@ -34,7 +34,7 @@ public class SkuCommandController {
       @AuthenticationPrincipal AuthUser authUser,
       @PathVariable UUID productId,
       @PathVariable UUID skuId) {
-    skuCommandService.deleteSku(new DeleteSkuCommand(authUser.id(), productId, skuId));
+    skuCommandUseCase.deleteSku(new DeleteSkuCommand(authUser.id(), productId, skuId));
     return ApiResponse.success(null);
   }
 }

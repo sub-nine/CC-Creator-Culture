@@ -1,6 +1,6 @@
 package com.sub9.productservice.category.application.query.port.out;
 
-import com.sub9.productservice.product.application.port.out.image.ProductMetadataQueryPort;
+import com.sub9.productservice.product.application.port.out.product.ProductMetadataQueryPort;
 
 import java.util.List;
 import java.util.Set;

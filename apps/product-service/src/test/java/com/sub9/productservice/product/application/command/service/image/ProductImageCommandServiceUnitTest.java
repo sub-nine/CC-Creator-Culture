@@ -2,7 +2,6 @@ package com.sub9.productservice.product.application.command.service.image;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
@@ -23,8 +22,8 @@ import org.springframework.context.ApplicationEventPublisher;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ProductImageCommandService - 단위 테스트")
 class ProductImageCommandServiceUnitTest {
-  @Mock ProductCommandRepository productCommandRepository;
-  @Mock ImageCommandRepository imageCommandRepository;
+  @Mock ProductRepository productRepository;
+  @Mock ImageRepository imageRepository;
   @Mock ImageStoragePort imageStoragePort;
   @Mock ImageStorageRollbackCleaner imageStorageRollbackCleaner;
   @Mock ApplicationEventPublisher eventPublisher;
@@ -46,14 +45,14 @@ class ProductImageCommandServiceUnitTest {
     // when & then
     assertThatThrownBy(() -> imageService.uploadImages(product.getId(), images))
         .isInstanceOf(BusinessException.class);
-    verifyNoInteractions(imageCommandRepository, imageStoragePort, eventPublisher);
+    verifyNoInteractions(imageRepository, imageStoragePort, eventPublisher);
   }
 
   @Test
   @DisplayName("상품이 존재하지 않으면 이미지 순서 변경에 실패한다.")
   void updateSortOrder_fails_when_product_not_found() {
     // given
-    given(productCommandRepository.findByIdForUpdate(product.getId())).willReturn(Optional.empty());
+    given(productRepository.findByIdForUpdate(product.getId())).willReturn(Optional.empty());
 
     // when & then
     assertThatThrownBy(
@@ -69,8 +68,7 @@ class ProductImageCommandServiceUnitTest {
   @DisplayName("상품 소유자가 아니면 이미지 순서 변경에 실패한다.")
   void updateSortOrder_fails_when_creator_is_not_owner() {
     // given
-    given(productCommandRepository.findByIdForUpdate(product.getId()))
-        .willReturn(Optional.of(product));
+    given(productRepository.findByIdForUpdate(product.getId())).willReturn(Optional.of(product));
 
     // when & then
     assertThatThrownBy(
@@ -80,7 +78,7 @@ class ProductImageCommandServiceUnitTest {
                         product.getId(), UUID.randomUUID(), List.of(UUID.randomUUID()))))
         .isInstanceOf(BusinessException.class)
         .hasMessage(ProductErrorCode.PRODUCT_ACCESS_DENIED.message());
-    verifyNoInteractions(imageCommandRepository);
+    verifyNoInteractions(imageRepository);
   }
 
   @Test
@@ -90,9 +88,8 @@ class ProductImageCommandServiceUnitTest {
     Image first = Image.create(product.getId(), "original/first", null, 0);
     Image second = Image.create(product.getId(), "original/second", null, 1);
 
-    given(productCommandRepository.findByIdForUpdate(product.getId()))
-        .willReturn(Optional.of(product));
-    given(imageCommandRepository.findAllByProductIdAndDeletedAtIsNull(product.getId()))
+    given(productRepository.findByIdForUpdate(product.getId())).willReturn(Optional.of(product));
+    given(imageRepository.findAllByProductIdAndDeletedAtIsNull(product.getId()))
         .willReturn(List.of(first, second));
 
     var invalidRequests =
@@ -118,8 +115,7 @@ class ProductImageCommandServiceUnitTest {
   @DisplayName("상품 소유자가 아니면 이미지 삭제에 실패한다.")
   void delete_fails_when_creator_is_not_owner() {
     // given
-    given(productCommandRepository.findByIdForUpdate(product.getId()))
-        .willReturn(Optional.of(product));
+    given(productRepository.findByIdForUpdate(product.getId())).willReturn(Optional.of(product));
 
     // when & then
     assertThatThrownBy(
@@ -129,7 +125,7 @@ class ProductImageCommandServiceUnitTest {
                         UUID.randomUUID(), product.getId(), UUID.randomUUID())))
         .isInstanceOf(BusinessException.class)
         .hasMessage(ProductErrorCode.PRODUCT_ACCESS_DENIED.message());
-    verifyNoInteractions(imageCommandRepository);
+    verifyNoInteractions(imageRepository);
   }
 
   @Test
@@ -137,9 +133,8 @@ class ProductImageCommandServiceUnitTest {
   void delete_fails_when_image_not_found() {
     // given
     UUID imageId = UUID.randomUUID();
-    given(productCommandRepository.findByIdForUpdate(product.getId()))
-        .willReturn(Optional.of(product));
-    given(imageCommandRepository.softDelete(imageId, product.getId(), creatorId)).willReturn(false);
+    given(productRepository.findByIdForUpdate(product.getId())).willReturn(Optional.of(product));
+    given(imageRepository.softDelete(imageId, product.getId(), creatorId)).willReturn(false);
 
     // when & then
     assertThatThrownBy(

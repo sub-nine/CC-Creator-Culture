@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.application.port;
+package com.sub9.productservice.product.application.port.out.product;
 
 import com.sub9.common.kafka.event.ProductViewSyncEvent;
 

@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 
-import com.sub9.productservice.product.application.port.ProductViewRepository;
+import com.sub9.productservice.product.application.port.out.product.ProductViewRepository;
 import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;

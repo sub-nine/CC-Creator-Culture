@@ -6,7 +6,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-public interface ProductDailyViewCommandRepository {
+public interface ProductDailyViewRepository {
   void upsert(UUID id, UUID productId, long viewCount, LocalDate viewDate);
 
   List<ProductDailyView> findAllByViewDate(LocalDate viewDate);

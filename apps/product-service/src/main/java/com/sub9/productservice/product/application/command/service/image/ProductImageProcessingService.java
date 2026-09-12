@@ -7,7 +7,7 @@ import com.sub9.productservice.product.application.port.out.image.ImageData;
 import com.sub9.productservice.product.application.port.out.image.ImageProcessorPort;
 import com.sub9.productservice.product.application.port.out.image.ImageStoragePort;
 import com.sub9.productservice.product.application.support.ImageStorageRollbackCleaner;
-import com.sub9.productservice.product.domain.repository.ImageCommandRepository;
+import com.sub9.productservice.product.domain.repository.ImageRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -22,7 +22,7 @@ public class ProductImageProcessingService implements ProductImageProcessingUseC
   private static final String PROCESSED_KEY_FORMAT = "products/%s/images/processed/%s";
 
   private final ImageStorageRollbackCleaner imageStorageRollbackCleaner;
-  private final ImageCommandRepository imageCommandRepository;
+  private final ImageRepository imageRepository;
   private final ImageProcessorPort imageProcessorPort;
   private final ImageStoragePort imageStoragePort;
 
@@ -38,7 +38,7 @@ public class ProductImageProcessingService implements ProductImageProcessingUseC
     imageStoragePort.upload(processedKey, resizedImageData);
     uploadedKeys.add(processedKey);
 
-    boolean updated = imageCommandRepository.completeProcessing(imageId, processedKey);
+    boolean updated = imageRepository.completeProcessing(imageId, processedKey);
 
     if (!updated) {
       log.warn("[FAIL] 리사이징 이미지 업데이트 실패 imageId= {}, processedKey = {}", imageId, processedKey);

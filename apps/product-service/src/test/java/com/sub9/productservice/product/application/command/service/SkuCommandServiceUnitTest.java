@@ -1,5 +1,6 @@
 package com.sub9.productservice.product.application.command.service;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
@@ -11,8 +12,8 @@ import com.sub9.productservice.product.application.command.dto.sku.UpdateSkuComm
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.Sku;
-import com.sub9.productservice.product.domain.repository.ProductCommandRepository;
-import com.sub9.productservice.product.domain.repository.SkuCommandRepository;
+import com.sub9.productservice.product.domain.repository.ProductRepository;
+import com.sub9.productservice.product.domain.repository.SkuRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.*;
@@ -24,8 +25,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @DisplayName("SkuCommandService - 단위 테스트")
 @ExtendWith(MockitoExtension.class)
 class SkuCommandServiceUnitTest {
-  @Mock private ProductCommandRepository productCommandRepository;
-  @Mock private SkuCommandRepository skuCommandRepository;
+  @Mock private ProductRepository productRepository;
+  @Mock private SkuRepository skuRepository;
   @InjectMocks private SkuCommandService skuCommandService;
 
   private final UUID creatorId = UUID.randomUUID();
@@ -55,16 +56,14 @@ class SkuCommandServiceUnitTest {
       Sku sku = mock(Sku.class);
       Sku currentDefaultSku = mock(Sku.class);
 
-      given(productCommandRepository.findByIdForUpdate(defaultUpdateSkuCommand.productId()))
+      given(productRepository.findByIdForUpdate(defaultUpdateSkuCommand.productId()))
           .willReturn(Optional.of(product));
       given(
-              skuCommandRepository.findByIdAndProductIdAndDeletedAtIsNull(
+              skuRepository.findByIdAndProductIdAndDeletedAtIsNull(
                   defaultUpdateSkuCommand.skuId(), defaultUpdateSkuCommand.productId()))
           .willReturn(Optional.of(sku));
       given(sku.isDefault()).willReturn(false);
-      given(
-              skuCommandRepository.findByProductIdAndIsDefaultTrue(
-                  defaultUpdateSkuCommand.productId()))
+      given(skuRepository.findByProductIdAndIsDefaultTrue(defaultUpdateSkuCommand.productId()))
           .willReturn(Optional.of(currentDefaultSku));
 
       // when
@@ -87,16 +86,14 @@ class SkuCommandServiceUnitTest {
       Product product = mock(Product.class);
       Sku sku = mock(Sku.class);
 
-      given(productCommandRepository.findByIdForUpdate(defaultUpdateSkuCommand.productId()))
+      given(productRepository.findByIdForUpdate(defaultUpdateSkuCommand.productId()))
           .willReturn(Optional.of(product));
       given(
-              skuCommandRepository.findByIdAndProductIdAndDeletedAtIsNull(
+              skuRepository.findByIdAndProductIdAndDeletedAtIsNull(
                   defaultUpdateSkuCommand.skuId(), defaultUpdateSkuCommand.productId()))
           .willReturn(Optional.of(sku));
       given(sku.isDefault()).willReturn(false);
-      given(
-              skuCommandRepository.findByProductIdAndIsDefaultTrue(
-                  defaultUpdateSkuCommand.productId()))
+      given(skuRepository.findByProductIdAndIsDefaultTrue(defaultUpdateSkuCommand.productId()))
           .willReturn(Optional.empty());
 
       // when & then
@@ -111,7 +108,7 @@ class SkuCommandServiceUnitTest {
     @DisplayName("상품이 존재하지 않으면 PRODUCT_NOT_FOUND 예외가 발생해야 한다.")
     void updateSku_fails_when_product_not_found() {
       // given
-      given(productCommandRepository.findByIdForUpdate(updateSkuCommand.productId()))
+      given(productRepository.findByIdForUpdate(updateSkuCommand.productId()))
           .willReturn(Optional.empty());
 
       // when & then
@@ -119,7 +116,7 @@ class SkuCommandServiceUnitTest {
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.PRODUCT_NOT_FOUND.message());
 
-      verifyNoInteractions(skuCommandRepository);
+      verifyNoInteractions(skuRepository);
     }
 
     @Test
@@ -128,7 +125,7 @@ class SkuCommandServiceUnitTest {
       // given
       Product product = mock(Product.class);
 
-      given(productCommandRepository.findByIdForUpdate(updateSkuCommand.productId()))
+      given(productRepository.findByIdForUpdate(updateSkuCommand.productId()))
           .willReturn(Optional.of(product));
       willThrow(new BusinessException(ProductErrorCode.PRODUCT_ACCESS_DENIED))
           .given(product)
@@ -139,7 +136,7 @@ class SkuCommandServiceUnitTest {
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.PRODUCT_ACCESS_DENIED.message());
 
-      verifyNoInteractions(skuCommandRepository);
+      verifyNoInteractions(skuRepository);
     }
 
     @Test
@@ -148,10 +145,10 @@ class SkuCommandServiceUnitTest {
       // given
       Product product = mock(Product.class);
 
-      given(productCommandRepository.findByIdForUpdate(updateSkuCommand.productId()))
+      given(productRepository.findByIdForUpdate(updateSkuCommand.productId()))
           .willReturn(Optional.of(product));
       given(
-              skuCommandRepository.findByIdAndProductIdAndDeletedAtIsNull(
+              skuRepository.findByIdAndProductIdAndDeletedAtIsNull(
                   updateSkuCommand.skuId(), updateSkuCommand.productId()))
           .willReturn(Optional.empty());
 
@@ -168,17 +165,15 @@ class SkuCommandServiceUnitTest {
     void updateSku_fails_when_default_sku_cannot_unset() {
       // given
       Product product = mock(Product.class);
-      Sku sku = mock(Sku.class);
+      Sku sku = Sku.create(updateSkuCommand.productId(), "핑크", 10000L, true);
 
-      given(productCommandRepository.findByIdForUpdate(updateSkuCommand.productId()))
+      given(productRepository.findByIdForUpdate(updateSkuCommand.productId()))
           .willReturn(Optional.of(product));
 
       given(
-              skuCommandRepository.findByIdAndProductIdAndDeletedAtIsNull(
+              skuRepository.findByIdAndProductIdAndDeletedAtIsNull(
                   updateSkuCommand.skuId(), updateSkuCommand.productId()))
           .willReturn(Optional.of(sku));
-
-      given(sku.isDefault()).willReturn(true);
 
       // when & then
       assertThatThrownBy(() -> skuCommandService.updateSku(updateSkuCommand))
@@ -186,8 +181,7 @@ class SkuCommandServiceUnitTest {
           .hasMessage(ProductErrorCode.DEFAULT_SKU_CANNOT_UNSET.message());
 
       verify(product).validateOwner(updateSkuCommand.creatorId());
-      verify(sku).isDefault();
-      verify(sku, never()).update(anyString(), anyLong(), anyBoolean());
+      assertThat(sku.isDefault()).isTrue();
     }
   }
 
@@ -198,7 +192,7 @@ class SkuCommandServiceUnitTest {
     @DisplayName("상품이 존재하지 않는 경우 PRODUCT_NOT_FOUND 예외가 발생해야한다.")
     void deleteSku_fails_when_product_not_found() {
       // given
-      given(productCommandRepository.findByIdForUpdate(deleteSkuCommand.productId()))
+      given(productRepository.findByIdForUpdate(deleteSkuCommand.productId()))
           .willReturn(Optional.empty());
 
       // when & then
@@ -206,8 +200,8 @@ class SkuCommandServiceUnitTest {
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.PRODUCT_NOT_FOUND.message());
 
-      verify(productCommandRepository).findByIdForUpdate(deleteSkuCommand.productId());
-      verifyNoInteractions(skuCommandRepository);
+      verify(productRepository).findByIdForUpdate(deleteSkuCommand.productId());
+      verifyNoInteractions(skuRepository);
     }
 
     @Test
@@ -216,7 +210,7 @@ class SkuCommandServiceUnitTest {
       // given
       Product product = mock(Product.class);
 
-      given(productCommandRepository.findByIdForUpdate(deleteSkuCommand.productId()))
+      given(productRepository.findByIdForUpdate(deleteSkuCommand.productId()))
           .willReturn(Optional.of(product));
 
       willThrow(new BusinessException(ProductErrorCode.PRODUCT_ACCESS_DENIED))
@@ -229,7 +223,7 @@ class SkuCommandServiceUnitTest {
           .hasMessage(ProductErrorCode.PRODUCT_ACCESS_DENIED.message());
 
       verify(product).validateOwner(deleteSkuCommand.creatorId());
-      verifyNoInteractions(skuCommandRepository);
+      verifyNoInteractions(skuRepository);
     }
 
     @Test
@@ -238,11 +232,11 @@ class SkuCommandServiceUnitTest {
       // given
       Product product = mock(Product.class);
 
-      given(productCommandRepository.findByIdForUpdate(deleteSkuCommand.productId()))
+      given(productRepository.findByIdForUpdate(deleteSkuCommand.productId()))
           .willReturn(Optional.of(product));
 
       given(
-              skuCommandRepository.findByIdAndProductIdAndDeletedAtIsNull(
+              skuRepository.findByIdAndProductIdAndDeletedAtIsNull(
                   deleteSkuCommand.skuId(), deleteSkuCommand.productId()))
           .willReturn(Optional.empty());
 
@@ -251,7 +245,7 @@ class SkuCommandServiceUnitTest {
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.SKU_NOT_FOUND.message());
 
-      verify(skuCommandRepository)
+      verify(skuRepository)
           .findByIdAndProductIdAndDeletedAtIsNull(
               deleteSkuCommand.skuId(), deleteSkuCommand.productId());
     }
@@ -261,25 +255,22 @@ class SkuCommandServiceUnitTest {
     void deleteSku_fails_when_default_sku() {
       // given
       Product product = mock(Product.class);
-      Sku sku = mock(Sku.class);
+      Sku sku = Sku.create(deleteSkuCommand.productId(), "핑크", 10000L, true);
 
-      given(productCommandRepository.findByIdForUpdate(deleteSkuCommand.productId()))
+      given(productRepository.findByIdForUpdate(deleteSkuCommand.productId()))
           .willReturn(Optional.of(product));
 
       given(
-              skuCommandRepository.findByIdAndProductIdAndDeletedAtIsNull(
+              skuRepository.findByIdAndProductIdAndDeletedAtIsNull(
                   deleteSkuCommand.skuId(), deleteSkuCommand.productId()))
           .willReturn(Optional.of(sku));
-
-      given(sku.isDefault()).willReturn(true);
 
       // when & then
       assertThatThrownBy(() -> skuCommandService.deleteSku(deleteSkuCommand))
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.DEFAULT_SKU_CANNOT_DELETED.message());
 
-      verify(sku).isDefault();
-      verify(sku, never()).delete(any());
+      assertThat(sku.getDeletedAt()).isNull();
     }
 
     @Test
@@ -287,27 +278,25 @@ class SkuCommandServiceUnitTest {
     void deleteSku_fails_when_sku_exists() {
       // given
       Product product = mock(Product.class);
-      Sku sku = mock(Sku.class);
+      Sku sku = Sku.create(deleteSkuCommand.productId(), "핑크", 10000L, false);
 
-      given(productCommandRepository.findByIdForUpdate(deleteSkuCommand.productId()))
+      given(productRepository.findByIdForUpdate(deleteSkuCommand.productId()))
           .willReturn(Optional.of(product));
 
       given(
-              skuCommandRepository.findByIdAndProductIdAndDeletedAtIsNull(
+              skuRepository.findByIdAndProductIdAndDeletedAtIsNull(
                   deleteSkuCommand.skuId(), deleteSkuCommand.productId()))
           .willReturn(Optional.of(sku));
 
-      given(skuCommandRepository.countByProductIdAndDeletedAtIsNull(deleteSkuCommand.productId()))
+      given(skuRepository.countByProductIdAndDeletedAtIsNull(deleteSkuCommand.productId()))
           .willReturn(1L);
-
-      given(sku.isDefault()).willReturn(false);
 
       // when & then
       assertThatThrownBy(() -> skuCommandService.deleteSku(deleteSkuCommand))
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.SKU_REQUIRED.message());
 
-      verify(sku, never()).delete(any());
+      assertThat(sku.getDeletedAt()).isNull();
     }
   }
 }

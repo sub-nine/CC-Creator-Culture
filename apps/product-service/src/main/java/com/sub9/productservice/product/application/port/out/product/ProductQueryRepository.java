@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.application.query.repository;
+package com.sub9.productservice.product.application.port.out.product;
 
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
