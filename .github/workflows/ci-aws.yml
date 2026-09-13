@@ -1,0 +1,180 @@
+name: CI - AWS
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "infra/terraform/aws/**"
+      - "deploy/aws/**"
+      - "config-repo/*-prod.yaml"
+      - "config-repo/application-prod.yaml"
+      - "infra/config-server/src/main/resources/application-prod.yaml"
+      - "infra/eureka-server/src/main/resources/application-prod.yaml"
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/ci-aws.yml"
+      - ".github/scripts/validate-aws-release-record.sh"
+      - ".github/scripts/validate-aws-release-record_test.sh"
+      - ".github/scripts/validate-candidate-manifest.sh"
+      - ".github/scripts/validate-candidate-manifest_test.sh"
+      - ".github/scripts/copy-ocir-images-to-ecr.sh"
+      - ".github/scripts/copy-ocir-images-to-ecr_test.sh"
+      - ".github/scripts/publish-db-artifacts.sh"
+      - ".github/scripts/publish-db-artifacts_test.sh"
+      - ".github/workflows/deploy-dev.yml"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "infra/terraform/aws/**"
+      - "deploy/aws/**"
+      - "config-repo/*-prod.yaml"
+      - "config-repo/application-prod.yaml"
+      - "infra/config-server/src/main/resources/application-prod.yaml"
+      - "infra/eureka-server/src/main/resources/application-prod.yaml"
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/ci-aws.yml"
+      - ".github/scripts/validate-aws-release-record.sh"
+      - ".github/scripts/validate-aws-release-record_test.sh"
+      - ".github/scripts/validate-candidate-manifest.sh"
+      - ".github/scripts/validate-candidate-manifest_test.sh"
+      - ".github/scripts/copy-ocir-images-to-ecr.sh"
+      - ".github/scripts/copy-ocir-images-to-ecr_test.sh"
+      - ".github/scripts/publish-db-artifacts.sh"
+      - ".github/scripts/publish-db-artifacts_test.sh"
+      - ".github/workflows/deploy-dev.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-aws-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Lint and controller checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install actionlint and shellcheck
+        run: |
+          set -euo pipefail
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)"
+          sudo apt-get update -y
+          sudo apt-get install -y shellcheck
+
+      - name: actionlint
+        run: ./actionlint .github/workflows/ci-aws.yml
+
+      - name: shellcheck AWS scripts
+        run: |
+          set -euo pipefail
+          shellcheck -x \
+            deploy/aws/db-tasks.sh \
+            deploy/aws/ecs-deploy.sh \
+            deploy/aws/obs-tasks.sh \
+            deploy/aws/database/scripts/migrate.sh \
+            deploy/aws/database/scripts/bootstrap-roles.sh \
+            deploy/aws/seed/scripts/seed.sh \
+            infra/terraform/aws/scripts/assert-safe-plan.sh \
+            .github/scripts/validate-aws-release-record.sh \
+            .github/scripts/validate-candidate-manifest.sh \
+            .github/scripts/copy-ocir-images-to-ecr.sh \
+            .github/scripts/publish-db-artifacts.sh
+
+      - name: Release and core controller tests
+        run: |
+          set -euo pipefail
+          bash .github/scripts/validate-aws-release-record_test.sh
+          bash .github/scripts/validate-candidate-manifest_test.sh
+          bash .github/scripts/copy-ocir-images-to-ecr_test.sh
+          bash .github/scripts/publish-db-artifacts_test.sh
+          bash infra/terraform/aws/scripts/assert-safe-plan_test.sh
+          bash infra/terraform/aws/persistent/persistent_config_test.sh
+          python3 infra/terraform/aws/runtime/deployment_config_test.py
+
+      - name: RDS CA bundle checksum drift
+        run: |
+          set -euo pipefail
+          url="https://truststore.pki.rds.amazonaws.com/ap-northeast-2/ap-northeast-2-bundle.pem"
+          bundle="$(mktemp)"
+          curl -fsSL --retry 3 "$url" -o "$bundle"
+          upstream="$(sha256sum "$bundle" | awk '{print $1}')"
+          rm -f "$bundle"
+          status=0
+          for dockerfile in Dockerfile deploy/aws/database/Dockerfile deploy/aws/seed/Dockerfile; do
+            pinned="$(grep -Eo -- '--checksum=sha256:[0-9a-f]{64}' "$dockerfile" | sed 's/^--checksum=sha256://' | sort -u)"
+            if [[ "$(wc -l <<<"$pinned")" -ne 1 ]]; then
+              echo "$dockerfile must pin exactly one RDS bundle checksum" >&2
+              status=1
+              continue
+            fi
+            if [[ "$pinned" != "$upstream" ]]; then
+              echo "$dockerfile pins sha256:$pinned but upstream bundle is sha256:$upstream" >&2
+              status=1
+            fi
+          done
+          if [[ "$status" -ne 0 ]]; then
+            echo "RDS CA bundle drift detected: update --checksum in the Dockerfiles above" >&2
+            exit 1
+          fi
+          echo "RDS CA bundle checksum matches upstream: sha256:$upstream"
+
+      - name: Database static checks
+        run: |
+          set -euo pipefail
+          sh -n deploy/aws/database/scripts/migrate.sh
+          sh -n deploy/aws/database/scripts/bootstrap-roles.sh
+          for service in user product order; do
+            test -f "deploy/aws/database/migrations/${service}/V1__${service}_schema.sql"
+          done
+          if grep -RE "TRUNCATE|DROP TABLE|CREATE EXTENSION[[:space:]]+vector" \
+            deploy/aws/database/scripts deploy/aws/database/migrations; then
+            echo "migrations must not truncate, drop tables, or create vector" >&2
+            exit 1
+          fi
+
+  database-images:
+    name: Database migrate and seed images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Database migrate integration
+        run: REQUIRE_DOCKER=true bash deploy/aws/database/database_test.sh
+
+      - name: Seed integration
+        run: REQUIRE_DOCKER=true bash deploy/aws/seed/seed_test.sh
+
+  terraform:
+    name: Terraform ${{ matrix.stack }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: [bootstrap, persistent, runtime]
+    defaults:
+      run:
+        working-directory: infra/terraform/aws/${{ matrix.stack }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+          terraform_wrapper: false
+
+      - name: fmt
+        run: terraform fmt -check -recursive
+
+      - name: init
+        run: terraform init -backend=false -input=false -no-color
+
+      - name: validate
+        run: terraform validate -no-color
