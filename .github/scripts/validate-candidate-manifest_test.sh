@@ -14,7 +14,6 @@ DIGEST="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 write_valid() {
   jq -n --arg sha "$SHA" --arg digest "$DIGEST" '{
     commit_sha: $sha,
-    config_sha: $sha,
     ci_url: "https://github.com/example/cc-service/actions/runs/1",
     images: {
       "config-server": ("nrt.ocir.io/ns/cc-dev/config-server@" + $digest),
@@ -23,6 +22,14 @@ write_valid() {
       "order-service": ("nrt.ocir.io/ns/cc-dev/order-service@" + $digest),
       "product-service": ("nrt.ocir.io/ns/cc-dev/product-service@" + $digest),
       "user-service": ("nrt.ocir.io/ns/cc-dev/user-service@" + $digest)
+    },
+    config_labels: {
+      "config-server": $sha,
+      "eureka-server": $sha,
+      "gateway": $sha,
+      "order-service": $sha,
+      "product-service": $sha,
+      "user-service": $sha
     }
   }' > "$1"
 }
@@ -39,8 +46,14 @@ expect_fail() {
 write_valid "$TEST_ROOT/valid.json"
 bash "$SCRIPT" "$TEST_ROOT/valid.json"
 
-jq '.config_sha = $sha' --arg sha "$OTHER" "$TEST_ROOT/valid.json" > "$TEST_ROOT/sha-mismatch.json"
-expect_fail sha-mismatch "$TEST_ROOT/sha-mismatch.json"
+jq '.config_labels["order-service"] = $sha' --arg sha "$OTHER" "$TEST_ROOT/valid.json" > "$TEST_ROOT/label-ok.json"
+bash "$SCRIPT" "$TEST_ROOT/label-ok.json"
+
+jq 'del(.config_labels["order-service"])' "$TEST_ROOT/valid.json" > "$TEST_ROOT/missing-label.json"
+expect_fail missing-label "$TEST_ROOT/missing-label.json"
+
+jq '.config_labels["order-service"] = "not-a-sha"' "$TEST_ROOT/valid.json" > "$TEST_ROOT/bad-label.json"
+expect_fail bad-label "$TEST_ROOT/bad-label.json"
 
 jq '.commit_sha = (.commit_sha | ascii_upcase)' "$TEST_ROOT/valid.json" > "$TEST_ROOT/uppercase.json"
 expect_fail uppercase "$TEST_ROOT/uppercase.json"
@@ -55,4 +68,3 @@ jq '.images["user-service"] = "nrt.ocir.io/ns/cc-dev/user-service:latest"' "$TES
 expect_fail mutable "$TEST_ROOT/mutable.json"
 
 echo "validate-candidate-manifest.sh regression tests passed."
-

@@ -29,6 +29,7 @@ jobs:
     outputs:
       sha: ${{ steps.revision.outputs.sha }}
       ref: ${{ steps.revision.outputs.ref }}
+      revisions: ${{ steps.revisions.outputs.revisions }}
     steps:
       - name: Validate candidate ref
         id: ref
@@ -45,7 +46,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ steps.ref.outputs.ref }}
-          fetch-depth: 1
+          fetch-depth: 0
 
       - id: revision
         name: Record immutable revision
@@ -59,6 +60,14 @@ jobs:
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "ref=$CANDIDATE_REF" >> "$GITHUB_OUTPUT"
+
+      - id: revisions
+        name: Compute per-service image tags and config labels
+        run: |
+          set -euo pipefail
+          json="$(bash .github/scripts/service-revisions.sh "$(git rev-parse HEAD)")"
+          jq -e 'type == "object"' <<<"$json" >/dev/null
+          echo "revisions=$json" >> "$GITHUB_OUTPUT"
 
   verify-common:
     name: Verify common module
@@ -190,33 +199,6 @@ jobs:
         with:
           ref: ${{ needs.prepare.outputs.sha }}
 
-      - uses: actions/setup-java@v5
-        if: matrix.gradle-task != ''
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - uses: gradle/actions/setup-gradle@v6
-        if: matrix.gradle-task != ''
-        with:
-          cache-provider: basic
-
-      - name: Build and test module
-        if: matrix.gradle-task != ''
-        env:
-          GRADLE_TASK: ${{ matrix.gradle-task }}
-        run: bash ./gradlew "$GRADLE_TASK" --no-daemon
-
-      - name: Prepare bootJar for image packaging
-        if: matrix.gradle-task != ''
-        env:
-          MODULE_DIR: ${{ matrix.module-dir }}
-        run: |
-          mapfile -t boot_jars < <(find "$MODULE_DIR/build/libs" -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar')
-          test "${#boot_jars[@]}" -eq 1
-          mkdir -p .image
-          cp "${boot_jars[0]}" .image/app.jar
-
       - uses: docker/setup-qemu-action@v3
         if: matrix.service != 'db-seed' || vars.AWS_ECR_REGISTRY != ''
         with:
@@ -251,34 +233,100 @@ jobs:
         env:
           SERVICE: ${{ matrix.service }}
           SHA: ${{ needs.prepare.outputs.sha }}
+          IMAGE_TAG: ${{ fromJson(needs.prepare.outputs.revisions)[matrix.service].image_tag }}
           GRADLE_TASK: ${{ matrix.gradle-task }}
         run: |
           set -euo pipefail
-          tags=()
-          # The six services go to OCIR; db-seed is an AWS-only artifact and never gets an OCIR tag.
+          [[ "$IMAGE_TAG" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid image tag for ${SERVICE}." >&2; exit 65; }
+
+          ocir_image=""
+          ecr_image=""
+          ocir_exists=false
+          ecr_exists=false
           if [[ "$SERVICE" != db-seed ]]; then
-            tags+=("${OCIR_REGISTRY}/${OCIR_NAMESPACE}/cc-dev/${SERVICE}:${SHA}")
-          fi
-          if [[ -n "$AWS_ECR_REGISTRY" ]]; then
-            repo="${AWS_ECR_REPOSITORY_PREFIX}${SERVICE}"
-            # ECR tags are IMMUTABLE. A re-run for the same SHA keeps the already published image.
-            if aws ecr batch-get-image --repository-name "$repo" --image-ids "imageTag=${SHA}" \
-                --query 'images[0].imageId.imageTag' --output text 2>/dev/null | grep -qx "$SHA"; then
-              echo "ECR ${repo}:${SHA} already exists, skipping ECR push."
-            else
-              tags+=("${AWS_ECR_REGISTRY}/${repo}:${SHA}")
+            ocir_image="${OCIR_REGISTRY}/${OCIR_NAMESPACE}/cc-dev/${SERVICE}:${IMAGE_TAG}"
+            if docker buildx imagetools inspect "$ocir_image" >/dev/null 2>&1; then
+              ocir_exists=true
+              echo "OCIR ${SERVICE}:${IMAGE_TAG} already exists."
             fi
           fi
+          if [[ -n "$AWS_ECR_REGISTRY" ]]; then
+            ecr_repo="${AWS_ECR_REPOSITORY_PREFIX}${SERVICE}"
+            ecr_image="${AWS_ECR_REGISTRY}/${ecr_repo}:${IMAGE_TAG}"
+            if aws ecr batch-get-image --repository-name "$ecr_repo" --image-ids "imageTag=${IMAGE_TAG}" \
+                --query 'images[0].imageId.imageTag' --output text 2>/dev/null | grep -qx "$IMAGE_TAG"; then
+              ecr_exists=true
+              echo "ECR ${ecr_repo}:${IMAGE_TAG} already exists."
+            fi
+          fi
+
+          tags=()
+          copy_src=""
+          copy_dst=""
+          need_gradle=false
+          if [[ "$SERVICE" == db-seed ]]; then
+            if [[ "$ecr_exists" != true ]]; then
+              tags+=("$ecr_image")
+            fi
+          elif [[ "$ocir_exists" == true && ( -z "$AWS_ECR_REGISTRY" || "$ecr_exists" == true ) ]]; then
+            :
+          elif [[ "$ocir_exists" == true && "$ecr_exists" != true ]]; then
+            copy_src="$ocir_image"
+            copy_dst="$ecr_image"
+          elif [[ "$ocir_exists" != true && "$ecr_exists" == true ]]; then
+            copy_src="$ecr_image"
+            copy_dst="$ocir_image"
+          else
+            [[ -n "$GRADLE_TASK" ]] && need_gradle=true
+            tags+=("$ocir_image")
+            if [[ -n "$ecr_image" ]]; then
+              tags+=("$ecr_image")
+            fi
+          fi
+
           if [[ -n "$GRADLE_TASK" ]]; then
             build_args="JAR_FILE=.image/app.jar"
           else
             build_args="RELEASE_SHA=${SHA}"
           fi
-          echo "tags=$(IFS=,; echo "${tags[*]}")" >> "$GITHUB_OUTPUT"
-          echo "build_args=$build_args" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "need_gradle=$need_gradle"
+            echo "tags=$(IFS=,; echo "${tags[*]}")"
+            echo "copy_src=$copy_src"
+            echo "copy_dst=$copy_dst"
+            echo "digest_ref=${ocir_image}"
+            echo "build_args=$build_args"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v5
+        if: steps.tags.outputs.need_gradle == 'true'
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v6
+        if: steps.tags.outputs.need_gradle == 'true'
+        with:
+          cache-provider: basic
+
+      - name: Build and test module
+        if: steps.tags.outputs.need_gradle == 'true'
+        env:
+          GRADLE_TASK: ${{ matrix.gradle-task }}
+        run: bash ./gradlew "$GRADLE_TASK" --no-daemon
+
+      - name: Prepare bootJar for image packaging
+        if: steps.tags.outputs.need_gradle == 'true'
+        env:
+          MODULE_DIR: ${{ matrix.module-dir }}
+        run: |
+          mapfile -t boot_jars < <(find "$MODULE_DIR/build/libs" -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar')
+          test "${#boot_jars[@]}" -eq 1
+          mkdir -p .image
+          cp "${boot_jars[0]}" .image/app.jar
 
       - id: build
-        # Skipped only for db-seed when its ECR tag already exists (the tag list is then empty).
         if: steps.tags.outputs.tags != ''
         uses: docker/build-push-action@v6
         with:
@@ -289,15 +337,40 @@ jobs:
           push: true
           build-args: ${{ steps.tags.outputs.build_args }}
           tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.prepare.outputs.sha }}
+
+      - name: Copy existing image between registries
+        if: steps.tags.outputs.copy_src != ''
+        env:
+          COPY_SRC: ${{ steps.tags.outputs.copy_src }}
+          COPY_DST: ${{ steps.tags.outputs.copy_dst }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create --tag "$COPY_DST" "$COPY_SRC"
+          echo "Copied ${COPY_SRC} to ${COPY_DST}."
 
       - name: Record immutable image reference
         if: matrix.gradle-task != ''
         env:
           SERVICE: ${{ matrix.service }}
           DIGEST: ${{ steps.build.outputs.digest }}
+          DIGEST_REF: ${{ steps.tags.outputs.digest_ref }}
           IMAGE_BASE: ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_NAMESPACE }}/cc-dev/${{ matrix.service }}
         run: |
-          jq -n --arg service "$SERVICE" --arg image "${IMAGE_BASE}@${DIGEST}" \
+          set -euo pipefail
+          digest="$DIGEST"
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            digest="$(docker buildx imagetools inspect "$DIGEST_REF" --format '{{.Manifest.Digest}}' 2>/dev/null || true)"
+          fi
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            digest="$(docker buildx imagetools inspect "$DIGEST_REF" | awk '/^Digest:/{print $2; exit}')"
+          fi
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo "Could not resolve digest for ${SERVICE}." >&2
+            exit 1
+          }
+          jq -n --arg service "$SERVICE" --arg image "${IMAGE_BASE}@${digest}" \
             '{service: $service, image: $image}' > "$RUNNER_TEMP/${SERVICE}.json"
 
       - uses: actions/upload-artifact@v4
@@ -332,12 +405,25 @@ jobs:
           merge-multiple: true
 
       - name: Build candidate manifest
+        env:
+          REVISIONS: ${{ needs.prepare.outputs.revisions }}
         run: |
           jq -s \
             --arg commit_sha "${{ needs.prepare.outputs.sha }}" \
-            --arg config_sha "${{ needs.prepare.outputs.sha }}" \
             --arg ci_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            '{commit_sha: $commit_sha, config_sha: $config_sha, ci_url: $ci_url, images: (map({key: .service, value: .image}) | from_entries)}' \
+            --argjson revisions "$REVISIONS" \
+            '{
+              commit_sha: $commit_sha,
+              ci_url: $ci_url,
+              images: (map({key: .service, value: .image}) | from_entries),
+              config_labels: (
+                $revisions
+                | to_entries
+                | map(select(.value.config_label != null))
+                | map({key: .key, value: .value.config_label})
+                | from_entries
+              )
+            }' \
             image-digests/*.json > candidate.json
           bash .github/scripts/validate-candidate-manifest.sh candidate.json
 
