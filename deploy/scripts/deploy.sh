@@ -71,14 +71,21 @@ umask 077
 mkdir -p "$STATE_DIR/releases" "$STATE_DIR/runtime"
 
 candidate_sha="$(jq -er '.commit_sha' "$MANIFEST")"
-config_sha="$(jq -er '.config_sha' "$MANIFEST")"
-if [[ ! "$candidate_sha" =~ ^[0-9a-f]{40}$ || "$config_sha" != "$candidate_sha" ]]; then
-  echo "Manifest commit_sha and config_sha must be the same full lowercase Git SHA." >&2
+[[ "$candidate_sha" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "Manifest commit_sha must be a full lowercase Git SHA." >&2
   exit 65
-fi
+}
 
 required_services=(config-server eureka-server gateway user-service product-service order-service)
+required_services_json='["config-server","eureka-server","gateway","order-service","product-service","user-service"]'
 database_containers=(user-postgres product-postgres order-postgres)
+jq -e --argjson required "$required_services_json" '
+  ((.config_labels | keys | sort) == $required)
+  and all(.config_labels[]; type == "string" and test("^[0-9a-f]{40}$"))
+' "$MANIFEST" >/dev/null || {
+  echo "Manifest config_labels must contain a 40-character SHA for each service." >&2
+  exit 65
+}
 for service in "${required_services[@]}"; do
   jq -e --arg service "$service" '
     .images[$service]
@@ -354,7 +361,6 @@ write_release_env() {
 
   {
     printf 'CANDIDATE_SHA=%s\n' "$candidate_sha"
-    printf 'CONFIG_SHA=%s\n' "$config_sha"
     printf 'DEV_DOMAIN=%s\n' "$DEV_DOMAIN"
     printf 'ENABLE_MESSAGING_PROFILE=%s\n' "$ENABLE_MESSAGING_PROFILE"
     printf 'ENABLE_OBSERVABILITY_PROFILE=%s\n' "$ENABLE_OBSERVABILITY_PROFILE"
@@ -372,6 +378,11 @@ write_release_env() {
       .images
       | to_entries[]
       | (.key | ascii_upcase | gsub("-"; "_") + "_IMAGE") + "=" + .value
+    ' "$MANIFEST"
+    jq -r '
+      .config_labels
+      | to_entries[]
+      | (.key | ascii_upcase | gsub("-"; "_") + "_CONFIG_LABEL") + "=" + .value
     ' "$MANIFEST"
   } > "$target"
   chmod 0600 "$target"

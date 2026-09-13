@@ -5,7 +5,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 export CANDIDATE_SHA=test
-export CONFIG_SHA=1111111111111111111111111111111111111111
+export CONFIG_SERVER_CONFIG_LABEL=1111111111111111111111111111111111111111
+export EUREKA_SERVER_CONFIG_LABEL=2222222222222222222222222222222222222222
+export GATEWAY_CONFIG_LABEL=3333333333333333333333333333333333333333
+export USER_SERVICE_CONFIG_LABEL=4444444444444444444444444444444444444444
+export PRODUCT_SERVICE_CONFIG_LABEL=5555555555555555555555555555555555555555
+export ORDER_SERVICE_CONFIG_LABEL=6666666666666666666666666666666666666666
 export DEV_DOMAIN=dev.example.com
 export POSTGRES_ADMIN_PASSWORD=postgres-admin
 export USER_DB_ADMIN_PASSWORD=user-admin
@@ -65,10 +70,19 @@ jq -e '
   )
 ' <<<"$deploy_config" >/dev/null
 
-jq -e --arg sha "$CONFIG_SHA" '
+jq -e \
+  --arg config_server "$CONFIG_SERVER_CONFIG_LABEL" \
+  --arg gateway "$GATEWAY_CONFIG_LABEL" \
+  --arg user_service "$USER_SERVICE_CONFIG_LABEL" \
+  --arg product_service "$PRODUCT_SERVICE_CONFIG_LABEL" \
+  --arg order_service "$ORDER_SERVICE_CONFIG_LABEL" \
+  '
   .services["config-server"].environment.SPRING_PROFILES_ACTIVE == "git"
-  and .services["config-server"].environment.CONFIG_GIT_DEFAULT_LABEL == $sha
-  and all(.services | to_entries[] | select(.key == "gateway" or .key == "user-service" or .key == "product-service" or .key == "order-service"); .value.environment.SPRING_CLOUD_CONFIG_LABEL == $sha)
+  and .services["config-server"].environment.CONFIG_GIT_DEFAULT_LABEL == $config_server
+  and .services.gateway.environment.SPRING_CLOUD_CONFIG_LABEL == $gateway
+  and .services["user-service"].environment.SPRING_CLOUD_CONFIG_LABEL == $user_service
+  and .services["product-service"].environment.SPRING_CLOUD_CONFIG_LABEL == $product_service
+  and .services["order-service"].environment.SPRING_CLOUD_CONFIG_LABEL == $order_service
 ' <<<"$deploy_config" >/dev/null
 
 local_config="$(docker compose \
