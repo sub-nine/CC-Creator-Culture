@@ -7,6 +7,7 @@ REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 export CANDIDATE_SHA=test
 export CONFIG_SHA=1111111111111111111111111111111111111111
 export DEV_DOMAIN=dev.example.com
+export POSTGRES_ADMIN_PASSWORD=postgres-admin
 export USER_DB_ADMIN_PASSWORD=user-admin
 export PRODUCT_DB_ADMIN_PASSWORD=product-admin
 export ORDER_DB_ADMIN_PASSWORD=order-admin
