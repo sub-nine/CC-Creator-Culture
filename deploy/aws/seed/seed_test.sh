@@ -41,10 +41,18 @@ docker build -f "$SCRIPT_DIR/Dockerfile" --build-arg RELEASE_SHA=test -t "$SEED_
 docker network create "$TEST_ID-net" >/dev/null
 docker run -d --name "$TEST_ID-postgres" --network "$TEST_ID-net" --network-alias postgres \
   -e POSTGRES_PASSWORD=admin-pass -e POSTGRES_DB=seed_test "$POSTGRES_IMAGE" >/dev/null
+# pg_isready is not enough: the image's entrypoint starts a socket-only temporary server before it creates
+# POSTGRES_DB, so check over TCP against the target database itself.
+ready=false
 for _ in $(seq 1 30); do
-  docker exec "$TEST_ID-postgres" pg_isready --username postgres >/dev/null 2>&1 && break
+  if docker exec -e PGPASSWORD=admin-pass "$TEST_ID-postgres" \
+    psql --host 127.0.0.1 --username postgres --dbname seed_test --quiet --command "SELECT 1" >/dev/null 2>&1; then
+    ready=true
+    break
+  fi
   sleep 1
 done
+[[ "$ready" == "true" ]] || fail "PostgreSQL did not become ready with database seed_test within 30s"
 
 psql_admin <<'SQL'
 CREATE SCHEMA private;
