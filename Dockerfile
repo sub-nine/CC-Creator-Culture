@@ -17,7 +17,7 @@ COPY --chown=spring:spring ${JAR_FILE} /app/app.jar
 
 # Public RDS CA, downloaded and checksum-verified by BuildKit at build time.
 ADD --chown=spring:spring --chmod=644 --checksum=sha256:913fb5b814f17af79d4c1622584a8d0ceddf5b0d76fe353d0c7d1186cdd6b229 \
-    https://truststore.pki.rds.amazonaws.com/ap-northeast-2/ap-northeast-2-bundle.pem /app/certs/global-bundle.pem
+    https://truststore.pki.rds.amazonaws.com/ap-northeast-2/ap-northeast-2-bundle.pem /app/certs/rds-ap-northeast-2-bundle.pem
 
 USER spring:spring
 ENTRYPOINT ["java", "-jar", "app.jar"]

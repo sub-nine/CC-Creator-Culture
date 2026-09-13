@@ -3,7 +3,7 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://${ORDER_DB_HOST}:${ORDER_DB_PORT:5432}/${ORDER_DB_NAME}?sslmode=verify-full&sslrootcert=${DB_SSLROOTCERT:/app/certs/global-bundle.pem}
+    url: jdbc:postgresql://${ORDER_DB_HOST}:${ORDER_DB_PORT:5432}/${ORDER_DB_NAME}?sslmode=verify-full&sslrootcert=${DB_SSLROOTCERT:/app/certs/rds-ap-northeast-2-bundle.pem}
     username: ${ORDER_DB_USERNAME}
     password: ${ORDER_DB_PASSWORD}
     hikari:
