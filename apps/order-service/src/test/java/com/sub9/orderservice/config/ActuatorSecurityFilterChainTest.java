@@ -1,10 +1,11 @@
-package com.sub9.userservice.config;
+package com.sub9.orderservice.config;
 
+import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.sub9.userservice.auth.application.service.LogoutService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,30 +13,24 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@WebMvcTest(
-        controllers = ProductionActuatorSecurityFilterChainTest.ActuatorProbeController.class,
-        properties = "auth.jwt.secret=test-secret")
+@WebMvcTest(controllers = ActuatorSecurityFilterChainTest.ActuatorProbeController.class)
 @ActiveProfiles("prod")
 @TestPropertySource(properties = "management.server.port=9090")
 @Import({
         SecurityConfig.class,
-        ProductionActuatorSecurityConfig.class,
-        ProductionActuatorSecurityFilterChainTest.ActuatorProbeController.class
+        ActuatorSecurityConfig.class,
+        ActuatorSecurityFilterChainTest.ActuatorProbeController.class
 })
-@DisplayName("User prod Actuator 보안")
-class ProductionActuatorSecurityFilterChainTest {
+@DisplayName("Order Actuator 보안")
+class ActuatorSecurityFilterChainTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @MockitoBean
-    private LogoutService logoutService;
 
     @Test
     @DisplayName("prod 9090에서 health와 readiness는 인증 없이 허용한다")
@@ -54,6 +49,15 @@ class ProductionActuatorSecurityFilterChainTest {
         mockMvc.perform(get("/actuator/prometheus").with(managementPort()))
                 .andExpect(status().isOk())
                 .andExpect(content().string("metrics"));
+    }
+
+    @Test
+    @DisplayName("prod 9090에서 허용 목록 밖의 Actuator 엔드포인트는 401 또는 403으로 거부한다")
+    void when_prod_management_port_other_actuator_endpoint_is_denied() throws Exception {
+        mockMvc.perform(get("/actuator/env").with(managementPort()))
+                .andExpect(status().is(anyOf(is(401), is(403))));
+        mockMvc.perform(get("/actuator/beans").with(managementPort()))
+                .andExpect(status().is(anyOf(is(401), is(403))));
     }
 
     private static RequestPostProcessor managementPort() {
@@ -81,6 +85,16 @@ class ProductionActuatorSecurityFilterChainTest {
         @GetMapping("/actuator/prometheus")
         String prometheus() {
             return "metrics";
+        }
+
+        @GetMapping("/actuator/env")
+        String env() {
+            return "env";
+        }
+
+        @GetMapping("/actuator/beans")
+        String beans() {
+            return "beans";
         }
     }
 }

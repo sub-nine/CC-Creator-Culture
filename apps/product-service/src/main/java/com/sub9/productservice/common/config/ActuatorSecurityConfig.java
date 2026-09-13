@@ -8,12 +8,12 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration(proxyBeanMethods = false)
-@Profile("prod")
-public class ProductionActuatorSecurityConfig {
+@Profile({"local", "dev", "prod"})
+public class ActuatorSecurityConfig {
 
   @Bean
   @Order(1)
-  SecurityFilterChain productionActuatorSecurityFilterChain(HttpSecurity http) throws Exception {
+  SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
     http.securityMatcher("/actuator/**")
         .authorizeHttpRequests(
             authorize ->

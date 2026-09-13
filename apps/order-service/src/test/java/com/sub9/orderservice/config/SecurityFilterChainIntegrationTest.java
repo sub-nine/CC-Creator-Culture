@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 @ActiveProfiles("dev")
 @Import({
         SecurityConfig.class,
-        NonProductionActuatorSecurityConfig.class,
+        ActuatorSecurityConfig.class,
         SecurityFilterChainIntegrationTest.TestOrderController.class
 })
 @DisplayName("Order Security Filter Chain")
