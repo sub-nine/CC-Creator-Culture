@@ -6,11 +6,11 @@ NAT 1개, ALB HTTPS, Redis, Fargate 서비스 6개, 태스크 정의, 실행 상
 
 - `release_sha`: 이 apply를 만든 40자 커밋 SHA. 추적용이며 이미지 태그로 쓰지 않는다.
 - `image_tags`: 서비스 6개와 db-seed의 콘텐츠 해시 태그. `${ecr_repository_urls[name]}:${image_tags[name]}`. ECR 태그는 IMMUTABLE이라 digest가 고정된다. 태그가 바뀐 서비스만 새 태스크 정의가 생긴다.
-- `config_labels`: 서비스별 config-repo 라벨. config-server에는 `CONFIG_GIT_DEFAULT_LABEL`, 나머지에는 `SPRING_CLOUD_CONFIG_LABEL`로 전달한다. 라벨이 바뀐 서비스만 재시작된다.
-- `app_running`: true면 서비스 desired_count 1, RDS available, 관측과 Kafka EC2 running. false면 모두 정지한다. 기본값 false.
+- `config_labels`: 서비스별 config-repo 레이블. config-server에는 `CONFIG_GIT_DEFAULT_LABEL`, 나머지에는 `SPRING_CLOUD_CONFIG_LABEL`로 전달한다. 레이블이 바뀐 서비스만 재시작된다.
+- `app_running`: true면 서비스 desired_count 1, RDS available, 모니터링과 Kafka EC2 running. false면 모두 정지한다. 기본값 false.
 - 출력: `release_sha`, `image_tags`, `config_labels`, `app_running`, `cluster_name`, `seed_task_families`(서비스 키 -> family 맵), `app_subnet_ids`, `migration_security_group_id`, `observation_instance_id`, `observation_bootstrap_document`, `kafka_instance_id`, `kafka_bootstrap_document`, `redis_user_group_id`.
 
-ignore_changes 는 없다. 이미지 교체, 설정 라벨, desired_count, 전원은 모두 `terraform apply` 한 번으로 반영된다.
+ignore_changes 는 없다. 이미지 교체, 설정 레이블, desired_count, 전원은 모두 `terraform apply` 한 번으로 반영된다.
 
 ## 기동 순서
 
@@ -32,7 +32,7 @@ api.nodyy.com 은 AWS 시험용이며 런타임 스택과 함께 만들고 정�
 
 브로커는 persistent의 t4g.small 1대다. 앱은 `kafka.<namespace>:9092` PLAINTEXT로 붙는다. SASL은 쓰지 않는다. 토픽은 브로커가 자동 생성하고 복제 계수는 1이다. 브로커를 늘리는 작업은 이 스택이 하지 않는다.
 
-## IAM 공백
+## IAM 역할별 권한 범위
 
 bootstrap 의 runtime-deploy 역할은 이 스택의 plan, apply, destroy 에 필요한 권한만 있고 persistent VPC/RDS/IAM/KMS 생성 권한은 없다. AdministratorAccess 는 넣지 않는다. bootstrap과 persistent 적용은 infrastructure_apply_role 이 한다.
 
