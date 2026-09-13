@@ -1,0 +1,5 @@
+aws_region             = "ap-northeast-2"
+name_prefix            = "cc-test"
+vpc_cidr               = "10.42.0.0/16"
+bootstrap_state_bucket = "replace-with-state-bucket"
+bootstrap_state_key    = "cc-service/aws/bootstrap/terraform.tfstate"
