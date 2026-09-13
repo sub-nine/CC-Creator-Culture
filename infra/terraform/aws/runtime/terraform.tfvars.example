@@ -1,0 +1,94 @@
+aws_region          = "ap-northeast-2"
+name_prefix         = "cc-test"
+api_hostname        = "api.nodyy.com"
+cloudflare_zone_id  = "replace-with-cloudflare-zone-id"
+redis_user_group_id = "replace-with-elasticache-user-group-id"
+msk_kafka_version   = "3.9.x"
+
+# Required. Six canonical ECR URIs with @sha256:<64 lowercase hex>. Do not use tags or placeholder digests.
+# service_images = { ... }
+
+# persistent_config is the persistent stack output object. Pass it through as-is after apply.
+persistent_config = {
+  vpc_id                  = "replace-with-vpc-id"
+  public_subnet_ids       = ["replace-with-public-subnet-a", "replace-with-public-subnet-b", "replace-with-public-subnet-c"]
+  app_subnet_ids          = ["replace-with-app-subnet-a", "replace-with-app-subnet-b"]
+  data_subnet_ids         = ["replace-with-data-subnet-a", "replace-with-data-subnet-b", "replace-with-data-subnet-c"]
+  private_route_table_id  = "replace-with-private-route-table-id"
+  observation_instance_id = "replace-with-observation-instance-id"
+  release_bucket          = "replace-with-release-bucket"
+  rds_instances = {
+    user-service    = "replace-with-rds-user-service"
+    product-service = "replace-with-rds-product-service"
+    order-service   = "replace-with-rds-order-service"
+  }
+  db_endpoints = {
+    user-service    = "replace-with-user-db-hostname"
+    product-service = "replace-with-product-db-hostname"
+    order-service   = "replace-with-order-db-hostname"
+  }
+  log_groups = {
+    config-server   = "/ecs/cc-test/config-server"
+    eureka-server   = "/ecs/cc-test/eureka-server"
+    gateway         = "/ecs/cc-test/gateway"
+    user-service    = "/ecs/cc-test/user-service"
+    product-service = "/ecs/cc-test/product-service"
+    order-service   = "/ecs/cc-test/order-service"
+  }
+  security_groups = {
+    config-server   = "replace-with-sg-config-server"
+    eureka-server   = "replace-with-sg-eureka-server"
+    gateway         = "replace-with-sg-gateway"
+    user-service    = "replace-with-sg-user-service"
+    product-service = "replace-with-sg-product-service"
+    order-service   = "replace-with-sg-order-service"
+    alb             = "replace-with-sg-alb"
+    observation     = "replace-with-sg-observation"
+    msk             = "replace-with-sg-msk"
+    redis           = "replace-with-sg-redis"
+    migration       = "replace-with-sg-migration"
+    rds = {
+      user-service    = "replace-with-sg-rds-user-service"
+      product-service = "replace-with-sg-rds-product-service"
+      order-service   = "replace-with-sg-rds-order-service"
+    }
+  }
+  secret_arns = {
+    jwt   = "replace-with-jwt-secret-arn"
+    redis = "replace-with-redis-secret-arn"
+    r2    = "replace-with-r2-secret-arn"
+    kafka = {
+      user-service    = "replace-with-msk-user-service-secret-arn"
+      product-service = "replace-with-msk-product-service-secret-arn"
+      order-service   = "replace-with-msk-order-service-secret-arn"
+    }
+    app = {
+      user-service    = "replace-with-app-user-service-secret-arn"
+      product-service = "replace-with-app-product-service-secret-arn"
+      order-service   = "replace-with-app-order-service-secret-arn"
+    }
+    rds_master = {
+      user-service    = "replace-with-rds-master-user-service-secret-arn"
+      product-service = "replace-with-rds-master-product-service-secret-arn"
+      order-service   = "replace-with-rds-master-order-service-secret-arn"
+    }
+  }
+  roles = {
+    ecs_execution = "replace-with-ecs-execution-role-arn"
+    ecs_task      = "replace-with-ecs-task-role-arn"
+    observation   = "replace-with-observation-role-arn"
+  }
+  cloudmap = {
+    namespace_id   = "replace-with-cloudmap-namespace-id"
+    namespace_name = "cc-test.internal"
+    hosted_zone_id = "replace-with-hosted-zone-id"
+    service_ids = {
+      config-server = "replace-with-config-server-service-id"
+      eureka-server = "replace-with-eureka-server-service-id"
+    }
+    dns_names = {
+      config-server = "config-server.cc-test.internal"
+      eureka-server = "eureka-server.cc-test.internal"
+    }
+  }
+}
