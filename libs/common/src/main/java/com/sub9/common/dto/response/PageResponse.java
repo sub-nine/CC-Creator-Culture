@@ -5,7 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Slice;
 
 public record PageResponse<T>(
-    List<T> data,
+    List<T> content,
     Integer totalPages,
     int pageSize,
     Long totalElements,
