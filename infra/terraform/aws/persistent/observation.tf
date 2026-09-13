@@ -33,14 +33,7 @@ resource "aws_instance" "observation" {
   }
 }
 
-resource "aws_ec2_instance_state" "observation" {
-  instance_id = aws_instance.observation.id
-  state       = "stopped"
-
-  lifecycle {
-    ignore_changes = [state]
-  }
-}
+# Power state (running/stopped) is owned by the runtime stack: aws_ec2_instance_state.observation.
 
 resource "aws_ssm_document" "start_observation" {
   name            = "${var.name_prefix}-start-observation"

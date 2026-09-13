@@ -50,36 +50,26 @@ variable "redis_user_group_id" {
   }
 }
 
-variable "artifact_images" {
-  description = "Digest-pinned ECR image URIs for db-migrate and db-seed one-off tasks."
-  type        = map(string)
+variable "release_sha" {
+  description = "Git commit SHA used as the ECR image tag for the six services and the db-seed artifact. ECR tags are IMMUTABLE, so this pins the digest."
+  type        = string
 
   validation {
-    condition = alltrue([
-      for name in ["db-migrate", "db-seed"] :
-      contains(keys(var.artifact_images), name) && can(regex("@sha256:[0-9a-f]{64}$", var.artifact_images[name]))
-    ])
-    error_message = "artifact_images must map db-migrate and db-seed to repository@sha256:<64 lowercase hex>."
+    condition     = can(regex("^[0-9a-f]{40}$", var.release_sha))
+    error_message = "release_sha must be a 40 character lowercase hex git commit SHA."
   }
 }
 
-variable "service_images" {
-  description = "Digest-pinned ECR image URIs for the six app services."
-  type        = map(string)
+variable "config_sha" {
+  description = "Git ref of the config repository that config-server serves. Defaults to release_sha."
+  type        = string
+  default     = null
+}
 
-  validation {
-    condition = length(var.service_images) == 6 && alltrue([
-      for svc in [
-        "config-server",
-        "eureka-server",
-        "gateway",
-        "user-service",
-        "product-service",
-        "order-service",
-      ] : contains(keys(var.service_images), svc) && can(regex("@sha256:[0-9a-f]{64}$", var.service_images[svc]))
-    ])
-    error_message = "service_images must map all 6 services to repository@sha256:<64 lowercase hex>."
-  }
+variable "app_running" {
+  description = "true starts the app: services desired_count 1, RDS available, observation EC2 running. false stops all of them."
+  type        = bool
+  default     = false
 }
 
 variable "persistent_config" {
@@ -131,7 +121,6 @@ variable "persistent_config" {
     })
     secret_arns = object({
       rds_master = map(string)
-      app        = map(string)
       jwt        = string
       redis      = string
       kafka      = map(string)

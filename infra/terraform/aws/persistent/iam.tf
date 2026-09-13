@@ -57,19 +57,24 @@ data "aws_iam_policy_document" "ecs_execution" {
     resources = [for name in local.app_keys : "${aws_cloudwatch_log_group.app[name].arn}:*"]
   }
 
+  # RDS managed master secrets (rds!db-...) are the app DB credentials. They use the AWS managed
+  # aws/secretsmanager KMS key, whose key policy already allows this account via Secrets Manager,
+  # so no extra kms:Decrypt statement is needed for them.
   statement {
     sid = "Secrets"
     actions = [
       "secretsmanager:GetSecretValue",
       "secretsmanager:DescribeSecret",
     ]
-    resources = [
-      "${local.secret_prefix}*",
-      "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:AmazonMSK_${var.name_prefix}_*",
-      local.rds_secret,
-      aws_secretsmanager_secret.seed.arn,
-      aws_secretsmanager_secret.product_r2.arn,
-    ]
+    resources = concat(
+      [
+        "${local.secret_prefix}*",
+        "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:AmazonMSK_${var.name_prefix}_*",
+        aws_secretsmanager_secret.seed.arn,
+        aws_secretsmanager_secret.product_r2.arn,
+      ],
+      [for name, db in aws_db_instance.service : db.master_user_secret[0].secret_arn],
+    )
   }
 
   statement {

@@ -19,8 +19,10 @@ locals {
       ],
       name == "config-server" ? [
         { name = "CONFIG_GIT_URI", value = "https://github.com/sub-nine/CC-Creator-Culture.git" },
+        { name = "CONFIG_GIT_DEFAULT_LABEL", value = local.config_sha },
         ] : [
         { name = "CONFIG_SERVER_IMPORT", value = local.config_import },
+        { name = "SPRING_CLOUD_CONFIG_LABEL", value = local.config_sha },
         { name = "EUREKA_CLIENT_SERVICEURL_DEFAULTZONE", value = local.eureka_zone },
       ],
       contains(local.redis_clients, name) ? [
@@ -53,8 +55,8 @@ locals {
         { name = "KAFKA_PASSWORD", valueFrom = "${var.persistent_config.secret_arns.kafka[name]}:password::" },
       ] : [],
       contains(local.db_keys, name) ? [
-        { name = local.db_user_env[name], valueFrom = "${var.persistent_config.secret_arns.app[name]}:username::" },
-        { name = local.db_password_env[name], valueFrom = "${var.persistent_config.secret_arns.app[name]}:password::" },
+        { name = local.db_user_env[name], valueFrom = "${var.persistent_config.secret_arns.rds_master[name]}:username::" },
+        { name = local.db_password_env[name], valueFrom = "${var.persistent_config.secret_arns.rds_master[name]}:password::" },
       ] : [],
       name == "product-service" ? [
         { name = "R2_ACCESS_KEY", valueFrom = "${var.persistent_config.secret_arns.r2}:access_key::" },
@@ -85,7 +87,7 @@ resource "aws_ecs_task_definition" "service" {
   container_definitions = jsonencode([
     {
       name        = each.key
-      image       = var.service_images[each.key]
+      image       = local.service_images[each.key]
       essential   = true
       cpu         = each.value.cpu
       memory      = each.value.memory
@@ -119,8 +121,4 @@ resource "aws_ecs_task_definition" "service" {
       }
     }
   ])
-
-  lifecycle {
-    ignore_changes = [container_definitions]
-  }
 }

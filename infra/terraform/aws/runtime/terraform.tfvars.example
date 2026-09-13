@@ -5,8 +5,12 @@ cloudflare_zone_id  = "replace-with-cloudflare-zone-id"
 redis_user_group_id = "replace-with-elasticache-user-group-id"
 msk_kafka_version   = "3.9.x"
 
-# Required. Six canonical ECR URIs with @sha256:<64 lowercase hex>. Do not use tags or placeholder digests.
-# service_images = { ... }
+# Required. 40 hex git commit SHA used as the ECR image tag for the six services and db-seed.
+release_sha = "0000000000000000000000000000000000000000"
+# Optional. Config repository ref served by config-server. Defaults to release_sha.
+# config_sha = "0000000000000000000000000000000000000000"
+# false stops services, RDS, and the observation EC2. true starts them.
+app_running = false
 
 # persistent_config is the persistent stack output object. Pass it through as-is after apply.
 persistent_config = {
@@ -61,11 +65,6 @@ persistent_config = {
       user-service    = "replace-with-msk-user-service-secret-arn"
       product-service = "replace-with-msk-product-service-secret-arn"
       order-service   = "replace-with-msk-order-service-secret-arn"
-    }
-    app = {
-      user-service    = "replace-with-app-user-service-secret-arn"
-      product-service = "replace-with-app-product-service-secret-arn"
-      order-service   = "replace-with-app-order-service-secret-arn"
     }
     rds_master = {
       user-service    = "replace-with-rds-master-user-service-secret-arn"

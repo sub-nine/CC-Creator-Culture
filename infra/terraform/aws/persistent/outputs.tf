@@ -43,7 +43,6 @@ output "persistent_config" {
 
     secret_arns = {
       rds_master = { for name, db in aws_db_instance.service : name => db.master_user_secret[0].secret_arn }
-      app        = { for name, secret in aws_secretsmanager_secret.app : name => secret.arn }
       jwt        = aws_secretsmanager_secret.jwt.arn
       redis      = aws_secretsmanager_secret.redis.arn
       kafka      = { for name, secret in aws_secretsmanager_secret.msk : name => secret.arn }
