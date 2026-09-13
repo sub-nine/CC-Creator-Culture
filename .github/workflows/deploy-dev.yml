@@ -29,31 +29,18 @@ jobs:
     outputs:
       sha: ${{ steps.revision.outputs.sha }}
       ref: ${{ steps.revision.outputs.ref }}
-      aws_required: ${{ steps.ref.outputs.aws_required }}
     steps:
       - name: Validate candidate ref
         id: ref
         env:
           CANDIDATE_REF: ${{ inputs.candidate_ref }}
-          AWS_IMAGE_PUBLISHER_ROLE_ARN: ${{ vars.AWS_IMAGE_PUBLISHER_ROLE_ARN }}
-          AWS_REGION: ${{ vars.AWS_REGION }}
-          AWS_ECR_REGISTRY: ${{ vars.AWS_ECR_REGISTRY }}
         run: |
           ref="${CANDIDATE_REF:-dev}"
           if [[ "$ref" != "dev" && ! "$ref" =~ ^release/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Candidate ref must be dev or release/vMAJOR.MINOR.PATCH." >&2
             exit 65
           fi
-          aws_required=false
-          if [[ "$ref" =~ ^release/v ]]; then
-            aws_required=true
-            if [[ -z "${AWS_IMAGE_PUBLISHER_ROLE_ARN:-}" || -z "${AWS_REGION:-}" || -z "${AWS_ECR_REGISTRY:-}" ]]; then
-              echo "release/v candidates require AWS_IMAGE_PUBLISHER_ROLE_ARN, AWS_REGION, and AWS_ECR_REGISTRY." >&2
-              exit 65
-            fi
-          fi
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
-          echo "aws_required=$aws_required" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v6
         with:
@@ -137,6 +124,9 @@ jobs:
     needs: [prepare, verify-common, storage-budget]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -145,53 +135,80 @@ jobs:
             gradle-task: :infra:config-server:build
             module-dir: infra/config-server
             target: config-server
+            context: .
+            file: Dockerfile
           - service: eureka-server
             gradle-task: :infra:eureka-server:build
             module-dir: infra/eureka-server
             target: service
+            context: .
+            file: Dockerfile
           - service: gateway
             gradle-task: :infra:gateway:build
             module-dir: infra/gateway
             target: service
+            context: .
+            file: Dockerfile
           - service: user-service
             gradle-task: :apps:user-service:build
             module-dir: apps/user-service
             target: service
+            context: .
+            file: Dockerfile
           - service: product-service
             gradle-task: :apps:product-service:build
             module-dir: apps/product-service
             target: service
+            context: .
+            file: Dockerfile
           - service: order-service
             gradle-task: :apps:order-service:build
             module-dir: apps/order-service
             target: service
+            context: .
+            file: Dockerfile
+          # AWS demo seed artifact: ECR only, no Java build, not part of the OCI candidate manifest.
+          # Every step is skipped for this entry when AWS_ECR_REGISTRY is empty.
+          - service: db-seed
+            gradle-task: ""
+            module-dir: ""
+            target: ""
+            context: deploy/aws/seed
+            file: deploy/aws/seed/Dockerfile
     env:
       OCIR_REGISTRY: ${{ vars.OCIR_REGISTRY }}
       OCIR_NAMESPACE: ${{ vars.OCIR_NAMESPACE }}
+      AWS_ECR_REGISTRY: ${{ vars.AWS_ECR_REGISTRY }}
+      AWS_ECR_REPOSITORY_PREFIX: ${{ vars.AWS_ECR_REPOSITORY_PREFIX || 'cc-test/' }}
       SPRING_CLOUD_CONFIG_ENABLED: "false"
       EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
       EUREKA_CLIENT_FETCH_REGISTRY: "false"
       MANAGEMENT_TRACING_EXPORT_ENABLED: "false"
     steps:
       - uses: actions/checkout@v6
+        if: matrix.service != 'db-seed' || vars.AWS_ECR_REGISTRY != ''
         with:
           ref: ${{ needs.prepare.outputs.sha }}
 
       - uses: actions/setup-java@v5
+        if: matrix.gradle-task != ''
         with:
           distribution: temurin
           java-version: "21"
 
       - uses: gradle/actions/setup-gradle@v6
+        if: matrix.gradle-task != ''
         with:
           cache-provider: basic
 
       - name: Build and test module
+        if: matrix.gradle-task != ''
         env:
           GRADLE_TASK: ${{ matrix.gradle-task }}
         run: bash ./gradlew "$GRADLE_TASK" --no-daemon
 
       - name: Prepare bootJar for image packaging
+        if: matrix.gradle-task != ''
         env:
           MODULE_DIR: ${{ matrix.module-dir }}
         run: |
@@ -201,30 +218,80 @@ jobs:
           cp "${boot_jars[0]}" .image/app.jar
 
       - uses: docker/setup-qemu-action@v3
+        if: matrix.service != 'db-seed' || vars.AWS_ECR_REGISTRY != ''
         with:
           platforms: arm64
 
       - uses: docker/setup-buildx-action@v3
+        if: matrix.service != 'db-seed' || vars.AWS_ECR_REGISTRY != ''
 
       - uses: docker/login-action@v4
+        if: matrix.service != 'db-seed'
         with:
           registry: ${{ env.OCIR_REGISTRY }}
           username: ${{ secrets.OCIR_USERNAME }}
           password: ${{ secrets.OCIR_AUTH_TOKEN }}
 
+      - name: Configure AWS credentials for ECR
+        if: vars.AWS_ECR_REGISTRY != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_IMAGE_PUBLISHER_ROLE_ARN }}
+          role-session-name: cc-image-publisher
+          aws-region: ${{ vars.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Log in to ECR
+        if: vars.AWS_ECR_REGISTRY != ''
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Resolve image tags and build args
+        id: tags
+        if: matrix.service != 'db-seed' || vars.AWS_ECR_REGISTRY != ''
+        env:
+          SERVICE: ${{ matrix.service }}
+          SHA: ${{ needs.prepare.outputs.sha }}
+          GRADLE_TASK: ${{ matrix.gradle-task }}
+        run: |
+          set -euo pipefail
+          tags=()
+          # The six services go to OCIR; db-seed is an AWS-only artifact and never gets an OCIR tag.
+          if [[ "$SERVICE" != db-seed ]]; then
+            tags+=("${OCIR_REGISTRY}/${OCIR_NAMESPACE}/cc-dev/${SERVICE}:${SHA}")
+          fi
+          if [[ -n "$AWS_ECR_REGISTRY" ]]; then
+            repo="${AWS_ECR_REPOSITORY_PREFIX}${SERVICE}"
+            # ECR tags are IMMUTABLE. A re-run for the same SHA keeps the already published image.
+            if aws ecr batch-get-image --repository-name "$repo" --image-ids "imageTag=${SHA}" \
+                --query 'images[0].imageId.imageTag' --output text 2>/dev/null | grep -qx "$SHA"; then
+              echo "ECR ${repo}:${SHA} already exists, skipping ECR push."
+            else
+              tags+=("${AWS_ECR_REGISTRY}/${repo}:${SHA}")
+            fi
+          fi
+          if [[ -n "$GRADLE_TASK" ]]; then
+            build_args="JAR_FILE=.image/app.jar"
+          else
+            build_args="RELEASE_SHA=${SHA}"
+          fi
+          echo "tags=$(IFS=,; echo "${tags[*]}")" >> "$GITHUB_OUTPUT"
+          echo "build_args=$build_args" >> "$GITHUB_OUTPUT"
+
       - id: build
+        # Skipped only for db-seed when its ECR tag already exists (the tag list is then empty).
+        if: steps.tags.outputs.tags != ''
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: Dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           target: ${{ matrix.target }}
           platforms: linux/arm64
           push: true
-          build-args: |
-            JAR_FILE=.image/app.jar
-          tags: ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_NAMESPACE }}/cc-dev/${{ matrix.service }}:${{ needs.prepare.outputs.sha }}
+          build-args: ${{ steps.tags.outputs.build_args }}
+          tags: ${{ steps.tags.outputs.tags }}
 
       - name: Record immutable image reference
+        if: matrix.gradle-task != ''
         env:
           SERVICE: ${{ matrix.service }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -234,6 +301,7 @@ jobs:
             '{service: $service, image: $image}' > "$RUNNER_TEMP/${SERVICE}.json"
 
       - uses: actions/upload-artifact@v4
+        if: matrix.gradle-task != ''
         with:
           name: image-digest-${{ matrix.service }}
           path: ${{ runner.temp }}/${{ matrix.service }}.json
@@ -360,244 +428,9 @@ jobs:
           echo "Public HTTPS health verification failed." >&2
           exit 1
 
-  record-oci-evidence:
-    name: Record OCI health evidence
-    needs: [prepare, manifest, external-smoke]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
-      OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
-      OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
-      OCI_CLI_REGION: ${{ vars.OCI_REGION }}
-      OCI_PRIVATE_KEY_B64: ${{ secrets.OCI_PRIVATE_KEY_B64 }}
-      OCI_NAMESPACE: ${{ vars.OCIR_NAMESPACE }}
-      RELEASE_MANIFEST_BUCKET: ${{ vars.RELEASE_MANIFEST_BUCKET }}
-      DEV_DOMAIN: ${{ vars.DEV_DOMAIN }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.prepare.outputs.sha }}
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: dev-release-manifest
-          path: .deploy
-
-      - name: Bind health evidence to candidate commit and manifest checksum
-        env:
-          SHA: ${{ needs.prepare.outputs.sha }}
-          CI_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          bash .github/scripts/validate-candidate-manifest.sh .deploy/candidate.json
-          if command -v sha256sum >/dev/null; then
-            hash="$(sha256sum .deploy/candidate.json | awk '{print $1}')"
-          else
-            hash="$(shasum -a 256 .deploy/candidate.json | awk '{print $1}')"
-          fi
-          jq -n \
-            --arg candidate_sha "$SHA" \
-            --arg config_sha "$SHA" \
-            --arg manifest_sha256 "sha256:${hash}" \
-            --arg ci_url "$CI_URL" \
-            --arg health_url "https://${DEV_DOMAIN}/actuator/health" \
-            '{
-              candidate_sha: $candidate_sha,
-              config_sha: $config_sha,
-              manifest_sha256: $manifest_sha256,
-              ci_url: $ci_url,
-              health_url: $health_url,
-              health_result: "passed",
-              e2e: false
-            }' > .deploy/oci-verified.json
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install and configure OCI CLI
-        run: |
-          pipx install --force oci-cli
-          bash .github/scripts/configure-oci-cli.sh
-
-      - name: Persist OCI health evidence
-        run: |
-          oci os object put --namespace "$OCI_NAMESPACE" --bucket-name "$RELEASE_MANIFEST_BUCKET" \
-            --name "candidates/${{ needs.prepare.outputs.sha }}.oci-verified.json" \
-            --file .deploy/oci-verified.json --force
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: oci-health-record
-          path: .deploy/oci-verified.json
-          retention-days: 7
-
-  publish-aws-images:
-    name: Copy verified images to ECR
-    needs: [prepare, manifest, external-smoke, record-oci-evidence]
-    if: ${{ vars.AWS_IMAGE_PUBLISHER_ROLE_ARN != '' && vars.AWS_REGION != '' && vars.AWS_ECR_REGISTRY != '' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: development
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
-      OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
-      OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
-      OCI_CLI_REGION: ${{ vars.OCI_REGION }}
-      OCI_PRIVATE_KEY_B64: ${{ secrets.OCI_PRIVATE_KEY_B64 }}
-      OCI_NAMESPACE: ${{ vars.OCIR_NAMESPACE }}
-      RELEASE_MANIFEST_BUCKET: ${{ vars.RELEASE_MANIFEST_BUCKET }}
-      OCIR_REGISTRY: ${{ vars.OCIR_REGISTRY }}
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      AWS_ECR_REGISTRY: ${{ vars.AWS_ECR_REGISTRY }}
-      AWS_ECR_REPOSITORY_PREFIX: ${{ vars.AWS_ECR_REPOSITORY_PREFIX }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.prepare.outputs.sha }}
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: dev-release-manifest
-          path: .deploy
-
-      - name: Validate candidate and resolve ECR prefix
-        run: |
-          bash .github/scripts/validate-candidate-manifest.sh .deploy/candidate.json
-          echo "AWS_ECR_REPOSITORY_PREFIX=${AWS_ECR_REPOSITORY_PREFIX:-cc-test/}" >> "$GITHUB_ENV"
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_IMAGE_PUBLISHER_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
-
-      - uses: docker/login-action@v4
-        with:
-          registry: ${{ env.OCIR_REGISTRY }}
-          username: ${{ secrets.OCIR_USERNAME }}
-          password: ${{ secrets.OCIR_AUTH_TOKEN }}
-
-      - name: Install skopeo and log in to ECR
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y skopeo
-          aws ecr get-login-password --region "$AWS_REGION" \
-            | skopeo login --username AWS --password-stdin "$AWS_ECR_REGISTRY"
-          aws ecr get-login-password --region "$AWS_REGION" \
-            | docker login --username AWS --password-stdin "$AWS_ECR_REGISTRY"
-
-      - name: Copy OCIR images to ECR without rebuilding
-        run: |
-          bash .github/scripts/copy-ocir-images-to-ecr.sh \
-            --candidate .deploy/candidate.json \
-            --registry "$AWS_ECR_REGISTRY" \
-            --repository-prefix "$AWS_ECR_REPOSITORY_PREFIX" \
-            --output .deploy/ecr-images.json
-
-      - uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Reuse or publish digest-pinned db images
-        env:
-          SHA: ${{ needs.prepare.outputs.sha }}
-        run: |
-          bash .github/scripts/publish-db-artifacts.sh \
-            --sha "$SHA" \
-            --registry "$AWS_ECR_REGISTRY" \
-            --repository-prefix "$AWS_ECR_REPOSITORY_PREFIX" \
-            --context deploy/aws \
-            --output .deploy/db-artifacts.json
-          echo "MIGRATE_IMAGE=$(jq -er '.images[\"db-migrate\"]' .deploy/db-artifacts.json)" >> "$GITHUB_ENV"
-          echo "SEED_IMAGE=$(jq -er '.images[\"db-seed\"]' .deploy/db-artifacts.json)" >> "$GITHUB_ENV"
-
-      - name: Test published db-migrate and db-seed digests
-        run: |
-          MIGRATE_IMAGE="$MIGRATE_IMAGE" SEED_IMAGE="$SEED_IMAGE" REQUIRE_DOCKER=true \
-            bash deploy/aws/database/database_test.sh
-          MIGRATE_IMAGE="$MIGRATE_IMAGE" SEED_IMAGE="$SEED_IMAGE" REQUIRE_DOCKER=true \
-            bash deploy/aws/seed/seed_test.sh
-
-      - name: Share tested artifact images
-        run: |
-          printf 'tested-db-migrate=%s\n' "$MIGRATE_IMAGE"
-          printf 'tested-db-seed=%s\n' "$SEED_IMAGE"
-
-      - name: Write migrations artifact record
-        env:
-          SHA: ${{ needs.prepare.outputs.sha }}
-          CI_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          jq -n \
-            --arg source_sha "$SHA" \
-            --arg config_sha "$SHA" \
-            --arg migrate "$MIGRATE_IMAGE" \
-            --arg seed "$SEED_IMAGE" \
-            --arg run_url "$CI_URL" \
-            '{
-              source_sha: $source_sha,
-              config_sha: $config_sha,
-              images: {"db-migrate": $migrate, "db-seed": $seed},
-              tests: {
-                result: "passed",
-                run_url: $run_url,
-                db_migrate: {result: "passed", image: $migrate},
-                db_seed: {result: "passed", image: $seed}
-              }
-            }' > .deploy/migrations.json
-
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install and configure OCI CLI
-        run: |
-          pipx install --force oci-cli
-          bash .github/scripts/configure-oci-cli.sh
-
-      - name: Persist ECR and migrations records
-        run: |
-          oci os object put --namespace "$OCI_NAMESPACE" --bucket-name "$RELEASE_MANIFEST_BUCKET" \
-            --name "candidates/${{ needs.prepare.outputs.sha }}.ecr.json" \
-            --file .deploy/ecr-images.json --force
-          oci os object put --namespace "$OCI_NAMESPACE" --bucket-name "$RELEASE_MANIFEST_BUCKET" \
-            --name "candidates/${{ needs.prepare.outputs.sha }}.migrations.json" \
-            --file .deploy/migrations.json --force
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: aws-ecr-images
-          path: .deploy/ecr-images.json
-          retention-days: 7
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: aws-migrations-record
-          path: .deploy/migrations.json
-          retention-days: 7
-
-
   cleanup-ocir:
     name: Retain current and previous OCIR images
-    needs: [prepare, external-smoke, record-oci-evidence, publish-aws-images]
-    if: >-
-      always()
-      && needs.prepare.result == 'success'
-      && needs.external-smoke.result == 'success'
-      && needs.record-oci-evidence.result == 'success'
-      && (
-        (needs.prepare.outputs.aws_required != 'true'
-          && (needs.publish-aws-images.result == 'success' || needs.publish-aws-images.result == 'skipped'))
-        || (needs.prepare.outputs.aws_required == 'true'
-          && needs.publish-aws-images.result == 'success')
-      )
+    needs: [prepare, external-smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
