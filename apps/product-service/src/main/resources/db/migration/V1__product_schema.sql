@@ -154,7 +154,8 @@ CREATE TABLE p_category_outbox_events (
 
 CREATE TABLE p_leaderboard_snapshots (
     id uuid PRIMARY KEY,
-    type integer NOT NULL,
+    -- LeaderboardType은 @Enumerated 없이 ORDINAL로 매핑되어 Hibernate가 smallint를 기대한다.
+    type smallint NOT NULL,
     target_id uuid NOT NULL,
     score double precision NOT NULL,
     ranking bigint NOT NULL,

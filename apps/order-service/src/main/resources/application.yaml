@@ -5,6 +5,10 @@ spring:
   config:
     import: ${CONFIG_SERVER_IMPORT:optional:configserver:http://localhost:8888}
 
+  # 기본은 비활성. OCI dev는 ddl-auto: update 경로를 유지하고 prod 설정에서만 켠다.
+  flyway:
+    enabled: false
+
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:

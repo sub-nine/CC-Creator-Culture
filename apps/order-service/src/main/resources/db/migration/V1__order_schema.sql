@@ -130,6 +130,7 @@ CREATE TABLE p_order_command_requests (
     actor_id uuid NOT NULL,
     command_type varchar(30) NOT NULL,
     idempotency_key varchar(100) NOT NULL,
+    -- 엔티티는 columnDefinition = "char(64)"이지만 Hibernate validate가 bpchar를 VARCHAR로 인정하지 않아 varchar(64)로 둔다.
     request_hash varchar(64) NOT NULL,
     status varchar(20) NOT NULL,
     order_id uuid,
