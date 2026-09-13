@@ -3,6 +3,7 @@ locals {
     "${var.name_prefix}-ecs-execution",
     "${var.name_prefix}-ecs-task",
     "${var.name_prefix}-observation",
+    "${var.name_prefix}-kafka",
   ]
   persistent_role_arns = [
     for name in local.persistent_role_names :
@@ -64,6 +65,7 @@ data "aws_iam_policy_document" "persistent_boundary" {
     ]
     resources = concat(local.persistent_role_arns, [
       "arn:aws:iam::${local.account_id}:instance-profile/${var.name_prefix}-observation",
+      "arn:aws:iam::${local.account_id}:instance-profile/${var.name_prefix}-kafka",
     ])
   }
 
@@ -273,6 +275,7 @@ data "aws_iam_policy_document" "infrastructure_apply" {
     ]
     resources = concat(local.persistent_role_arns, [
       "arn:aws:iam::${local.account_id}:instance-profile/${var.name_prefix}-observation",
+      "arn:aws:iam::${local.account_id}:instance-profile/${var.name_prefix}-kafka",
     ])
   }
 

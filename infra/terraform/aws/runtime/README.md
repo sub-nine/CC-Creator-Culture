@@ -1,13 +1,13 @@
 # AWS runtime 스택
 
-NAT 1개, ALB HTTPS, MSK, Redis, Fargate 서비스 6개, 태스크 정의, 실행 상태를 관리한다. persistent_config 는 persistent 스택 출력 객체를 그대로 넣는다.
+NAT 1개, ALB HTTPS, Redis, Fargate 서비스 6개, 태스크 정의, 실행 상태를 관리한다. Kafka 브로커는 persistent의 t4g.small EC2다. persistent_config 는 persistent 스택 출력 객체를 그대로 넣는다.
 
 ## 입력과 출력
 
 - `release_sha`: 40자 커밋 SHA. 서비스 6개와 db-seed 이미지 태그로 쓴다. `${ecr_repository_urls[name]}:${release_sha}`. ECR 태그는 IMMUTABLE이라 digest가 고정된다.
 - `config_sha`: config-server가 서비스하는 설정 저장소 ref. 비우면 `release_sha`를 쓴다. config-server에는 `CONFIG_GIT_DEFAULT_LABEL`, 나머지에는 `SPRING_CLOUD_CONFIG_LABEL`로 전달한다.
-- `app_running`: true면 서비스 desired_count 1, RDS available, 관측 EC2 running. false면 모두 정지한다. 기본값 false.
-- 출력: `release_sha`, `config_sha`, `app_running`, `cluster_name`, `seed_task_families`(서비스 키 -> family 맵), `app_subnet_ids`, `migration_security_group_id`, `observation_instance_id`, `observation_bootstrap_document`, `redis_user_group_id`.
+- `app_running`: true면 서비스 desired_count 1, RDS available, 관측과 Kafka EC2 running. false면 모두 정지한다. 기본값 false.
+- 출력: `release_sha`, `config_sha`, `app_running`, `cluster_name`, `seed_task_families`(서비스 키 -> family 맵), `app_subnet_ids`, `migration_security_group_id`, `observation_instance_id`, `observation_bootstrap_document`, `kafka_instance_id`, `kafka_bootstrap_document`, `redis_user_group_id`.
 
 ignore_changes 는 없다. 이미지 교체, desired_count, 전원은 모두 `terraform apply -var release_sha=... -var app_running=...` 한 번으로 반영된다.
 
@@ -27,9 +27,9 @@ Terraform은 Redis 비밀번호를 읽거나 쓰지 않는다. redis_user_group_
 
 api.nodyy.com 은 AWS 시험용이며 런타임 스택과 함께 만들고 정리한다. 이미 명시 레코드가 있으면 import 한다. wildcard 여부는 여기서 확인하지 않는다. dev.nodyy.com 은 건드리지 않는다.
 
-## MSK
+## Kafka
 
-kafka_version 기본값은 3.9.x 다. 이 계정은 MSK 구독이 없어 지원 버전 API로 사전 확인하지 못했다. 토픽 ACL은 이 스택이 만들지 않는다.
+브로커는 persistent의 t4g.small 1대다. 앱은 `kafka.<namespace>:9092` PLAINTEXT로 붙는다. SASL은 쓰지 않는다. 토픽은 브로커가 자동 생성하고 복제 계수는 1이다. 브로커를 늘리는 작업은 이 스택이 하지 않는다.
 
 ## IAM 공백
 

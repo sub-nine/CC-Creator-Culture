@@ -1,0 +1,67 @@
+#!/bin/bash
+set -euo pipefail
+
+KAFKA_IMAGE='${kafka_image}'
+CLUSTER_ID='${cluster_id}'
+DATA_ROOT=/var/lib/kafka
+LOG_DIR="$DATA_ROOT/kraft-combined-logs"
+
+if ! command -v docker >/dev/null 2>&1; then
+  dnf install -y docker
+fi
+systemctl enable --now docker
+
+data_dev=""
+for candidate in /dev/nvme1n1 /dev/xvdf /dev/sdf; do
+  if [ -b "$candidate" ]; then
+    data_dev="$candidate"
+    break
+  fi
+done
+if [ -z "$data_dev" ]; then
+  echo "kafka data volume is not attached." >&2
+  exit 1
+fi
+
+if ! blkid "$data_dev" >/dev/null 2>&1; then
+  mkfs.ext4 -L kafka-data "$data_dev"
+fi
+mkdir -p "$DATA_ROOT"
+if ! grep -q ' /var/lib/kafka ' /etc/fstab; then
+  echo "LABEL=kafka-data /var/lib/kafka ext4 defaults,nofail 0 2" >> /etc/fstab
+fi
+mountpoint -q "$DATA_ROOT" || mount "$DATA_ROOT"
+chown -R 1000:1000 "$DATA_ROOT"
+
+docker pull "$KAFKA_IMAGE"
+docker rm -f kafka >/dev/null 2>&1 || true
+docker run -d --name kafka --restart unless-stopped --network host \
+  -v "$DATA_ROOT:$DATA_ROOT" \
+  -e CLUSTER_ID="$CLUSTER_ID" \
+  -e KAFKA_NODE_ID=1 \
+  -e KAFKA_PROCESS_ROLES=broker,controller \
+  -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT \
+  -e KAFKA_LISTENERS=CONTROLLER://:29093,PLAINTEXT://:9092 \
+  -e KAFKA_ADVERTISED_LISTENERS='PLAINTEXT://${advertised_host}:9092' \
+  -e KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT \
+  -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER \
+  -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@127.0.0.1:29093 \
+  -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+  -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 \
+  -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
+  -e KAFKA_AUTO_CREATE_TOPICS_ENABLE=true \
+  -e KAFKA_DEFAULT_REPLICATION_FACTOR=1 \
+  -e KAFKA_LOG_DIRS="$LOG_DIR" \
+  -e KAFKA_HEAP_OPTS="-Xms256m -Xmx384m" \
+  "$KAFKA_IMAGE"
+
+for _ in $(seq 1 90); do
+  if bash -c 'echo >/dev/tcp/127.0.0.1/9092' 2>/dev/null; then
+    echo "kafka ready on 9092"
+    exit 0
+  fi
+  sleep 2
+done
+echo "timed out waiting for kafka on 9092" >&2
+docker logs kafka >&2 || true
+exit 1

@@ -9,18 +9,20 @@ required=(
   public_subnet_ids app_subnet_ids data_subnet_ids
   private_route_table_id
   config-server eureka-server gateway user-service product-service order-service
-  alb observation msk redis migration
+  alb observation kafka redis migration
   rds_instances db_endpoints
-  rds_master jwt redis kafka
-  AmazonMSK_
+  rds_master jwt redis
   ecs_execution ecs_task
   observation_instance_id observation_images
+  kafka_instance_id kafka_image
   artifact_repository_urls
   management_port
   grafana seed
   r2 product-r2
   observation_bootstrap_document
+  kafka_bootstrap_document
   start-observation
+  start-kafka
   password_hash
 )
 

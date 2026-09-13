@@ -73,4 +73,9 @@ locals {
     for line in local.base_image_lines : split("=", line)[0] => split("=", line)[1]
     if contains(["PROMETHEUS_IMAGE", "GRAFANA_IMAGE", "ZIPKIN_IMAGE"], split("=", line)[0])
   }
+
+  kafka_image = one([
+    for line in local.base_image_lines : split("=", line)[1]
+    if startswith(line, "KAFKA_IMAGE=")
+  ])
 }

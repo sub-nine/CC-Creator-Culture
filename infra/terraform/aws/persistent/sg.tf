@@ -30,13 +30,13 @@ resource "aws_security_group" "rds" {
   }
 }
 
-resource "aws_security_group" "msk" {
-  name        = "${var.name_prefix}-msk"
-  description = "MSK brokers"
+resource "aws_security_group" "kafka" {
+  name        = "${var.name_prefix}-kafka"
+  description = "Single Kafka broker EC2"
   vpc_id      = aws_vpc.this.id
 
   tags = {
-    Name = "${var.name_prefix}-msk"
+    Name = "${var.name_prefix}-kafka"
   }
 }
 
@@ -85,6 +85,12 @@ resource "aws_vpc_security_group_egress_rule" "alb_all" {
 
 resource "aws_vpc_security_group_egress_rule" "observation_all" {
   security_group_id = aws_security_group.observation.id
+  ip_protocol       = "-1"
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "kafka_all" {
+  security_group_id = aws_security_group.kafka.id
   ip_protocol       = "-1"
   cidr_ipv4         = "0.0.0.0/0"
 }
@@ -156,13 +162,13 @@ resource "aws_vpc_security_group_ingress_rule" "rds_from_migration" {
   to_port                      = 5432
 }
 
-resource "aws_vpc_security_group_ingress_rule" "msk_from_clients" {
+resource "aws_vpc_security_group_ingress_rule" "kafka_from_clients" {
   for_each                     = local.kafka_clients
-  security_group_id            = aws_security_group.msk.id
+  security_group_id            = aws_security_group.kafka.id
   referenced_security_group_id = aws_security_group.app[each.key].id
   ip_protocol                  = "tcp"
-  from_port                    = 9096
-  to_port                      = 9096
+  from_port                    = 9092
+  to_port                      = 9092
 }
 
 resource "aws_vpc_security_group_ingress_rule" "redis_from_clients" {

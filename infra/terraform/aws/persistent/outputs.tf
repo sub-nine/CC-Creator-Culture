@@ -28,7 +28,7 @@ output "persistent_config" {
       order-service   = aws_security_group.app["order-service"].id
       alb             = aws_security_group.alb.id
       observation     = aws_security_group.observation.id
-      msk             = aws_security_group.msk.id
+      kafka           = aws_security_group.kafka.id
       redis           = aws_security_group.redis.id
       migration       = aws_security_group.migration.id
       rds = {
@@ -45,18 +45,16 @@ output "persistent_config" {
       rds_master = { for name, db in aws_db_instance.service : name => db.master_user_secret[0].secret_arn }
       jwt        = aws_secretsmanager_secret.jwt.arn
       redis      = aws_secretsmanager_secret.redis.arn
-      kafka      = { for name, secret in aws_secretsmanager_secret.msk : name => secret.arn }
       grafana    = aws_secretsmanager_secret.grafana.arn
       seed       = aws_secretsmanager_secret.seed.arn
       r2         = aws_secretsmanager_secret.product_r2.arn
     }
 
-    msk_secrets_kms_key_arn = aws_kms_key.msk_secrets.arn
-
     roles = {
       ecs_execution = aws_iam_role.ecs_execution.arn
       ecs_task      = aws_iam_role.ecs_task.arn
       observation   = aws_iam_role.observation.arn
+      kafka         = aws_iam_role.kafka.arn
     }
 
     cloudmap = {
@@ -67,17 +65,25 @@ output "persistent_config" {
         for name, svc in aws_service_discovery_service.core : name => svc.id
       }
       dns_names = {
-        for name, svc in aws_service_discovery_service.core :
-        name => "${name}.${aws_service_discovery_private_dns_namespace.this.name}"
+        config-server = "config-server.${aws_service_discovery_private_dns_namespace.this.name}"
+        eureka-server = "eureka-server.${aws_service_discovery_private_dns_namespace.this.name}"
+        kafka         = "kafka.${aws_service_discovery_private_dns_namespace.this.name}"
       }
     }
 
     observation_instance_id = aws_instance.observation.id
     observation_images      = local.observation_images
+    kafka_instance_id       = aws_instance.kafka.id
+    kafka_image             = local.kafka_image
 
     observation_bootstrap_document = {
       name    = aws_ssm_document.start_observation.name
       version = aws_ssm_document.start_observation.latest_version
+    }
+
+    kafka_bootstrap_document = {
+      name    = aws_ssm_document.start_kafka.name
+      version = aws_ssm_document.start_kafka.latest_version
     }
 
     log_groups = { for name, group in aws_cloudwatch_log_group.app : name => group.name }

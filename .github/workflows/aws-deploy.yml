@@ -147,32 +147,37 @@ jobs:
         if: inputs.action == 'destroy-runtime'
         run: terraform -chdir="$TF_DIR" destroy -auto-approve -input=false -no-color -var "release_sha=$RELEASE_SHA" -var "app_running=false"
 
-      - name: Bootstrap observation instance
+      - name: Bootstrap observation and kafka instances
         if: inputs.action == 'deploy' || inputs.action == 'start'
         run: |
           set -euo pipefail
-          instance="$(terraform -chdir="$TF_DIR" output -raw observation_instance_id)"
-          doc="$(terraform -chdir="$TF_DIR" output -json observation_bootstrap_document)"
           # send-command is rejected until the SSM agent reports in after the instance starts, so retry it.
-          command_id=""
-          for _ in $(seq 1 60); do
-            command_id="$(aws ssm send-command --instance-ids "$instance" \
-              --document-name "$(jq -r .name <<<"$doc")" --document-version "$(jq -r .version <<<"$doc")" \
-              --query 'Command.CommandId' --output text 2>/dev/null || true)"
-            [[ -n "$command_id" ]] && break
-            sleep 5
-          done
-          [[ -n "$command_id" ]] || { echo "SSM agent on ${instance} did not come online." >&2; exit 1; }
-          for _ in $(seq 1 120); do
-            status="$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$instance" \
-              --query Status --output text 2>/dev/null || echo Pending)"
-            case "$status" in
-              Success) echo "Observation bootstrap succeeded."; exit 0 ;;
-              Failed|Cancelled|TimedOut) echo "Observation bootstrap ended with $status." >&2; exit 1 ;;
-            esac
-            sleep 5
-          done
-          echo "Observation bootstrap did not finish in time." >&2; exit 1
+          bootstrap() {
+            local label="$1" instance doc command_id="" status
+            instance="$(terraform -chdir="$TF_DIR" output -raw "${label}_instance_id")"
+            doc="$(terraform -chdir="$TF_DIR" output -json "${label}_bootstrap_document")"
+            for _ in $(seq 1 60); do
+              command_id="$(aws ssm send-command --instance-ids "$instance" \
+                --document-name "$(jq -r .name <<<"$doc")" --document-version "$(jq -r .version <<<"$doc")" \
+                --query 'Command.CommandId' --output text 2>/dev/null || true)"
+              [[ -n "$command_id" ]] && break
+              sleep 5
+            done
+            [[ -n "$command_id" ]] || { echo "SSM agent on ${instance} (${label}) did not come online." >&2; exit 1; }
+            for _ in $(seq 1 120); do
+              status="$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$instance" \
+                --query Status --output text 2>/dev/null || echo Pending)"
+              case "$status" in
+                Success) echo "${label} bootstrap succeeded."; return 0 ;;
+                Failed|Cancelled|TimedOut) echo "${label} bootstrap ended with $status." >&2; exit 1 ;;
+              esac
+              sleep 5
+            done
+            echo "${label} bootstrap did not finish in time." >&2
+            exit 1
+          }
+          bootstrap observation
+          bootstrap kafka
 
       - name: Run db-seed task
         if: inputs.action == 'deploy' && inputs.seed_run_id != ''

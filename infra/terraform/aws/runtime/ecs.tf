@@ -73,6 +73,7 @@ resource "aws_ecs_service" "platform" {
     aws_nat_gateway.this,
     aws_route.private_nat,
     aws_rds_instance_state.service,
+    aws_ec2_instance_state.kafka,
   ]
 }
 
@@ -161,7 +162,7 @@ resource "aws_appautoscaling_target" "service" {
   max_capacity       = local.autoscaling_max[each.key]
 }
 
-# Power state. app_running=false stops RDS and the observation EC2 together with the services.
+# Power state. app_running=false stops RDS and the observation/kafka EC2 together with the services.
 
 resource "aws_rds_instance_state" "service" {
   for_each   = var.persistent_config.rds_instances
@@ -171,5 +172,10 @@ resource "aws_rds_instance_state" "service" {
 
 resource "aws_ec2_instance_state" "observation" {
   instance_id = var.persistent_config.observation_instance_id
+  state       = var.app_running ? "running" : "stopped"
+}
+
+resource "aws_ec2_instance_state" "kafka" {
+  instance_id = var.persistent_config.kafka_instance_id
   state       = var.app_running ? "running" : "stopped"
 }

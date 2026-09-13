@@ -1,56 +1,5 @@
-resource "aws_kms_key" "msk_secrets" {
-  description             = "${var.name_prefix} MSK SCRAM secrets"
-  deletion_window_in_days = 7
-  enable_key_rotation     = true
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AccountRoot"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
-        }
-        Action   = "kms:*"
-        Resource = "*"
-      }
-    ]
-  })
-
-  tags = {
-    Name = "${var.name_prefix}-msk-secrets"
-  }
-
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
-resource "aws_kms_alias" "msk_secrets" {
-  name          = "alias/${var.name_prefix}/msk-secrets"
-  target_key_id = aws_kms_key.msk_secrets.id
-}
-
-resource "aws_secretsmanager_secret" "msk" {
-  for_each = local.kafka_clients
-
-  name                    = "AmazonMSK_${var.name_prefix}_${each.key}"
-  description             = "MSK SCRAM container for ${each.key}. Populate username/password outside Terraform."
-  kms_key_id              = aws_kms_key.msk_secrets.arn
-  recovery_window_in_days = 7
-
-  tags = {
-    Name = "AmazonMSK_${var.name_prefix}_${each.key}"
-  }
-
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
 # App DB credentials come from the RDS managed master secret (aws_db_instance.service[*].master_user_secret).
-# There is no separate app secret.
+# There is no separate app secret. Kafka is PLAINTEXT on the VPC, so there is no broker secret.
 
 resource "aws_secretsmanager_secret" "jwt" {
   name                    = "${var.name_prefix}/jwt"

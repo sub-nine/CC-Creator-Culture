@@ -3,13 +3,12 @@ name_prefix         = "cc-test"
 api_hostname        = "api.nodyy.com"
 cloudflare_zone_id  = "replace-with-cloudflare-zone-id"
 redis_user_group_id = "replace-with-elasticache-user-group-id"
-msk_kafka_version   = "3.9.x"
 
 # Required. 40 hex git commit SHA used as the ECR image tag for the six services and db-seed.
 release_sha = "0000000000000000000000000000000000000000"
 # Optional. Config repository ref served by config-server. Defaults to release_sha.
 # config_sha = "0000000000000000000000000000000000000000"
-# false stops services, RDS, and the observation EC2. true starts them.
+# false stops services, RDS, and the observation/kafka EC2. true starts them.
 app_running = false
 
 # persistent_config is the persistent stack output object. Pass it through as-is after apply.
@@ -20,6 +19,7 @@ persistent_config = {
   data_subnet_ids         = ["replace-with-data-subnet-a", "replace-with-data-subnet-b", "replace-with-data-subnet-c"]
   private_route_table_id  = "replace-with-private-route-table-id"
   observation_instance_id = "replace-with-observation-instance-id"
+  kafka_instance_id       = "replace-with-kafka-instance-id"
   release_bucket          = "replace-with-release-bucket"
   rds_instances = {
     user-service    = "replace-with-rds-user-service"
@@ -48,7 +48,7 @@ persistent_config = {
     order-service   = "replace-with-sg-order-service"
     alb             = "replace-with-sg-alb"
     observation     = "replace-with-sg-observation"
-    msk             = "replace-with-sg-msk"
+    kafka           = "replace-with-sg-kafka"
     redis           = "replace-with-sg-redis"
     migration       = "replace-with-sg-migration"
     rds = {
@@ -61,11 +61,6 @@ persistent_config = {
     jwt   = "replace-with-jwt-secret-arn"
     redis = "replace-with-redis-secret-arn"
     r2    = "replace-with-r2-secret-arn"
-    kafka = {
-      user-service    = "replace-with-msk-user-service-secret-arn"
-      product-service = "replace-with-msk-product-service-secret-arn"
-      order-service   = "replace-with-msk-order-service-secret-arn"
-    }
     rds_master = {
       user-service    = "replace-with-rds-master-user-service-secret-arn"
       product-service = "replace-with-rds-master-product-service-secret-arn"
@@ -76,6 +71,7 @@ persistent_config = {
     ecs_execution = "replace-with-ecs-execution-role-arn"
     ecs_task      = "replace-with-ecs-task-role-arn"
     observation   = "replace-with-observation-role-arn"
+    kafka         = "replace-with-kafka-role-arn"
   }
   cloudmap = {
     namespace_id   = "replace-with-cloudmap-namespace-id"
@@ -88,6 +84,11 @@ persistent_config = {
     dns_names = {
       config-server = "config-server.cc-test.internal"
       eureka-server = "eureka-server.cc-test.internal"
+      kafka         = "kafka.cc-test.internal"
     }
+  }
+  kafka_bootstrap_document = {
+    name    = "cc-test-start-kafka"
+    version = "1"
   }
 }

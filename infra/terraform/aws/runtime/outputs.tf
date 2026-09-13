@@ -9,7 +9,7 @@ output "config_sha" {
 }
 
 output "app_running" {
-  description = "Whether services, RDS, and the observation EC2 are running."
+  description = "Whether services, RDS, and the observation and kafka EC2 instances are running."
   value       = var.app_running
 }
 
@@ -36,6 +36,14 @@ output "observation_instance_id" {
 
 output "observation_bootstrap_document" {
   value = var.persistent_config.observation_bootstrap_document
+}
+
+output "kafka_instance_id" {
+  value = var.persistent_config.kafka_instance_id
+}
+
+output "kafka_bootstrap_document" {
+  value = var.persistent_config.kafka_bootstrap_document
 }
 
 output "redis_user_group_id" {

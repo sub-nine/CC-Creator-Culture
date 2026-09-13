@@ -69,18 +69,11 @@ data "aws_iam_policy_document" "ecs_execution" {
     resources = concat(
       [
         "${local.secret_prefix}*",
-        "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:AmazonMSK_${var.name_prefix}_*",
         aws_secretsmanager_secret.seed.arn,
         aws_secretsmanager_secret.product_r2.arn,
       ],
       [for name, db in aws_db_instance.service : db.master_user_secret[0].secret_arn],
     )
-  }
-
-  statement {
-    sid       = "MskSecretKms"
-    actions   = ["kms:Decrypt", "kms:DescribeKey"]
-    resources = [aws_kms_key.msk_secrets.arn]
   }
 }
 

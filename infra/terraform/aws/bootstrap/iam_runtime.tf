@@ -9,8 +9,6 @@ locals {
   ecs_service_arn     = "arn:aws:ecs:${var.aws_region}:${local.account_id}:service/${var.name_prefix}*/*"
   ecs_taskdef_arn     = "arn:aws:ecs:${var.aws_region}:${local.account_id}:task-definition/${var.name_prefix}-*:*"
   ecs_task_arn        = "arn:aws:ecs:${var.aws_region}:${local.account_id}:task/${var.name_prefix}*/*"
-  msk_cluster_arn     = "arn:aws:kafka:${var.aws_region}:${local.account_id}:cluster/${var.name_prefix}-*/*"
-  msk_config_arn      = "arn:aws:kafka:${var.aws_region}:${local.account_id}:configuration/${var.name_prefix}-*/*"
   redis_arn           = "arn:aws:elasticache:${var.aws_region}:${local.account_id}:replicationgroup:${var.name_prefix}-*"
   redis_cluster_arn   = "arn:aws:elasticache:${var.aws_region}:${local.account_id}:cluster:${var.name_prefix}-*"
   redis_paramgroup    = "arn:aws:elasticache:${var.aws_region}:${local.account_id}:parametergroup:default*"
@@ -148,7 +146,6 @@ data "aws_iam_policy_document" "runtime_deploy" {
       "arn:aws:iam::${local.account_id}:role/aws-service-role/ecs.amazonaws.com/*",
       "arn:aws:iam::${local.account_id}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/*",
       "arn:aws:iam::${local.account_id}:role/aws-service-role/elasticloadbalancing.amazonaws.com/*",
-      "arn:aws:iam::${local.account_id}:role/aws-service-role/kafka.amazonaws.com/*",
       "arn:aws:iam::${local.account_id}:role/aws-service-role/elasticache.amazonaws.com/*",
     ]
   }
@@ -209,60 +206,6 @@ data "aws_iam_policy_document" "runtime_deploy" {
       "cloudwatch:DescribeAlarms",
     ]
     resources = [local.cw_alarm_arn]
-  }
-
-  statement {
-    sid = "MskCreate"
-    actions = [
-      "kafka:CreateCluster",
-      "kafka:CreateClusterV2",
-      "kafka:CreateConfiguration",
-    ]
-    resources = ["*"]
-  }
-
-  statement {
-    sid = "MskRead"
-    actions = [
-      "kafka:ListClusters",
-      "kafka:ListClustersV2",
-      "kafka:GetCompatibleKafkaVersions",
-      "kafka:ListConfigurations",
-      "kafka:ListConfigurationRevisions",
-      "kafka:DescribeClusterOperation",
-      "kafka:DescribeClusterOperationV2",
-    ]
-    resources = ["*"]
-  }
-
-  statement {
-    sid = "MskMutate"
-    actions = [
-      "kafka:DeleteCluster",
-      "kafka:DescribeCluster",
-      "kafka:DescribeClusterV2",
-      "kafka:GetBootstrapBrokers",
-      "kafka:ListTagsForResource",
-      "kafka:UpdateClusterConfiguration",
-      "kafka:UpdateBrokerStorage",
-      "kafka:TagResource",
-      "kafka:UntagResource",
-      "kafka:BatchAssociateScramSecret",
-      "kafka:BatchDisassociateScramSecret",
-      "kafka:ListScramSecrets",
-    ]
-    resources = [local.msk_cluster_arn]
-  }
-
-  statement {
-    sid = "MskConfiguration"
-    actions = [
-      "kafka:DescribeConfiguration",
-      "kafka:DescribeConfigurationRevision",
-      "kafka:UpdateConfiguration",
-      "kafka:DeleteConfiguration",
-    ]
-    resources = [local.msk_config_arn]
   }
 
   statement {

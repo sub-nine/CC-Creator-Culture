@@ -28,12 +28,6 @@ variable "cloudflare_zone_id" {
   sensitive   = true
 }
 
-variable "msk_kafka_version" {
-  description = "MSK Kafka version. Live version list was not available on the free-plan account."
-  type        = string
-  default     = "3.9.x"
-}
-
 variable "redis_username" {
   description = "Redis ACL user name created outside Terraform."
   type        = string
@@ -67,7 +61,7 @@ variable "config_sha" {
 }
 
 variable "app_running" {
-  description = "true starts the app: services desired_count 1, RDS available, observation EC2 running. false stops all of them."
+  description = "true starts the app: services desired_count 1, RDS available, observation and kafka EC2 running. false stops all of them."
   type        = bool
   default     = false
 }
@@ -96,6 +90,12 @@ variable "persistent_config" {
       name    = string
       version = string
     })
+    kafka_instance_id = string
+    kafka_image       = optional(string)
+    kafka_bootstrap_document = object({
+      name    = string
+      version = string
+    })
     rds_instances         = map(string)
     db_endpoints          = map(string)
     release_bucket        = string
@@ -110,7 +110,7 @@ variable "persistent_config" {
       order-service   = string
       alb             = string
       observation     = string
-      msk             = string
+      kafka           = string
       redis           = string
       migration       = string
       rds = object({
@@ -123,16 +123,15 @@ variable "persistent_config" {
       rds_master = map(string)
       jwt        = string
       redis      = string
-      kafka      = map(string)
       grafana    = string
       seed       = string
       r2         = string
     })
-    msk_secrets_kms_key_arn = string
     roles = object({
       ecs_execution = string
       ecs_task      = string
       observation   = string
+      kafka         = optional(string)
     })
     cloudmap = object({
       namespace_id   = string
@@ -150,6 +149,16 @@ variable "persistent_config" {
   validation {
     condition     = can(regex("^i-[0-9a-z]+$", var.persistent_config.observation_instance_id))
     error_message = "persistent_config.observation_instance_id must be an EC2 instance id."
+  }
+
+  validation {
+    condition     = can(regex("^i-[0-9a-z]+$", var.persistent_config.kafka_instance_id))
+    error_message = "persistent_config.kafka_instance_id must be an EC2 instance id."
+  }
+
+  validation {
+    condition     = contains(keys(var.persistent_config.cloudmap.dns_names), "kafka")
+    error_message = "persistent_config.cloudmap.dns_names must include kafka."
   }
 
   validation {

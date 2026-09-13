@@ -2,7 +2,7 @@ locals {
   config_import = "configserver:http://${local.config_dns}:${local.services["config-server"].port}"
   eureka_zone   = "http://${local.eureka_dns}:${local.services["eureka-server"].port}/eureka/"
   redis_host    = aws_elasticache_replication_group.this.primary_endpoint_address
-  kafka_brokers = data.aws_msk_bootstrap_brokers.this.bootstrap_brokers_sasl_scram
+  kafka_brokers = "${var.persistent_config.cloudmap.dns_names["kafka"]}:9092"
   zipkin_endpoint = format(
     "http://%s:%s/api/v2/spans",
     coalesce(var.persistent_config.observation_private_ip, data.aws_instance.observation.private_ip),
@@ -32,7 +32,6 @@ locals {
       ] : [],
       contains(local.kafka_clients, name) ? [
         { name = "KAFKA_BOOTSTRAP_SERVERS", value = local.kafka_brokers },
-        { name = "KAFKA_SASL_MECHANISM", value = "SCRAM-SHA-512" },
       ] : [],
       contains(local.db_keys, name) ? [
         { name = local.db_host_env[name], value = var.persistent_config.db_endpoints[name] },
@@ -49,10 +48,6 @@ locals {
       ] : [],
       contains(local.redis_clients, name) ? [
         { name = "REDIS_PASSWORD", valueFrom = var.persistent_config.secret_arns.redis },
-      ] : [],
-      contains(local.kafka_clients, name) ? [
-        { name = "KAFKA_USERNAME", valueFrom = "${var.persistent_config.secret_arns.kafka[name]}:username::" },
-        { name = "KAFKA_PASSWORD", valueFrom = "${var.persistent_config.secret_arns.kafka[name]}:password::" },
       ] : [],
       contains(local.db_keys, name) ? [
         { name = local.db_user_env[name], valueFrom = "${var.persistent_config.secret_arns.rds_master[name]}:username::" },
