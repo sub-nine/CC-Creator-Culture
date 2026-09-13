@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class KafkaTopics {
   public static final String PRODUCT_CREATED = "product.created";
+  public static final String PRODUCT_DELETED = "product.deleted";
   public static final String PRODUCT_VIEW_COUNT_SYNC = "product.view-count.sync";
   public static final String PRODUCT_IMAGE_UPLOADED = "product.image.uploaded";
   public static final String ORDER_PAID = "order.paid";
