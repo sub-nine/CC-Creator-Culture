@@ -122,8 +122,9 @@ class AdminCategoryCommandControllerTest extends AbstractIntegrationTest {
             assertThat(categoryHashtag.getMatchType()).isEqualTo(CategoryHashtagMatchType.MANUAL);
             assertThat(categoryHashtag.getStatus()).isEqualTo(CategoryHashtagStatus.MERGED);
 
+            // usage_count는 상품에 링크될 때만 증가하므로, 카테고리-해시태그 연결로는 늘지 않는다
             Hashtag persistedHashtag = hashtagJpaRepository.findById(hashtag.getId()).orElseThrow();
-            assertThat(persistedHashtag.getUsageCount()).isEqualTo(1L);
+            assertThat(persistedHashtag.getUsageCount()).isZero();
         }
 
         @Test
@@ -142,9 +143,9 @@ class AdminCategoryCommandControllerTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("관리자가 카테고리에 연결된 해시태그를 연결 해제한다")
+        @DisplayName("관리자가 카테고리에 연결된 해시태그를 연결 해제해도, 상품 링크로 쌓인 usage_count는 그대로 유지된다")
         void unlinkHashtag_success() throws Exception {
-            // Given
+            // Given - usage_count는 상품 링크(가상)로 쌓였다고 가정
             Category category = categoryJpaRepository.save(Category.create("패션", null));
             Hashtag hashtag = hashtagJpaRepository.save(Hashtag.create("스트릿"));
             hashtag.increaseUsageCount();
@@ -163,8 +164,9 @@ class AdminCategoryCommandControllerTest extends AbstractIntegrationTest {
                     .findByCategory_IdAndHashtag_IdAndDeletedAtIsNull(category.getId(), hashtag.getId()))
                     .isEmpty();
 
+            // 카테고리-해시태그 연결 해제는 usage_count에 영향을 주지 않는다 (상품 링크 해제 시에만 감소해야 함)
             Hashtag persistedHashtag = hashtagJpaRepository.findById(hashtag.getId()).orElseThrow();
-            assertThat(persistedHashtag.getUsageCount()).isZero();
+            assertThat(persistedHashtag.getUsageCount()).isEqualTo(1L);
         }
 
         @Test
@@ -209,8 +211,9 @@ class AdminCategoryCommandControllerTest extends AbstractIntegrationTest {
             CategoryHashtag persisted = categoryHashtagJpaRepository.findById(categoryHashtag.getId()).orElseThrow();
             assertThat(persisted.getStatus()).isEqualTo(CategoryHashtagStatus.MERGED);
 
+            // usage_count는 상품에 링크될 때만 증가하므로, 모호한 연결 승인으로는 늘지 않는다
             Hashtag persistedHashtag = hashtagJpaRepository.findById(hashtag.getId()).orElseThrow();
-            assertThat(persistedHashtag.getUsageCount()).isEqualTo(1L);
+            assertThat(persistedHashtag.getUsageCount()).isZero();
         }
 
         @Test
