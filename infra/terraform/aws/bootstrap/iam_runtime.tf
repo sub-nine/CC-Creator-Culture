@@ -1,19 +1,26 @@
 locals {
-  account_id          = data.aws_caller_identity.current.account_id
-  state_key_prefix    = "cc-service/aws"
-  runtime_state_key   = "cc-service/aws/runtime/terraform.tfstate"
-  task_role_arn       = "arn:aws:iam::${local.account_id}:role/${var.name_prefix}-*"
-  rds_instance_arn    = "arn:aws:rds:${var.aws_region}:${local.account_id}:db:${var.name_prefix}-*"
-  ecs_cluster_arn     = "arn:aws:ecs:${var.aws_region}:${local.account_id}:cluster/${var.name_prefix}-*"
-  ecs_service_arn     = "arn:aws:ecs:${var.aws_region}:${local.account_id}:service/${var.name_prefix}-*/*"
+  account_id        = data.aws_caller_identity.current.account_id
+  state_key_prefix  = "cc-service/aws"
+  runtime_state_key = "cc-service/aws/runtime/terraform.tfstate"
+  task_role_arn     = "arn:aws:iam::${local.account_id}:role/${var.name_prefix}-*"
+  rds_instance_arn  = "arn:aws:rds:${var.aws_region}:${local.account_id}:db:${var.name_prefix}-*"
+  # The runtime ECS cluster is named exactly name_prefix, so cluster paths use "${name_prefix}*" not "${name_prefix}-*".
+  ecs_cluster_arn     = "arn:aws:ecs:${var.aws_region}:${local.account_id}:cluster/${var.name_prefix}*"
+  ecs_service_arn     = "arn:aws:ecs:${var.aws_region}:${local.account_id}:service/${var.name_prefix}*/*"
   ecs_taskdef_arn     = "arn:aws:ecs:${var.aws_region}:${local.account_id}:task-definition/${var.name_prefix}-*:*"
-  ecs_task_arn        = "arn:aws:ecs:${var.aws_region}:${local.account_id}:task/${var.name_prefix}-*/*"
+  ecs_task_arn        = "arn:aws:ecs:${var.aws_region}:${local.account_id}:task/${var.name_prefix}*/*"
   msk_cluster_arn     = "arn:aws:kafka:${var.aws_region}:${local.account_id}:cluster/${var.name_prefix}-*/*"
+  msk_config_arn      = "arn:aws:kafka:${var.aws_region}:${local.account_id}:configuration/${var.name_prefix}-*/*"
   redis_arn           = "arn:aws:elasticache:${var.aws_region}:${local.account_id}:replicationgroup:${var.name_prefix}-*"
+  redis_cluster_arn   = "arn:aws:elasticache:${var.aws_region}:${local.account_id}:cluster:${var.name_prefix}-*"
+  redis_paramgroup    = "arn:aws:elasticache:${var.aws_region}:${local.account_id}:parametergroup:default*"
   cw_alarm_arn        = "arn:aws:cloudwatch:${var.aws_region}:${local.account_id}:alarm:${var.name_prefix}-*"
   redis_subnet_arn    = "arn:aws:elasticache:${var.aws_region}:${local.account_id}:subnetgroup:${var.name_prefix}-*"
   redis_user_arn      = "arn:aws:elasticache:${var.aws_region}:${local.account_id}:user:${var.name_prefix}-*"
   redis_usergroup_arn = "arn:aws:elasticache:${var.aws_region}:${local.account_id}:usergroup:${var.name_prefix}-*"
+  ecr_repository_arn  = "arn:aws:ecr:${var.aws_region}:${local.account_id}:repository/${var.name_prefix}/*"
+  ssm_document_arn    = "arn:aws:ssm:${var.aws_region}:${local.account_id}:document/${var.name_prefix}-*"
+  ec2_instance_arn    = "arn:aws:ec2:${var.aws_region}:${local.account_id}:instance/*"
 }
 
 data "aws_iam_policy_document" "plan_read_lock" {
@@ -44,16 +51,29 @@ data "aws_iam_policy_document" "runtime_deploy" {
     resources = ["*"]
   }
 
+  # These ECS actions have no resource-level scoping in IAM, so they must be "*".
+  statement {
+    sid = "EcsUnscoped"
+    actions = [
+      "ecs:CreateCluster",
+      "ecs:RegisterTaskDefinition",
+      "ecs:DeregisterTaskDefinition",
+    ]
+    resources = ["*"]
+  }
+
   statement {
     sid = "EcsMutate"
     actions = [
+      "ecs:DeleteCluster",
+      "ecs:UpdateClusterSettings",
+      "ecs:PutClusterCapacityProviders",
       "ecs:CreateService",
       "ecs:DeleteService",
       "ecs:UpdateService",
-      "ecs:RegisterTaskDefinition",
-      "ecs:DeregisterTaskDefinition",
       "ecs:TagResource",
       "ecs:UntagResource",
+      "ecs:RunTask",
       "ecs:StopTask",
     ]
     resources = [
@@ -62,6 +82,45 @@ data "aws_iam_policy_document" "runtime_deploy" {
       local.ecs_taskdef_arn,
       local.ecs_task_arn,
     ]
+  }
+
+  # The deploy workflow checks that release_sha tags exist before terraform apply.
+  statement {
+    sid = "EcrDescribeImages"
+    actions = [
+      "ecr:DescribeImages",
+      "ecr:DescribeRepositories",
+    ]
+    resources = [local.ecr_repository_arn]
+  }
+
+  # The deploy workflow bootstraps the observation EC2 with the persistent SSM document after NAT exists.
+  statement {
+    sid       = "SsmSendCommandDocument"
+    actions   = ["ssm:SendCommand"]
+    resources = [local.ssm_document_arn]
+  }
+
+  statement {
+    sid       = "SsmSendCommandInstance"
+    actions   = ["ssm:SendCommand"]
+    resources = [local.ec2_instance_arn]
+
+    condition {
+      test     = "StringLike"
+      variable = "ssm:resourceTag/Name"
+      values   = ["${var.name_prefix}-*"]
+    }
+  }
+
+  statement {
+    sid = "SsmCommandRead"
+    actions = [
+      "ssm:GetCommandInvocation",
+      "ssm:ListCommandInvocations",
+      "ssm:ListCommands",
+    ]
+    resources = ["*"]
   }
 
   statement {
@@ -87,6 +146,7 @@ data "aws_iam_policy_document" "runtime_deploy" {
     actions = ["iam:CreateServiceLinkedRole"]
     resources = [
       "arn:aws:iam::${local.account_id}:role/aws-service-role/ecs.amazonaws.com/*",
+      "arn:aws:iam::${local.account_id}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/*",
       "arn:aws:iam::${local.account_id}:role/aws-service-role/elasticloadbalancing.amazonaws.com/*",
       "arn:aws:iam::${local.account_id}:role/aws-service-role/kafka.amazonaws.com/*",
       "arn:aws:iam::${local.account_id}:role/aws-service-role/elasticache.amazonaws.com/*",
@@ -117,7 +177,7 @@ data "aws_iam_policy_document" "runtime_deploy" {
       "ec2:StartInstances",
       "ec2:StopInstances",
     ]
-    resources = ["arn:aws:ec2:${var.aws_region}:${local.account_id}:instance/*"]
+    resources = [local.ec2_instance_arn]
 
     condition {
       test     = "StringLike"
@@ -155,6 +215,7 @@ data "aws_iam_policy_document" "runtime_deploy" {
     sid = "MskCreate"
     actions = [
       "kafka:CreateCluster",
+      "kafka:CreateClusterV2",
       "kafka:CreateConfiguration",
     ]
     resources = ["*"]
@@ -167,6 +228,9 @@ data "aws_iam_policy_document" "runtime_deploy" {
       "kafka:ListClustersV2",
       "kafka:GetCompatibleKafkaVersions",
       "kafka:ListConfigurations",
+      "kafka:ListConfigurationRevisions",
+      "kafka:DescribeClusterOperation",
+      "kafka:DescribeClusterOperationV2",
     ]
     resources = ["*"]
   }
@@ -178,16 +242,27 @@ data "aws_iam_policy_document" "runtime_deploy" {
       "kafka:DescribeCluster",
       "kafka:DescribeClusterV2",
       "kafka:GetBootstrapBrokers",
+      "kafka:ListTagsForResource",
       "kafka:UpdateClusterConfiguration",
       "kafka:UpdateBrokerStorage",
       "kafka:TagResource",
       "kafka:UntagResource",
-      "kafka:DescribeConfiguration",
-      "kafka:UpdateConfiguration",
       "kafka:BatchAssociateScramSecret",
       "kafka:BatchDisassociateScramSecret",
+      "kafka:ListScramSecrets",
     ]
     resources = [local.msk_cluster_arn]
+  }
+
+  statement {
+    sid = "MskConfiguration"
+    actions = [
+      "kafka:DescribeConfiguration",
+      "kafka:DescribeConfigurationRevision",
+      "kafka:UpdateConfiguration",
+      "kafka:DeleteConfiguration",
+    ]
+    resources = [local.msk_config_arn]
   }
 
   statement {
@@ -211,7 +286,9 @@ data "aws_iam_policy_document" "runtime_deploy" {
       "elasticache:ModifyReplicationGroup",
       "elasticache:CreateCacheSubnetGroup",
       "elasticache:DeleteCacheSubnetGroup",
+      "elasticache:ModifyCacheSubnetGroup",
       "elasticache:AddTagsToResource",
+      "elasticache:RemoveTagsFromResource",
       "elasticache:CreateUser",
       "elasticache:DeleteUser",
       "elasticache:ModifyUser",
@@ -219,8 +296,12 @@ data "aws_iam_policy_document" "runtime_deploy" {
       "elasticache:DeleteUserGroup",
       "elasticache:ModifyUserGroup",
     ]
+    # CreateReplicationGroup is authorized against the member cache clusters, the parameter group,
+    # the subnet group, and the user group too. redis_user_group_id must therefore start with name_prefix.
     resources = [
       local.redis_arn,
+      local.redis_cluster_arn,
+      local.redis_paramgroup,
       local.redis_subnet_arn,
       local.redis_user_arn,
       local.redis_usergroup_arn,
@@ -234,7 +315,9 @@ data "aws_iam_policy_document" "runtime_deploy" {
       "acm:RequestCertificate",
       "acm:DescribeCertificate",
       "acm:ListCertificates",
+      "acm:ListTagsForCertificate",
       "acm:AddTagsToCertificate",
+      "acm:RemoveTagsFromCertificate",
       "acm:DeleteCertificate",
     ]
     resources = ["*"]

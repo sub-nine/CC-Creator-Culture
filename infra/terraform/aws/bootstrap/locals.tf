@@ -16,7 +16,6 @@ locals {
   ])
 
   artifact_names = toset([
-    "db-migrate",
     "db-seed",
   ])
 
@@ -26,7 +25,10 @@ locals {
   production_subs = [
     "repo:${var.github_repository}:environment:production",
   ]
+  # deploy-dev image job runs without an environment, so trust the dev and release/* branch refs too.
   image_publisher_subs = [
     "repo:${var.github_repository}:environment:development",
+    "repo:${var.github_repository}:ref:refs/heads/dev",
+    "repo:${var.github_repository}:ref:refs/heads/release/*",
   ]
 }

@@ -8,6 +8,10 @@ resource "aws_iam_openid_connect_provider" "github" {
   url             = local.github_oidc_url
   client_id_list  = [local.github_oidc_aud]
   thumbprint_list = [data.tls_certificate.github.certificates[length(data.tls_certificate.github.certificates) - 1].sha1_fingerprint]
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 data "aws_iam_policy_document" "production_assume" {
@@ -51,7 +55,7 @@ data "aws_iam_policy_document" "image_publisher_assume" {
     }
 
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values   = local.image_publisher_subs
     }
