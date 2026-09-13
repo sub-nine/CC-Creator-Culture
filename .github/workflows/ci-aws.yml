@@ -16,6 +16,8 @@ on:
       - ".github/workflows/deploy-dev.yml"
       - ".github/scripts/validate-candidate-manifest.sh"
       - ".github/scripts/validate-candidate-manifest_test.sh"
+      - ".github/scripts/service-revisions.sh"
+      - ".github/scripts/service-revisions_test.sh"
   pull_request:
     branches: [main, dev]
     paths:
@@ -31,6 +33,8 @@ on:
       - ".github/workflows/deploy-dev.yml"
       - ".github/scripts/validate-candidate-manifest.sh"
       - ".github/scripts/validate-candidate-manifest_test.sh"
+      - ".github/scripts/service-revisions.sh"
+      - ".github/scripts/service-revisions_test.sh"
   workflow_dispatch:
 
 permissions:
@@ -64,10 +68,14 @@ jobs:
           shellcheck -x \
             deploy/aws/seed/scripts/seed.sh \
             deploy/aws/seed/seed_test.sh \
-            .github/scripts/validate-candidate-manifest.sh
+            .github/scripts/validate-candidate-manifest.sh \
+            .github/scripts/service-revisions.sh
 
       - name: Candidate manifest validator tests
         run: bash .github/scripts/validate-candidate-manifest_test.sh
+
+      - name: Service revision tests
+        run: bash .github/scripts/service-revisions_test.sh
 
       - name: RDS CA bundle checksum drift
         run: |
