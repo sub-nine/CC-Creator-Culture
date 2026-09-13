@@ -1,11 +1,16 @@
 output "release_sha" {
-  description = "Image tag currently applied to the six services and db-seed."
+  description = "Git commit that produced this apply. Images are tagged by image_tags."
   value       = var.release_sha
 }
 
-output "config_sha" {
-  description = "Config repository label served by config-server."
-  value       = local.config_sha
+output "image_tags" {
+  description = "Content-hash tags currently applied to the six services and db-seed."
+  value       = var.image_tags
+}
+
+output "config_labels" {
+  description = "Per-service config-repo labels currently applied to the six services."
+  value       = var.config_labels
 }
 
 output "app_running" {

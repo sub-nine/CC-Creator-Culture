@@ -4,12 +4,13 @@ NAT 1개, ALB HTTPS, Redis, Fargate 서비스 6개, 태스크 정의, 실행 상
 
 ## 입력과 출력
 
-- `release_sha`: 40자 커밋 SHA. 서비스 6개와 db-seed 이미지 태그로 쓴다. `${ecr_repository_urls[name]}:${release_sha}`. ECR 태그는 IMMUTABLE이라 digest가 고정된다.
-- `config_sha`: config-server가 서비스하는 설정 저장소 ref. 비우면 `release_sha`를 쓴다. config-server에는 `CONFIG_GIT_DEFAULT_LABEL`, 나머지에는 `SPRING_CLOUD_CONFIG_LABEL`로 전달한다.
+- `release_sha`: 이 apply를 만든 40자 커밋 SHA. 추적용이며 이미지 태그로 쓰지 않는다.
+- `image_tags`: 서비스 6개와 db-seed의 콘텐츠 해시 태그. `${ecr_repository_urls[name]}:${image_tags[name]}`. ECR 태그는 IMMUTABLE이라 digest가 고정된다. 태그가 바뀐 서비스만 새 태스크 정의가 생긴다.
+- `config_labels`: 서비스별 config-repo 라벨. config-server에는 `CONFIG_GIT_DEFAULT_LABEL`, 나머지에는 `SPRING_CLOUD_CONFIG_LABEL`로 전달한다. 라벨이 바뀐 서비스만 재시작된다.
 - `app_running`: true면 서비스 desired_count 1, RDS available, 관측과 Kafka EC2 running. false면 모두 정지한다. 기본값 false.
-- 출력: `release_sha`, `config_sha`, `app_running`, `cluster_name`, `seed_task_families`(서비스 키 -> family 맵), `app_subnet_ids`, `migration_security_group_id`, `observation_instance_id`, `observation_bootstrap_document`, `kafka_instance_id`, `kafka_bootstrap_document`, `redis_user_group_id`.
+- 출력: `release_sha`, `image_tags`, `config_labels`, `app_running`, `cluster_name`, `seed_task_families`(서비스 키 -> family 맵), `app_subnet_ids`, `migration_security_group_id`, `observation_instance_id`, `observation_bootstrap_document`, `kafka_instance_id`, `kafka_bootstrap_document`, `redis_user_group_id`.
 
-ignore_changes 는 없다. 이미지 교체, desired_count, 전원은 모두 `terraform apply -var release_sha=... -var app_running=...` 한 번으로 반영된다.
+ignore_changes 는 없다. 이미지 교체, 설정 라벨, desired_count, 전원은 모두 `terraform apply` 한 번으로 반영된다.
 
 ## 기동 순서
 

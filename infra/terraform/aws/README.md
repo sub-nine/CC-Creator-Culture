@@ -8,6 +8,6 @@
 
 runtime-deploy 역할은 runtime 스택의 plan, apply, destroy 전부를 담당한다. infrastructure-apply 역할은 bootstrap과 persistent 전용이다. plan-read와 runtime-deploy 역할은 GitHub Environment production, audience sts.amazonaws.com만 신뢰한다. 이미지 게시 역할만 Environment development 와 브랜치 ref `dev`, `release/*` 를 신뢰한다(StringLike). 기존 OCI 배포의 development 환경과 섞지 않는다.
 
-스택은 bootstrap, persistent, runtime 세 개다. runtime 은 `release_sha`, `config_sha`, `app_running` 세 변수로 태스크 정의, desired_count, RDS와 관측/Kafka EC2 전원을 소유한다. 자세한 것은 각 디렉터리 README 에 있다.
+스택은 bootstrap, persistent, runtime 세 개다. runtime 은 `release_sha`, `image_tags`, `config_labels`, `app_running`으로 태스크 정의, desired_count, RDS와 관측/Kafka EC2 전원을 소유한다. 자세한 것은 각 디렉터리 README 에 있다.
 
 시크릿 값과 계정 ID는 예시에 넣지 않는다. 버킷 이름은 적용 입력으로 받는다.

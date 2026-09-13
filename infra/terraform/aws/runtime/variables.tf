@@ -45,7 +45,7 @@ variable "redis_user_group_id" {
 }
 
 variable "release_sha" {
-  description = "Git commit SHA used as the ECR image tag for the six services and the db-seed artifact. ECR tags are IMMUTABLE, so this pins the digest."
+  description = "Git commit that produced this apply. Images are tagged by image_tags, not this SHA."
   type        = string
 
   validation {
@@ -54,10 +54,43 @@ variable "release_sha" {
   }
 }
 
-variable "config_sha" {
-  description = "Git ref of the config repository that config-server serves. Defaults to release_sha."
-  type        = string
-  default     = null
+variable "image_tags" {
+  description = "Content-hash tags for the six services and db-seed. Keys must match the ECR repository names."
+  type        = map(string)
+
+  validation {
+    condition = toset(keys(var.image_tags)) == toset([
+      "config-server",
+      "eureka-server",
+      "gateway",
+      "user-service",
+      "product-service",
+      "order-service",
+      "db-seed",
+      ]) && alltrue([
+      for tag in values(var.image_tags) : can(regex("^[0-9a-f]{64}$", tag))
+    ])
+    error_message = "image_tags must have exactly the seven service keys, each a 64-character lowercase hex content hash."
+  }
+}
+
+variable "config_labels" {
+  description = "Per-service git SHA that config-server should serve for that service."
+  type        = map(string)
+
+  validation {
+    condition = toset(keys(var.config_labels)) == toset([
+      "config-server",
+      "eureka-server",
+      "gateway",
+      "user-service",
+      "product-service",
+      "order-service",
+      ]) && alltrue([
+      for label in values(var.config_labels) : can(regex("^[0-9a-f]{40}$", label))
+    ])
+    error_message = "config_labels must have exactly the six service keys, each a 40-character lowercase git SHA."
+  }
 }
 
 variable "app_running" {

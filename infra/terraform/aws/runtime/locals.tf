@@ -119,12 +119,10 @@ locals {
   release_bucket = coalesce(var.release_bucket, var.persistent_config.release_bucket)
   account_id     = split(":", var.persistent_config.roles.ecs_execution)[4]
 
-  config_sha = coalesce(var.config_sha, var.release_sha)
-
   service_images = {
-    for name in local.app_keys : name => "${var.persistent_config.ecr_repository_urls[name]}:${var.release_sha}"
+    for name in local.app_keys : name => "${var.persistent_config.ecr_repository_urls[name]}:${var.image_tags[name]}"
   }
-  db_seed_image = "${var.persistent_config.artifact_repository_urls["db-seed"]}:${var.release_sha}"
+  db_seed_image = "${var.persistent_config.artifact_repository_urls["db-seed"]}:${var.image_tags["db-seed"]}"
 
   config_dns = var.persistent_config.cloudmap.dns_names["config-server"]
   eureka_dns = var.persistent_config.cloudmap.dns_names["eureka-server"]

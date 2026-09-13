@@ -19,10 +19,10 @@ locals {
       ],
       name == "config-server" ? [
         { name = "CONFIG_GIT_URI", value = "https://github.com/sub-nine/CC-Creator-Culture.git" },
-        { name = "CONFIG_GIT_DEFAULT_LABEL", value = local.config_sha },
+        { name = "CONFIG_GIT_DEFAULT_LABEL", value = var.config_labels[name] },
         ] : [
         { name = "CONFIG_SERVER_IMPORT", value = local.config_import },
-        { name = "SPRING_CLOUD_CONFIG_LABEL", value = local.config_sha },
+        { name = "SPRING_CLOUD_CONFIG_LABEL", value = var.config_labels[name] },
         { name = "EUREKA_CLIENT_SERVICEURL_DEFAULTZONE", value = local.eureka_zone },
       ],
       contains(local.redis_clients, name) ? [

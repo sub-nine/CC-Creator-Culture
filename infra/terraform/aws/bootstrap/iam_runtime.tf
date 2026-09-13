@@ -82,7 +82,7 @@ data "aws_iam_policy_document" "runtime_deploy" {
     ]
   }
 
-  # The deploy workflow checks that release_sha tags exist before terraform apply.
+  # The deploy workflow checks that per-service image_tags exist before terraform apply.
   statement {
     sid = "EcrDescribeImages"
     actions = [

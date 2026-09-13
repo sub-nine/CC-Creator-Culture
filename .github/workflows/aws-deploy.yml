@@ -70,7 +70,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.action == 'deploy' && inputs.release_ref || github.ref }}
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Resolve revision
         run: |
@@ -85,15 +85,6 @@ jobs:
           role-session-name: cc-aws-deploy
           aws-region: ${{ vars.AWS_REGION }}
           audience: sts.amazonaws.com
-
-      - name: Verify ECR tags for the release
-        if: inputs.action == 'deploy'
-        run: |
-          set -euo pipefail
-          for name in config-server eureka-server gateway user-service product-service order-service db-seed; do
-            aws ecr describe-images --repository-name "${ECR_PREFIX}${name}" --image-ids "imageTag=${HEAD_SHA}" >/dev/null \
-              || { echo "Missing ECR image ${ECR_PREFIX}${name}:${HEAD_SHA}. Run deploy-dev.yml for this revision first." >&2; exit 65; }
-          done
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -116,6 +107,47 @@ jobs:
           # persistent_config is passed through exactly as the persistent stack outputs it.
           terraform -chdir=infra/terraform/aws/persistent output -json persistent_config \
             | jq '{persistent_config: .}' > "$TF_DIR/persistent.auto.tfvars.json"
+
+      - name: Write image_tags and config_labels
+        env:
+          ACTION: ${{ inputs.action }}
+        run: |
+          set -euo pipefail
+          revisions_from_git() {
+            bash .github/scripts/service-revisions.sh "$HEAD_SHA" | jq '{
+              image_tags: (to_entries | map({key: .key, value: .value.image_tag}) | from_entries),
+              config_labels: (
+                to_entries
+                | map(select(.value.config_label != null))
+                | map({key: .key, value: .value.config_label})
+                | from_entries
+              )
+            }'
+          }
+          if [[ "$ACTION" == deploy ]]; then
+            revisions_from_git > "$TF_DIR/revisions.auto.tfvars.json"
+            exit 0
+          fi
+          if image_tags="$(terraform -chdir="$TF_DIR" output -json image_tags 2>/dev/null)" \
+            && config_labels="$(terraform -chdir="$TF_DIR" output -json config_labels 2>/dev/null)" \
+            && jq -e 'type == "object" and (keys | length) == 7' <<<"$image_tags" >/dev/null \
+            && jq -e 'type == "object" and (keys | length) == 6' <<<"$config_labels" >/dev/null; then
+            jq -n --argjson image_tags "$image_tags" --argjson config_labels "$config_labels" \
+              '{image_tags: $image_tags, config_labels: $config_labels}' \
+              > "$TF_DIR/revisions.auto.tfvars.json"
+          else
+            revisions_from_git > "$TF_DIR/revisions.auto.tfvars.json"
+          fi
+
+      - name: Verify ECR tags for the release
+        if: inputs.action == 'deploy'
+        run: |
+          set -euo pipefail
+          for name in config-server eureka-server gateway user-service product-service order-service db-seed; do
+            tag="$(jq -er --arg name "$name" '.image_tags[$name]' "$TF_DIR/revisions.auto.tfvars.json")"
+            aws ecr describe-images --repository-name "${ECR_PREFIX}${name}" --image-ids "imageTag=${tag}" >/dev/null \
+              || { echo "Missing ECR image ${ECR_PREFIX}${name}:${tag}. Run deploy-dev.yml for this revision first." >&2; exit 65; }
+          done
 
       - name: Resolve release_sha and app_running
         env:
