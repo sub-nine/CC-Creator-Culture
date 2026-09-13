@@ -1,7 +1,9 @@
 package com.sub9.productservice.product.application.command.service;
 
+import com.github.f4b6a3.uuid.UuidCreator;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.kafka.event.ProductCreatedEvent;
+import com.sub9.common.kafka.event.ProductDeletedEvent;
 import com.sub9.productservice.product.application.command.dto.product.CreateProductCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
@@ -18,6 +20,7 @@ import com.sub9.productservice.product.domain.model.Stock;
 import com.sub9.productservice.product.domain.repository.ProductRepository;
 import com.sub9.productservice.product.domain.repository.SkuRepository;
 import com.sub9.productservice.product.domain.repository.StockRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -107,6 +110,9 @@ public class ProductCommandService implements ProductCommandUseCase, AdminProduc
     for (Sku sku : skus) {
       sku.delete(creatorId);
     }
+
+    eventPublisher.publishEvent(
+        new ProductDeletedEvent(UuidCreator.getTimeOrderedEpoch(), productId, Instant.now()));
   }
 
   // ============================== Helper Method ====================================
