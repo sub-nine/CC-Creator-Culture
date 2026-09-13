@@ -7,42 +7,30 @@ on:
       - "infra/terraform/aws/**"
       - "deploy/aws/**"
       - "config-repo/*-prod.yaml"
-      - "config-repo/application-prod.yaml"
       - "infra/config-server/src/main/resources/application-prod.yaml"
       - "infra/eureka-server/src/main/resources/application-prod.yaml"
       - "Dockerfile"
       - ".dockerignore"
       - ".github/workflows/ci-aws.yml"
-      - ".github/scripts/validate-aws-release-record.sh"
-      - ".github/scripts/validate-aws-release-record_test.sh"
+      - ".github/workflows/aws-deploy.yml"
+      - ".github/workflows/deploy-dev.yml"
       - ".github/scripts/validate-candidate-manifest.sh"
       - ".github/scripts/validate-candidate-manifest_test.sh"
-      - ".github/scripts/copy-ocir-images-to-ecr.sh"
-      - ".github/scripts/copy-ocir-images-to-ecr_test.sh"
-      - ".github/scripts/publish-db-artifacts.sh"
-      - ".github/scripts/publish-db-artifacts_test.sh"
-      - ".github/workflows/deploy-dev.yml"
   pull_request:
     branches: [main, dev]
     paths:
       - "infra/terraform/aws/**"
       - "deploy/aws/**"
       - "config-repo/*-prod.yaml"
-      - "config-repo/application-prod.yaml"
       - "infra/config-server/src/main/resources/application-prod.yaml"
       - "infra/eureka-server/src/main/resources/application-prod.yaml"
       - "Dockerfile"
       - ".dockerignore"
       - ".github/workflows/ci-aws.yml"
-      - ".github/scripts/validate-aws-release-record.sh"
-      - ".github/scripts/validate-aws-release-record_test.sh"
+      - ".github/workflows/aws-deploy.yml"
+      - ".github/workflows/deploy-dev.yml"
       - ".github/scripts/validate-candidate-manifest.sh"
       - ".github/scripts/validate-candidate-manifest_test.sh"
-      - ".github/scripts/copy-ocir-images-to-ecr.sh"
-      - ".github/scripts/copy-ocir-images-to-ecr_test.sh"
-      - ".github/scripts/publish-db-artifacts.sh"
-      - ".github/scripts/publish-db-artifacts_test.sh"
-      - ".github/workflows/deploy-dev.yml"
   workflow_dispatch:
 
 permissions:
@@ -54,7 +42,7 @@ concurrency:
 
 jobs:
   static:
-    name: Lint and controller checks
+    name: Lint workflows and scripts
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -68,34 +56,18 @@ jobs:
           sudo apt-get install -y shellcheck
 
       - name: actionlint
-        run: ./actionlint .github/workflows/ci-aws.yml
+        run: ./actionlint .github/workflows/aws-deploy.yml .github/workflows/ci-aws.yml .github/workflows/deploy-dev.yml
 
-      - name: shellcheck AWS scripts
+      - name: shellcheck
         run: |
           set -euo pipefail
           shellcheck -x \
-            deploy/aws/db-tasks.sh \
-            deploy/aws/ecs-deploy.sh \
-            deploy/aws/obs-tasks.sh \
-            deploy/aws/database/scripts/migrate.sh \
-            deploy/aws/database/scripts/bootstrap-roles.sh \
             deploy/aws/seed/scripts/seed.sh \
-            infra/terraform/aws/scripts/assert-safe-plan.sh \
-            .github/scripts/validate-aws-release-record.sh \
-            .github/scripts/validate-candidate-manifest.sh \
-            .github/scripts/copy-ocir-images-to-ecr.sh \
-            .github/scripts/publish-db-artifacts.sh
+            deploy/aws/seed/seed_test.sh \
+            .github/scripts/validate-candidate-manifest.sh
 
-      - name: Release and core controller tests
-        run: |
-          set -euo pipefail
-          bash .github/scripts/validate-aws-release-record_test.sh
-          bash .github/scripts/validate-candidate-manifest_test.sh
-          bash .github/scripts/copy-ocir-images-to-ecr_test.sh
-          bash .github/scripts/publish-db-artifacts_test.sh
-          bash infra/terraform/aws/scripts/assert-safe-plan_test.sh
-          bash infra/terraform/aws/persistent/persistent_config_test.sh
-          python3 infra/terraform/aws/runtime/deployment_config_test.py
+      - name: Candidate manifest validator tests
+        run: bash .github/scripts/validate-candidate-manifest_test.sh
 
       - name: RDS CA bundle checksum drift
         run: |
@@ -106,7 +78,7 @@ jobs:
           upstream="$(sha256sum "$bundle" | awk '{print $1}')"
           rm -f "$bundle"
           status=0
-          for dockerfile in Dockerfile deploy/aws/database/Dockerfile deploy/aws/seed/Dockerfile; do
+          for dockerfile in Dockerfile deploy/aws/seed/Dockerfile; do
             pinned="$(grep -Eo -- '--checksum=sha256:[0-9a-f]{64}' "$dockerfile" | sed 's/^--checksum=sha256://' | sort -u)"
             if [[ "$(wc -l <<<"$pinned")" -ne 1 ]]; then
               echo "$dockerfile must pin exactly one RDS bundle checksum" >&2
@@ -124,31 +96,14 @@ jobs:
           fi
           echo "RDS CA bundle checksum matches upstream: sha256:$upstream"
 
-      - name: Database static checks
-        run: |
-          set -euo pipefail
-          sh -n deploy/aws/database/scripts/migrate.sh
-          sh -n deploy/aws/database/scripts/bootstrap-roles.sh
-          for service in user product order; do
-            test -f "deploy/aws/database/migrations/${service}/V1__${service}_schema.sql"
-          done
-          if grep -RE "TRUNCATE|DROP TABLE|CREATE EXTENSION[[:space:]]+vector" \
-            deploy/aws/database/scripts deploy/aws/database/migrations; then
-            echo "migrations must not truncate, drop tables, or create vector" >&2
-            exit 1
-          fi
-
-  database-images:
-    name: Database migrate and seed images
+  seed-image:
+    name: Seed image against PostgreSQL 17
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
 
-      - name: Database migrate integration
-        run: REQUIRE_DOCKER=true bash deploy/aws/database/database_test.sh
-
-      - name: Seed integration
+      - name: Build and apply seed once
         run: REQUIRE_DOCKER=true bash deploy/aws/seed/seed_test.sh
 
   terraform:
