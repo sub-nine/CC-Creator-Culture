@@ -39,5 +39,6 @@ kafka:
   bootstrap-servers: ${KAFKA_HOST:localhost:9092}
   auto-offset-reset: latest
   product-group-id: product-group
+  wishlist-group-id: wishlist-group
   category-group-id: category-group
   leaderboard-group-id: leaderboard-group

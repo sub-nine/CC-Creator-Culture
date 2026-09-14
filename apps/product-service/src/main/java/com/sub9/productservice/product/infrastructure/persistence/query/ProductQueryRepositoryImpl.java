@@ -13,17 +13,14 @@ import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.sub9.productservice.product.application.port.out.product.ProductQueryRepository;
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
 import com.sub9.productservice.product.application.query.dto.SkuInfo;
-import com.sub9.productservice.product.application.port.out.product.ProductQueryRepository;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import com.sub9.productservice.product.domain.model.QImage;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -141,14 +138,21 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
         != null;
   }
 
-  private Product findProductById(UUID productId) {
+  @Override
+  public boolean existsById(UUID productId) {
     return queryFactory
-        .selectFrom(product)
-        .where(product.id.eq(productId), product.deletedAt.isNull())
-        .fetchOne();
+            .selectOne()
+            .from(product)
+            .where(
+                product.id.eq(productId),
+                product.deletedAt.isNull(),
+                product.status.ne(ProductStatus.SUSPENDED))
+            .fetchFirst()
+        != null;
   }
 
-  private List<ProductInfo> findProductsByIds(List<UUID> productIds) {
+  @Override
+  public List<ProductInfo> findProductsByIds(List<UUID> productIds) {
     return queryFactory
         .select(
             Projections.constructor(
@@ -167,12 +171,18 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
         .join(stock)
         .on(stock.skuId.eq(sku.id))
         .leftJoin(image)
-        .on(image.productId.eq(product.id),
-            image.deletedAt.isNull(),
-            imageSortOrderEqMin())
+        .on(image.productId.eq(product.id), image.deletedAt.isNull(), imageSortOrderEqMin())
         .where(product.id.in(productIds), product.deletedAt.isNull())
         .orderBy(productStatusOrder(), product.createdAt.desc(), product.id.desc())
         .fetch();
+  }
+
+  // ============================== Helper Method ====================================
+  private Product findProductById(UUID productId) {
+    return queryFactory
+        .selectFrom(product)
+        .where(product.id.eq(productId), product.deletedAt.isNull())
+        .fetchOne();
   }
 
   private List<ProductDetailInfo.SkuInfo> findSkusByProductId(UUID productId) {
@@ -211,15 +221,10 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
     QImage subImage = new QImage("subImage");
 
     return image.sortOrder.eq(
-        JPAExpressions
-            .select(subImage.sortOrder.min())
+        JPAExpressions.select(subImage.sortOrder.min())
             .from(subImage)
-            .where(
-                subImage.productId.eq(product.id),
-                subImage.deletedAt.isNull()));
+            .where(subImage.productId.eq(product.id), subImage.deletedAt.isNull()));
   }
-
-
 
   private OrderSpecifier<Integer> productStatusOrder() {
     return new CaseBuilder()
