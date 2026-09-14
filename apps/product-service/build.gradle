@@ -19,6 +19,9 @@ dependencies {
     implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
     implementation 'io.github.openfeign:feign-micrometer'
 
+    // Resilience4j
+    implementation "io.github.resilience4j:resilience4j-spring-boot4:2.4.0"
+
     // Kafka
     implementation 'org.springframework.boot:spring-boot-starter-kafka'
 
