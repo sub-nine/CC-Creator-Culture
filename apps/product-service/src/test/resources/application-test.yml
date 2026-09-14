@@ -2,10 +2,6 @@ spring:
   config:
     activate:
       on-profile: test
-  servlet:
-    multipart:
-      max-file-size: 5MB
-      max-request-size: 26MB
   cloud:
     discovery:
       enabled: false

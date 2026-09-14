@@ -1,7 +1,7 @@
 package com.sub9.productservice.category.application.query.adapter;
 
 import com.sub9.productservice.category.application.query.port.out.ProductMetadataQueryRepository;
-import com.sub9.productservice.product.application.port.ProductMetadataQueryPort;
+import com.sub9.productservice.product.application.port.out.image.ProductMetadataQueryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

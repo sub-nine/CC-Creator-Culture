@@ -7,6 +7,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLDelete;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -15,12 +16,12 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @Entity
 @EntityListeners(AuditingEntityListener.class)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SQLDelete(sql = "UPDATE p_images SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?")
 @Table(
     name = "p_images",
-    uniqueConstraints = {
-      @UniqueConstraint(
-          name = "uk_images_product_id_image_order",
-          columnNames = {"product_id", "sort_order"})
+    indexes = {
+      @Index(name = "idx_images_product_id_deleted_at", columnList = "product_id, deleted_at"),
+      @Index(name = "idx_images_deleted_at", columnList = "deleted_at")
     })
 public class Image {
   @Id private UUID id;
@@ -49,12 +50,12 @@ public class Image {
   @Column(nullable = false, updatable = false)
   private UUID createdBy;
 
-  @Column
-  private Instant processedAt;
+  @Column private Instant processedAt;
 
   private Instant deletedAt;
 
-  public static Image create(UUID productId, String originalKey, String processedKey, int sortOrder) {
+  public static Image create(
+      UUID productId, String originalKey, String processedKey, int sortOrder) {
     Image image = new Image();
     image.id = UuidCreator.getTimeOrderedEpoch();
     image.productId = productId;
@@ -66,8 +67,7 @@ public class Image {
     return image;
   }
 
-  public void delete() {
-    // TODO : 추후 스케쥴러로 7일이 지나면 삭제 로직 구현
-    this.deletedAt = Instant.now();
+  public void updateSortOrder(int sortOrder) {
+    this.sortOrder = sortOrder;
   }
 }

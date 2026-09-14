@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 public class ProductViewCountScheduler {
   private final ProductViewCountCommandService viewCountCommandService;
 
-  @Scheduled(cron = "0 * * * * *")
+  @Scheduled(cron = "0 * * * * *", zone = "UTC") // 매 분 실행
   public void execute() {
     int productCount = viewCountCommandService.syncViewCounts();
     if (productCount > 0) log.info("상품 조회수 집계 요청. 상품 수 = {}개", productCount);

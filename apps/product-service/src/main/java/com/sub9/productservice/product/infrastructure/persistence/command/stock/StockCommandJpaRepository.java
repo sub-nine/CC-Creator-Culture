@@ -13,7 +13,7 @@ public interface StockCommandJpaRepository extends JpaRepository<Stock, UUID> {
       """
        UPDATE Stock s
        SET s.quantity = s.quantity + :quantity,
-           s.updatedAt = instant
+           s.updatedAt = CURRENT_TIMESTAMP
        WHERE s.skuId = :skuId
        """)
   int increaseStock(UUID skuId, int quantity);
@@ -23,7 +23,7 @@ public interface StockCommandJpaRepository extends JpaRepository<Stock, UUID> {
       """
       UPDATE Stock s
       SET s.quantity = s.quantity - :quantity,
-          s.updatedAt = instant
+          s.updatedAt = CURRENT_TIMESTAMP
       WHERE s.skuId = :skuId
       AND s.quantity >= :quantity
        """)
@@ -34,7 +34,7 @@ public interface StockCommandJpaRepository extends JpaRepository<Stock, UUID> {
       """
       UPDATE Stock s
       SET s.quantity = s.quantity + :quantity,
-          s.updatedAt = instant
+          s.updatedAt = CURRENT_TIMESTAMP
       WHERE s.skuId = :skuId
       AND s.quantity + :quantity >= 0
       """)

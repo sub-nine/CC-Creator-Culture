@@ -15,8 +15,8 @@ import com.sub9.productservice.product.application.command.dto.product.UpdatePro
 import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
 import com.sub9.productservice.product.application.command.dto.sku.CreateSkuCommand;
 import com.sub9.productservice.product.application.event.ProductImageUploadedEvent;
-import com.sub9.productservice.product.application.port.ImageData;
-import com.sub9.productservice.product.application.port.ImageStoragePort;
+import com.sub9.productservice.product.application.port.out.image.ImageData;
+import com.sub9.productservice.product.application.port.out.image.ImageStoragePort;
 import com.sub9.productservice.product.domain.model.Image;
 import com.sub9.productservice.product.domain.model.ImageProcessingStatus;
 import com.sub9.productservice.product.domain.model.Product;
@@ -175,7 +175,8 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
     List<UploadImageCommand> images =
         List.of(
             new UploadImageCommand(
-                "image/png", com.sub9.productservice.support.ImageTestFixture.imageBytes("png")),
+                "application/octet-stream",
+                com.sub9.productservice.support.ImageTestFixture.imageBytes("png")),
             new UploadImageCommand(
                 "image/jpeg", com.sub9.productservice.support.ImageTestFixture.imageBytes("jpeg")));
 
@@ -217,6 +218,7 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
             });
     ArgumentCaptor<ImageData> data = ArgumentCaptor.forClass(ImageData.class);
     verify(imageStoragePort, times(2)).upload(anyString(), data.capture());
+    assertThat(data.getAllValues().get(0).contentType()).isEqualTo("image/png");
     assertThat(data.getAllValues().get(0).data()).containsExactly(images.get(0).data());
     assertThat(data.getAllValues().get(1).data()).containsExactly(images.get(1).data());
   }
@@ -316,7 +318,7 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
   @DisplayName("상품 삭제 테스트")
   class DeleteProduct {
     @Test
-    @DisplayName("상품 삭제 시 상품, SKU와 이미지를 논리 삭제하고 다른 상품의 이미지는 유지한다.")
+    @DisplayName("상품 삭제 시 상품과 SKU를 논리 삭제하고 복원을 위해 이미지는 유지한다.")
     void deleteProduct_success() {
       // given
       SecurityContextHolder.getContext()
@@ -348,11 +350,10 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
       // then
       assertThat(productRepository.findByIdAndDeletedAtIsNull(dummyProduct.getId())).isEmpty();
       assertThat(imageRepository.findAllByProductIdAndDeletedAtIsNull(dummyProduct.getId()))
-          .isEmpty();
-      assertThat(imageRepository.findById(pending.getId()).orElseThrow().getDeletedAt())
-          .isNotNull();
+          .hasSize(2);
+      assertThat(imageRepository.findById(pending.getId()).orElseThrow().getDeletedAt()).isNull();
       Image deleted = imageRepository.findById(completed.getId()).orElseThrow();
-      assertThat(deleted.getDeletedAt()).isNotNull();
+      assertThat(deleted.getDeletedAt()).isNull();
       assertThat(deleted.getProcessedKey()).isEqualTo("processed/completed");
       assertThat(imageRepository.findById(otherImage.getId()).orElseThrow().getDeletedAt())
           .isNull();

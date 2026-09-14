@@ -9,7 +9,7 @@ import static org.mockito.Mockito.verify;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.productservice.common.config.r2.R2Properties;
-import com.sub9.productservice.product.application.port.ImageData;
+import com.sub9.productservice.product.application.port.out.image.ImageData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

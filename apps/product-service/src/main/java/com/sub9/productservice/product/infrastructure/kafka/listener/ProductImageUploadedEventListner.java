@@ -1,8 +1,8 @@
 package com.sub9.productservice.product.infrastructure.kafka.listener;
 
 import com.sub9.common.kafka.topic.KafkaTopics;
-import com.sub9.productservice.product.application.command.service.ProductImageCommandService;
 import com.sub9.productservice.product.application.event.ProductImageUploadedEvent;
+import com.sub9.productservice.product.application.port.in.image.ProductImageProcessingUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class ProductImageUploadedEventListner {
-  private final ProductImageCommandService productImageCommandService;
+  private final ProductImageProcessingUseCase imageProcessingUseCase;
 
   @KafkaListener(
       topics = KafkaTopics.PRODUCT_IMAGE_UPLOADED,
@@ -21,7 +21,7 @@ public class ProductImageUploadedEventListner {
   )
   public void handleProducImageUploadEvent(ProductImageUploadedEvent event, Acknowledgment ack) {
     try {
-      productImageCommandService.resizeImage(event.imageId(), event.productId(), event.originalKey());
+      imageProcessingUseCase.resizeImage(event.imageId(), event.productId(), event.originalKey());
       
       ack.acknowledge();
     } catch (Exception e) {
