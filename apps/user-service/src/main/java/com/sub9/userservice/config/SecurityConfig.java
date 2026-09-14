@@ -59,6 +59,12 @@ public class SecurityConfig {
                 .hasRole("MASTER")
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/admin/creators/*/approval")
                 .hasAnyRole("MASTER", "MANAGER")
+                .requestMatchers(HttpMethod.POST, "/api/v1/follows/*")
+                .hasRole("CUSTOMER")
+                .requestMatchers(HttpMethod.DELETE, "/api/v1/follows/*")
+                .hasRole("CUSTOMER")
+                .requestMatchers(HttpMethod.GET, "/api/v1/follows", "/api/v1/follows/*")
+                .hasRole("CUSTOMER")
                 .anyRequest()
                 .authenticated());
 
