@@ -1,0 +1,23 @@
+services:
+  k6:
+    build: .
+    networks:
+      - cc-service-apps_default
+    environment:
+      - TARGET=local
+    volumes:
+      - ./results:/scripts/results
+
+  k6-all:
+    build: .
+    networks:
+      - cc-service-apps_default
+    environment:
+      - TARGET=local
+    entrypoint: ["sh", "entrypoint.sh"]
+    volumes:
+      - ./results:/scripts/results
+
+networks:
+  cc-service-apps_default:
+    external: true
