@@ -12,6 +12,8 @@ public interface CreatorRepository {
 
     Optional<Creator> findActiveById(UUID creatorId);
 
+    Optional<Creator> findApprovedActiveById(UUID creatorId);
+
     Optional<Creator> findActiveByIdForUpdate(UUID creatorId);
 
     Optional<Creator> findActiveByUserId(UUID userId);

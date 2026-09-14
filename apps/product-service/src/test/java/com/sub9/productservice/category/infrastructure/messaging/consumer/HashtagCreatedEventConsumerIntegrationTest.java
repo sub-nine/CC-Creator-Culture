@@ -64,8 +64,8 @@ class HashtagCreatedEventConsumerIntegrationTest extends AbstractKafkaIntegratio
     }
 
     @Test
-    @DisplayName("HASHTAG_CREATED 이벤트를 수신하면 매칭되는 카테고리가 없을 때 새 카테고리를 만들어 연결한다")
-    void consume_noMatchingCategory_promotesHashtagToNewCategory() throws Exception {
+    @DisplayName("HASHTAG_CREATED 이벤트를 수신하면 매칭되는 카테고리가 없을 때 새 카테고리를 만들어 연결하고, usage_count는 증가시키지 않는다")
+    void consume_noMatchingCategory_promotesHashtagToNewCategoryWithoutIncreasingUsageCount() throws Exception {
         // Given
         String hashtagName = "통합테스트해시태그" + UUID.randomUUID();
         Hashtag hashtag = hashtagJpaRepository.save(Hashtag.create(hashtagName));
@@ -80,8 +80,9 @@ class HashtagCreatedEventConsumerIntegrationTest extends AbstractKafkaIntegratio
             List<Category> categories = categoryJpaRepository.findAllByStatusAndDeletedAtIsNull(CategoryStatus.ACTIVE);
             assertThat(categories).anyMatch(category -> category.getName().equals(hashtagName));
 
+            // usage_count는 상품에 링크될 때만 증가하므로, 카테고리 승격으로는 늘지 않는다
             Hashtag persisted = hashtagJpaRepository.findById(hashtag.getId()).orElseThrow();
-            assertThat(persisted.getUsageCount()).isEqualTo(1L);
+            assertThat(persisted.getUsageCount()).isZero();
         });
     }
 }

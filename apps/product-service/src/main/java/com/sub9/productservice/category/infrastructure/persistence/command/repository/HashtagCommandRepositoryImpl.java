@@ -6,8 +6,8 @@ import com.sub9.productservice.category.application.command.port.out.HashtagUpse
 import com.sub9.productservice.category.domain.entity.Hashtag;
 import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.HashtagJpaRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -15,8 +15,6 @@ import java.util.UUID;
 @Repository
 @RequiredArgsConstructor
 public class HashtagCommandRepositoryImpl implements HashtagCommandRepository {
-
-    private static final int MAX_USAGE_COUNT_RETRY = 3;
 
     private final HashtagJpaRepository jpaRepository;
 
@@ -43,22 +41,11 @@ public class HashtagCommandRepositoryImpl implements HashtagCommandRepository {
     }
 
     @Override
-    public Hashtag increaseUsageCount(UUID hashtagId) {
-        OptimisticLockingFailureException lastFailure = null;
-
-        for (int attempt = 1; attempt <= MAX_USAGE_COUNT_RETRY; attempt++) {
-            Hashtag hashtag = findById(hashtagId)
-                    .orElseThrow(() -> new IllegalStateException("Hashtag 없음 - id: " + hashtagId));
-
-            hashtag.increaseUsageCount();
-
-            try {
-                return jpaRepository.saveAndFlush(hashtag);
-            } catch (OptimisticLockingFailureException e) {
-                lastFailure = e;
-            }
+    @Transactional
+    public void increaseUsageCount(UUID hashtagId) {
+        int updated = jpaRepository.increaseUsageCount(hashtagId);
+        if (updated == 0) {
+            throw new IllegalStateException("Hashtag 없음 - id: " + hashtagId);
         }
-
-        throw lastFailure;
     }
 }

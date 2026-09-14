@@ -84,7 +84,7 @@ class CategoryEventPipelineIntegrationTest extends AbstractKafkaIntegrationTest 
         // -> OutboxRelay 발행 -> HashtagCreatedEventConsumer 소비 -> tryLink() -> 카테고리 승격
         // test 프로파일에서는 @EnableScheduling이 꺼져있어(SchedulerConfig의 @Profile("!test")) OutboxRelay가
         // 자동으로 돌지 않으므로, 실제로 아웃박스 행이 생길 때까지 폴링하며 매번 직접 호출해준다
-        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
             outboxRelay.publishPending();
 
             mockMvc.perform(get("/api/v1/hashtags")
@@ -93,27 +93,31 @@ class CategoryEventPipelineIntegrationTest extends AbstractKafkaIntegrationTest 
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.content.length()").value(1))
                     .andExpect(jsonPath("$.data.content[0].name").value(normalizedHashtagName))
-                    // 상품 링크(+1)와 카테고리 승격(+1)에서 각각 usage_count가 증가해 총 2가 된다
-                    .andExpect(jsonPath("$.data.content[0].usageCount").value(2));
+                    // usage_count는 상품 링크 시에만 증가하므로(카테고리 승격으로는 증가하지 않음) 1이 된다
+                    .andExpect(jsonPath("$.data.content[0].usageCount").value(1));
         });
 
         // 해시태그와 동일한 이름으로 승격된 신규 카테고리도 검색 API에서 조회돼야 한다
-        String categorySearchResponse = mockMvc.perform(get("/api/v1/categories")
-                        .param("keyword", normalizedHashtagName)
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.content.length()").value(1))
-                .andExpect(jsonPath("$.data.content[0].name").value(normalizedHashtagName))
-                .andReturn().getResponse().getContentAsString();
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            outboxRelay.publishPending();
 
-        UUID categoryId = UUID.fromString(
-                objectMapper.readTree(categorySearchResponse).get("data").get("content").get(0).get("id").asText());
+            String categorySearchResponse = mockMvc.perform(get("/api/v1/categories")
+                            .param("keyword", normalizedHashtagName)
+                            .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.content.length()").value(1))
+                    .andExpect(jsonPath("$.data.content[0].name").value(normalizedHashtagName))
+                    .andReturn().getResponse().getContentAsString();
 
-        // 그 카테고리 상세 조회에도 우리 해시태그가 연결돼 있어야 한다
-        mockMvc.perform(get("/api/v1/categories/{categoryId}", categoryId)
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.hashtags[0].name").value(normalizedHashtagName));
+            UUID categoryId = UUID.fromString(
+                    objectMapper.readTree(categorySearchResponse).get("data").get("content").get(0).get("id").asText());
+
+            // 그 카테고리 상세 조회에도 우리 해시태그가 연결돼 있어야 한다
+            mockMvc.perform(get("/api/v1/categories/{categoryId}", categoryId)
+                            .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.hashtags[0].name").value(normalizedHashtagName));
+        });
     }
 
     private MessageListenerContainer findContainerForTopic(String topic) {

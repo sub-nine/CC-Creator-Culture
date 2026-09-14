@@ -10,6 +10,7 @@ import org.springframework.kafka.test.context.EmbeddedKafka;
                 KafkaTopics.HASHTAG_CREATED,
                 KafkaTopics.PRODUCT_CREATED,
                 KafkaTopics.ORDER_PAID,
+                KafkaTopics.ORDER_CANCELED,
                 KafkaTopics.PRODUCT_VIEW_COUNT_SYNC
         }
 )

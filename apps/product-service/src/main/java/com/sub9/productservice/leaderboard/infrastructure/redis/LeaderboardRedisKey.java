@@ -9,7 +9,8 @@ import java.util.UUID;
 public final class LeaderboardRedisKey {
 
     private static final String CURRENT_PREFIX = "leaderboard:current:";
-    private static final String PROCESSED_ORDER_PREFIX = "leaderboard:processed:order:paid:";
+    private static final String PROCESSED_ORDER_PAID_PREFIX = "leaderboard:processed:order:paid:";
+    private static final String PROCESSED_ORDER_CANCELED_PREFIX = "leaderboard:processed:order:canceled:";
     private static final String PROCESSED_PRODUCT_VIEW_PREFIX = "leaderboard:processed:product:viewed:";
 
     public static String current(LeaderboardType type) {
@@ -18,7 +19,8 @@ public final class LeaderboardRedisKey {
 
     public static String processed(LeaderboardEventType type, UUID id) {
         return switch (type) {
-            case LeaderboardEventType.ORDER_PAID -> PROCESSED_ORDER_PREFIX + id;
+            case LeaderboardEventType.ORDER_PAID -> PROCESSED_ORDER_PAID_PREFIX + id;
+            case LeaderboardEventType.ORDER_CANCELED -> PROCESSED_ORDER_CANCELED_PREFIX + id;
             case LeaderboardEventType.PRODUCT_SYNC_VIEW -> PROCESSED_PRODUCT_VIEW_PREFIX + id;
         };
     }
