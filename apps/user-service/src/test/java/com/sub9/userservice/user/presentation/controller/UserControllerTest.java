@@ -1,8 +1,10 @@
 package com.sub9.userservice.user.presentation.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -11,7 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.GlobalExceptionHandler;
 import com.sub9.userservice.auth.domain.exception.UserErrorCode;
+import com.sub9.userservice.auth.domain.exception.AuthenticationTokenStorageException;
 import com.sub9.userservice.config.SecurityConfig;
+import com.sub9.userservice.user.application.service.UserDeletionService;
 import com.sub9.userservice.user.application.service.UserProfileService;
 import com.sub9.userservice.user.domain.model.UserRole;
 import com.sub9.userservice.user.presentation.request.UpdateMyProfileRequest;
@@ -26,6 +30,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -45,6 +50,9 @@ class UserControllerTest {
 
     @MockitoBean
     private UserProfileService userProfileService;
+
+    @MockitoBean
+    private UserDeletionService userDeletionService;
 
     @ParameterizedTest
     @EnumSource(UserRole.class)
@@ -148,6 +156,64 @@ class UserControllerTest {
                         .content("{\"nickname\":null}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("COMMON_0003"));
+    }
+
+    @Test
+    @DisplayName("인증된 사용자가 회원 탈퇴하면 204를 반환한다")
+    void when_authenticated_user_deletes_account_response_is_no_content() throws Exception {
+        mockMvc.perform(withGatewayHeaders(delete("/api/v1/users/me"), UserRole.CUSTOMER))
+                .andExpect(status().isNoContent())
+                .andExpect(result -> assertThat(result.getResponse().getContentAsByteArray())
+                        .isEmpty());
+
+        verify(userDeletionService).deleteMyAccount(USER_ID, TOKEN_ID, 4102444800L);
+    }
+
+    @Test
+    @DisplayName("인증 정보 없이 회원 탈퇴하면 401을 반환한다")
+    void when_authentication_is_missing_delete_my_account_returns_unauthorized()
+            throws Exception {
+        mockMvc.perform(delete("/api/v1/users/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("COMMON_0007"));
+    }
+
+    @Test
+    @DisplayName("탈퇴할 수 없는 역할이면 403을 반환한다")
+    void when_role_cannot_delete_account_response_is_forbidden() throws Exception {
+        doThrow(new AccessDeniedException("forbidden"))
+                .when(userDeletionService)
+                .deleteMyAccount(USER_ID, TOKEN_ID, 4102444800L);
+
+        mockMvc.perform(withGatewayHeaders(delete("/api/v1/users/me"), UserRole.MASTER))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("COMMON_0008"));
+    }
+
+    @Test
+    @DisplayName("탈퇴 대상 사용자가 없으면 404를 반환한다")
+    void when_active_user_does_not_exist_delete_my_account_returns_not_found()
+            throws Exception {
+        doThrow(new BusinessException(UserErrorCode.USER_NOT_FOUND))
+                .when(userDeletionService)
+                .deleteMyAccount(USER_ID, TOKEN_ID, 4102444800L);
+
+        mockMvc.perform(withGatewayHeaders(delete("/api/v1/users/me"), UserRole.CUSTOMER))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("USER_0007"));
+    }
+
+    @Test
+    @DisplayName("토큰 무효화에 실패하면 503을 반환한다")
+    void when_token_invalidation_fails_delete_my_account_returns_service_unavailable()
+            throws Exception {
+        doThrow(new AuthenticationTokenStorageException())
+                .when(userDeletionService)
+                .deleteMyAccount(USER_ID, TOKEN_ID, 4102444800L);
+
+        mockMvc.perform(withGatewayHeaders(delete("/api/v1/users/me"), UserRole.CUSTOMER))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.errorCode").value("COMMON_0009"));
     }
 
     private MyProfileResponse profile(UserRole role) {

@@ -2,12 +2,14 @@ package com.sub9.userservice.follow.application.service;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
+import com.sub9.userservice.auth.domain.exception.UserErrorCode;
 import com.sub9.userservice.creator.domain.repository.CreatorRepository;
 import com.sub9.userservice.follow.domain.exception.FollowErrorCode;
 import com.sub9.userservice.follow.domain.model.Follow;
 import com.sub9.userservice.follow.domain.repository.FollowRepository;
-import com.sub9.userservice.follow.presentation.response.FollowStatusResponse;
 import com.sub9.userservice.follow.presentation.response.FollowPageResponse;
+import com.sub9.userservice.follow.presentation.response.FollowStatusResponse;
+import com.sub9.userservice.user.domain.repository.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
@@ -24,12 +26,15 @@ public class FollowService {
 
     private final FollowRepository followRepository;
     private final CreatorRepository creatorRepository;
+    private final UserRepository userRepository;
     private final UuidV7Generator uuidV7Generator;
     private final Clock clock;
 
     @Transactional
     public FollowStatusResponse follow(UUID userId, UUID creatorId) {
-        creatorRepository.findApprovedActiveById(creatorId)
+        userRepository.findActiveByIdForUpdate(userId)
+                .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+        creatorRepository.findApprovedActiveByIdForUpdate(creatorId)
                 .orElseThrow(() -> new BusinessException(FollowErrorCode.FOLLOW_TARGET_NOT_FOUND));
 
         Instant now = clock.instant();
