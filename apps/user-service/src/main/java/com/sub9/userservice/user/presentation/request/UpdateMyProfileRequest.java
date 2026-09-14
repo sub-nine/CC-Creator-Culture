@@ -1,5 +1,6 @@
 package com.sub9.userservice.user.presentation.request;
 
+import com.sub9.userservice.shared.presentation.request.SignupRequestNormalizer;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -68,23 +69,22 @@ public class UpdateMyProfileRequest {
 
     public void setNickname(String nickname) {
         nicknameProvided = true;
-        this.nickname = normalizeText(nickname);
+        this.nickname = SignupRequestNormalizer.text(nickname);
     }
 
     public void setPhone(String phone) {
         phoneProvided = true;
-        this.phone = phone == null ? null : phone.trim().replace("-", "");
+        this.phone = SignupRequestNormalizer.number(phone);
     }
 
     public void setAddress(String address) {
         addressProvided = true;
-        this.address = normalizeText(address);
+        this.address = SignupRequestNormalizer.text(address);
     }
 
     public void setSlackId(String slackId) {
         slackIdProvided = true;
-        String normalized = normalizeText(slackId);
-        this.slackId = normalized == null || normalized.isEmpty() ? null : normalized;
+        this.slackId = SignupRequestNormalizer.nullableText(slackId);
     }
 
     @AssertTrue(message = "수정할 정보가 하나 이상 필요합니다.")
@@ -105,10 +105,6 @@ public class UpdateMyProfileRequest {
     @AssertTrue(message = "주소는 비어 있을 수 없습니다.")
     public boolean isAddressValid() {
         return !addressProvided || hasText(address);
-    }
-
-    private String normalizeText(String value) {
-        return value == null ? null : value.trim();
     }
 
     private boolean hasText(String value) {
