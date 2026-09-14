@@ -1,6 +1,7 @@
 package com.sub9.productservice.category.presentation.command.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sub9.productservice.category.application.command.port.out.HashtagCommandRepository;
 import com.sub9.productservice.category.domain.entity.Category;
 import com.sub9.productservice.category.domain.entity.CategoryHashtag;
 import com.sub9.productservice.category.domain.entity.Hashtag;
@@ -49,6 +50,9 @@ class AdminCategoryCommandControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private CategoryHashtagJpaRepository categoryHashtagJpaRepository;
+
+    @Autowired
+    private HashtagCommandRepository hashtagCommandRepository;
 
     private final UUID adminUserId = UUID.randomUUID();
 
@@ -148,8 +152,7 @@ class AdminCategoryCommandControllerTest extends AbstractIntegrationTest {
             // Given - usage_count는 상품 링크(가상)로 쌓였다고 가정
             Category category = categoryJpaRepository.save(Category.create("패션", null));
             Hashtag hashtag = hashtagJpaRepository.save(Hashtag.create("스트릿"));
-            hashtag.increaseUsageCount();
-            hashtagJpaRepository.save(hashtag);
+            hashtagCommandRepository.increaseUsageCount(hashtag.getId());
             categoryHashtagJpaRepository.save(category.linkManually(hashtag, 0.0));
 
             // When & Then
