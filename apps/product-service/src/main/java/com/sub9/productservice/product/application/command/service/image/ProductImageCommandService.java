@@ -56,12 +56,10 @@ public class ProductImageCommandService implements ProductImageCommandUseCase {
       UUID imageId = UuidCreator.getTimeOrderedEpoch();
       String originalKey = ORIGINAL_KEY_FORMAT.formatted(productId, imageId);
 
-      Image image =
-          imageRepository.save(Image.create(productId, originalKey, null, sortOrder));
-
-      imageStoragePort.upload(originalKey, new ImageData(mediaType, command.data()));
+      Image image = imageRepository.save(Image.create(productId, originalKey, null, sortOrder));
 
       uploadedKeys.add(originalKey);
+      imageStoragePort.upload(originalKey, new ImageData(mediaType, command.data()));
 
       eventPublisher.publishEvent(
           new ProductImageUploadedEvent(
@@ -76,8 +74,7 @@ public class ProductImageCommandService implements ProductImageCommandUseCase {
   public void updateSortOrder(UpdateImageSortOrderCommand command) {
     validateOwner(command.productId(), command.creatorId());
 
-    List<Image> images =
-        imageRepository.findAllByProductIdAndDeletedAtIsNull(command.productId());
+    List<Image> images = imageRepository.findAllByProductIdAndDeletedAtIsNull(command.productId());
 
     Map<UUID, Image> imageMap =
         images.stream().collect(Collectors.toMap(Image::getId, Function.identity()));
@@ -102,8 +99,7 @@ public class ProductImageCommandService implements ProductImageCommandUseCase {
     validateOwner(command.productId(), command.creatorId());
 
     boolean deleted =
-        imageRepository.softDelete(
-            command.imageId(), command.productId(), command.creatorId());
+        imageRepository.softDelete(command.imageId(), command.productId(), command.creatorId());
 
     if (!deleted) throw new BusinessException(ProductErrorCode.PRODUCT_IMAGE_NOT_FOUND);
   }
