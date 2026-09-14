@@ -52,6 +52,23 @@ public class LeaderboardScoreService implements RecordOrderScoreUseCase, RecordP
 
     @Override
     @Transactional(readOnly = true)
+    public void recordOrderCancellationScore(UUID orderId, List<ProductQuantity> productQuantities) {
+        // ProductQuantity에 대한 점수 일반화 (ORDER_CANCELED의 음수 가중치가 실제 차감을 담당)
+        List<SourceScore> productOrderScores = productQuantities.stream().map((quantity) ->
+                new SourceScore(quantity.productId(), quantity.quantity())
+        ).toList();
+
+        boolean applied = calcScoresAndSaveToRedis(
+                LeaderboardEventType.ORDER_CANCELED, productOrderScores, orderId
+        );
+
+        if (!applied) {
+            log.info("[LEADERBOARD] 이미 처리된 주문 취소라 점수 차감 스킵 - orderId: {}", orderId);
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public void recordProductViewScore(UUID eventId, List<ProductViewCount> productViewCounts) {
         // ProductViewCount에 대한 점수 일반화
         List<SourceScore> productViewScores = productViewCounts.stream().map((viewCount) ->

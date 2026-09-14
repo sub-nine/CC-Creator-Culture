@@ -102,6 +102,57 @@ class LeaderboardScoreServiceTest {
     }
 
     @Nested
+    @DisplayName("recordOrderCancellationScore()")
+    class RecordOrderCancellationScore {
+
+        @Test
+        @DisplayName("취소된 주문 상품들의 카테고리/해시태그 점수를 계산해 ORDER_CANCELED(음수) 가중치로 Redis에 반영한다")
+        void recordOrderCancellationScore_success() {
+            UUID orderId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID categoryId = UUID.randomUUID();
+            UUID hashtagId = UUID.randomUUID();
+
+            List<ProductQuantity> productQuantities = List.of(new ProductQuantity(productId, 3L));
+            List<SourceScore> expectedSourceScores = List.of(new SourceScore(productId, 3L));
+
+            when(categoryQueryPort.getCategoryIdsByProductIds(List.of(productId)))
+                    .thenReturn(List.of(new ProductCategoryIdsResponse(productId, List.of(categoryId))));
+            when(hashtagQueryPort.getHashtagIdsByProductIds(List.of(productId)))
+                    .thenReturn(List.of(new ProductHashtagIdsResponse(productId, List.of(hashtagId))));
+
+            List<LeaderboardScore> categoryScores = List.of(new LeaderboardScore(categoryId, -4.5));
+            List<LeaderboardScore> hashtagScores = List.of(new LeaderboardScore(hashtagId, -4.5));
+
+            when(leaderboardScoreDistributionDomainService.distribute(
+                    eq(expectedSourceScores), eq(LeaderboardEventType.ORDER_CANCELED.getWeight()), any()))
+                    .thenReturn(categoryScores, hashtagScores);
+
+            leaderboardScoreService.recordOrderCancellationScore(orderId, productQuantities);
+
+            verify(redisRepository).incrementScoresIfNotProcessed(
+                    LeaderboardEventType.ORDER_CANCELED, orderId, categoryScores, hashtagScores);
+        }
+
+        @Test
+        @DisplayName("이미 처리된 주문 취소면 예외 없이 스킵한다")
+        void recordOrderCancellationScore_alreadyProcessed_doesNotThrow() {
+            UUID orderId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            List<ProductQuantity> productQuantities = List.of(new ProductQuantity(productId, 1L));
+
+            when(categoryQueryPort.getCategoryIdsByProductIds(any())).thenReturn(List.of());
+            when(hashtagQueryPort.getHashtagIdsByProductIds(any())).thenReturn(List.of());
+            when(leaderboardScoreDistributionDomainService.distribute(any(), anyDouble(), any()))
+                    .thenReturn(List.of());
+            when(redisRepository.incrementScoresIfNotProcessed(any(), any(), any(), any())).thenReturn(false);
+
+            assertThatCode(() -> leaderboardScoreService.recordOrderCancellationScore(orderId, productQuantities))
+                    .doesNotThrowAnyException();
+        }
+    }
+
+    @Nested
     @DisplayName("recordProductViewScore()")
     class RecordProductViewScore {
 
