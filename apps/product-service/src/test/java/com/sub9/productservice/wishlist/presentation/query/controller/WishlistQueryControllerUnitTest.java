@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.sub9.productservice.common.config.r2.R2Properties;
+import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.support.AbstractControllerTest;
 import com.sub9.productservice.wishlist.application.port.in.WishlistQueryUseCase;
@@ -27,6 +28,7 @@ import org.springframework.data.domain.SliceImpl;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @WebMvcTest(WishlistQueryController.class)
 @DisplayName("WishlistQueryController - 단위 테스트")
@@ -35,9 +37,14 @@ class WishlistQueryControllerUnitTest extends AbstractControllerTest {
   @MockitoBean R2Properties r2Properties;
 
   private final UUID userId = UUID.randomUUID();
+  private final AuthUser authUser = new AuthUser(userId, "CUSTOMER");
   private final UUID productId = UUID.randomUUID();
   private final UUID wishlistId = UUID.randomUUID();
   private final String endPoint = "/api/v1/wishlist";
+
+  private RequestPostProcessor authUser(AuthUser authUser) {
+    return authentication(CustomAuthenticationToken.of(authUser.id(), authUser.role()));
+  }
 
   @Test
   @DisplayName("페이지 번호를 생략하면 0번째 관심상품 목록과 이미지 URL을 반환한다")
@@ -52,10 +59,7 @@ class WishlistQueryControllerUnitTest extends AbstractControllerTest {
 
     // when & then
     mockMvc
-        .perform(
-            get(endPoint)
-                .with(authentication(CustomAuthenticationToken.of(userId, "CUSTOMER")))
-                .contentType(MediaType.APPLICATION_JSON))
+        .perform(get(endPoint).with(authUser(authUser)).contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.message").value("관심상품 목록 조회 성공"))
         .andExpect(jsonPath("$.data.content.length()").value(1))
@@ -86,10 +90,7 @@ class WishlistQueryControllerUnitTest extends AbstractControllerTest {
 
     // when & then
     mockMvc
-        .perform(
-            get(endPoint)
-                .param("pageNum", "1")
-                .with(authentication(CustomAuthenticationToken.of(userId, "CUSTOMER"))))
+        .perform(get(endPoint).param("pageNum", "1").with(authUser(authUser)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.content").isEmpty())
         .andExpect(jsonPath("$.data.pageNumber").value(1))
@@ -108,7 +109,7 @@ class WishlistQueryControllerUnitTest extends AbstractControllerTest {
 
     // when & then
     mockMvc
-        .perform(get(endPoint).with(authentication(CustomAuthenticationToken.of(userId, "CUSTOMER"))))
+        .perform(get(endPoint).with(authUser(authUser)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.content[0].imageUrl").doesNotExist());
   }
@@ -118,10 +119,7 @@ class WishlistQueryControllerUnitTest extends AbstractControllerTest {
   void getWishlist_fails_when_page_number_is_negative() throws Exception {
     // when & then
     mockMvc
-        .perform(
-            get(endPoint)
-                .param("pageNum", "-1")
-                .with(authentication(CustomAuthenticationToken.of(userId, "CUSTOMER"))))
+        .perform(get(endPoint).param("pageNum", "-1").with(authUser(authUser)))
         .andExpect(status().isBadRequest());
     verifyNoInteractions(wishlistQueryUseCase);
   }
