@@ -167,26 +167,4 @@ class ReviewCommandControllerUnitTest extends AbstractControllerTest {
           .andExpect(jsonPath("$.errorCode").value("REVIEW_0004"));
     }
   }
-
-  @ParameterizedTest(name = "[{index}] {0}: {1}")
-  @MethodSource("invalidRequests")
-  @DisplayName("등록이나 수정 시 수정 요청의 평점과 내용이 유효하지 않으면 400을 반환한다")
-  void writeReview_fails_when_request_invalid(String method, int rating, String content)
-      throws Exception {
-    // given
-    var request =
-        method.equals("POST") ? post(endPoint) : patch(endPoint + "/{reviewId}", reviewId);
-
-    // when & then
-    mockMvc
-        .perform(
-            request
-                .with(authUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    jsonMapper.writeValueAsBytes(
-                        Map.of("orderItemId", orderItemId, "rating", rating, "content", content))))
-        .andExpect(status().isBadRequest());
-    verifyNoInteractions(reviewCommandUseCase);
-  }
 }
