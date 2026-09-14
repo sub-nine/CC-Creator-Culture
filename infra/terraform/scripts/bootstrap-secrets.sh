@@ -48,3 +48,4 @@ create_secret USER_DB_PASSWORD_SECRET_OCID cc-dev-user-db-password
 create_secret PRODUCT_DB_PASSWORD_SECRET_OCID cc-dev-product-db-password
 create_secret ORDER_DB_PASSWORD_SECRET_OCID cc-dev-order-db-password
 create_secret GRAFANA_ADMIN_PASSWORD_SECRET_OCID cc-dev-grafana-admin-password
+create_secret JWT_SECRET_SECRET_OCID cc-dev-jwt-secret

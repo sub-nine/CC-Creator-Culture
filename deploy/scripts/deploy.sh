@@ -33,6 +33,7 @@ done
 : "${PRODUCT_DB_PASSWORD_SECRET_OCID:?PRODUCT_DB_PASSWORD_SECRET_OCID is required}"
 : "${ORDER_DB_PASSWORD_SECRET_OCID:?ORDER_DB_PASSWORD_SECRET_OCID is required}"
 : "${GRAFANA_ADMIN_PASSWORD_SECRET_OCID:?GRAFANA_ADMIN_PASSWORD_SECRET_OCID is required}"
+: "${JWT_SECRET_SECRET_OCID:?JWT_SECRET_SECRET_OCID is required}"
 : "${OCIR_REGISTRY:?OCIR_REGISTRY is required}"
 
 ENABLE_MESSAGING_PROFILE="${ENABLE_MESSAGING_PROFILE:-true}"
@@ -348,7 +349,7 @@ read_secret_value() {
 write_release_env() {
   local target="$1"
   local user_db_admin_password product_db_admin_password order_db_admin_password
-  local user_db_password product_db_password order_db_password grafana_admin_password
+  local user_db_password product_db_password order_db_password grafana_admin_password jwt_secret
   local key
 
   user_db_admin_password="$(read_secret_value USER_DB_ADMIN_PASSWORD "$USER_DB_ADMIN_PASSWORD_SECRET_OCID")" || return 1
@@ -358,6 +359,7 @@ write_release_env() {
   product_db_password="$(read_secret_value PRODUCT_DB_PASSWORD "$PRODUCT_DB_PASSWORD_SECRET_OCID")" || return 1
   order_db_password="$(read_secret_value ORDER_DB_PASSWORD "$ORDER_DB_PASSWORD_SECRET_OCID")" || return 1
   grafana_admin_password="$(read_secret_value GRAFANA_ADMIN_PASSWORD "$GRAFANA_ADMIN_PASSWORD_SECRET_OCID")" || return 1
+  jwt_secret="$(read_secret_value JWT_SECRET "$JWT_SECRET_SECRET_OCID")" || return 1
 
   {
     printf 'CANDIDATE_SHA=%s\n' "$candidate_sha"
@@ -371,6 +373,7 @@ write_release_env() {
     printf 'PRODUCT_DB_PASSWORD=%s\n' "$product_db_password"
     printf 'ORDER_DB_PASSWORD=%s\n' "$order_db_password"
     printf 'GRAFANA_ADMIN_PASSWORD=%s\n' "$grafana_admin_password"
+    printf 'JWT_SECRET=%s\n' "$jwt_secret"
     for key in "${base_image_keys[@]}"; do
       printf '%s=%s\n' "$key" "$(locked_image_value "$key")"
     done
@@ -501,6 +504,7 @@ wait_healthy() {
       fi
       if [[ "$health" == "unhealthy" || "$health" == "exited" || "$health" == "dead" ]]; then
         echo "$service is $health" >&2
+        docker logs --tail 80 "$container" >&2 || true
         return 1
       fi
     fi
@@ -761,6 +765,12 @@ deploy_release() {
   wait_healthy config-server || return 1
   wait_healthy eureka-server || return 1
 
+  if [[ "$ENABLE_MESSAGING_PROFILE" == "true" ]]; then
+    compose --profile messaging up -d redis kafka || return 1
+    wait_healthy redis || return 1
+    wait_healthy kafka || return 1
+  fi
+
   local service
   for service in user-service product-service order-service; do
     compose up -d "$service" || return 1
@@ -772,9 +782,7 @@ deploy_release() {
   verify_eureka || return 1
 
   if [[ "$ENABLE_MESSAGING_PROFILE" == "true" ]]; then
-    compose --profile messaging up -d redis kafka kafka-ui || return 1
-    wait_healthy redis || return 1
-    wait_healthy kafka || return 1
+    compose --profile messaging up -d kafka-ui || return 1
     wait_healthy kafka-ui || return 1
     verify_kafka || return 1
   else
