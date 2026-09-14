@@ -12,4 +12,7 @@ if [ -z "$SCENARIO" ]; then
   exit 1
 fi
 
-docker compose -f load-test/docker-compose.yml run --rm --build -e TARGET="$TARGET" k6 run "$SCENARIO"
+TESTID="$(date +%s)"
+
+docker compose -f load-test/docker-compose.yml run --rm --build -e TARGET="$TARGET" k6 \
+  run --out experimental-prometheus-rw --tag testid="$TESTID" "$SCENARIO"

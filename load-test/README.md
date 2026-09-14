@@ -43,6 +43,13 @@ sh load-test/scripts/run.sh scenarios/product-service/search-products.js dev
 sh load-test/scripts/run-all.sh dev
 ```
 
+## 결과 확인
+
+콘솔 요약 외에, 실행 중인 지표를 Grafana 대시보드로도 볼 수 있습니다. 실행 결과는 Prometheus로 remote write 되고, `sh load-test/scripts/up.sh`로 띄운 스택에 k6 전용 대시보드가 미리 provisioning 되어 있습니다.
+
+- Grafana: http://localhost:3000 (k6 폴더의 "k6 Prometheus" 대시보드)
+- 같은 실행에서 나온 시나리오들은 `testid` 변수로 묶여서 필터링됩니다.
+
 ## 테스트 데이터 정리
 
 시나리오가 만드는 데이터는 `k6-test-`로 시작하는 프리픽스를 Unique 값으로 씁니다. local은 DB가 로컬 볼륨이라 정리 대신 통째로 밀고 다시 띄우는 게 더 간단합니다:
