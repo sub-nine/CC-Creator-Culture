@@ -117,6 +117,15 @@ public class User extends BaseAuditEntity {
         markDeleted(actorId, now);
     }
 
+    public void updateProfile(String nickname, String phone, String address, String slackId,
+            UUID actorId, Instant now) {
+        this.nickname = Objects.requireNonNull(nickname, "nickname must not be null");
+        this.phone = Objects.requireNonNull(phone, "phone must not be null");
+        this.address = Objects.requireNonNull(address, "address must not be null");
+        this.slackId = slackId;
+        recordUpdate(actorId, now);
+    }
+
     private static UUID requireUuidV7(UUID id, String fieldName) {
         Objects.requireNonNull(id, fieldName + " must not be null");
         if (id.version() != 7 || id.variant() != 2) {

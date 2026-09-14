@@ -10,6 +10,7 @@ import com.sub9.userservice.user.application.service.UserProfileService;
 import com.sub9.userservice.user.domain.model.User;
 import com.sub9.userservice.user.domain.model.UserRole;
 import com.sub9.userservice.user.domain.repository.UserRepository;
+import com.sub9.userservice.user.presentation.request.UpdateMyProfileRequest;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -87,6 +88,46 @@ class UserProfileIntegrationTest {
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> assertThat(((BusinessException) exception).getErrorCode())
                         .isEqualTo(UserErrorCode.USER_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("수정한 내 정보가 PostgreSQL에 반영된다")
+    void when_profile_is_updated_changes_are_persisted() {
+        User user = createUser("update-profile@example.com", "update-profile", "01055556666");
+        userRepository.save(user);
+        userRepository.flush();
+        UpdateMyProfileRequest request = new UpdateMyProfileRequest();
+        request.setNickname("updated-profile");
+        request.setAddress("부산시 예시구 통합로 2");
+        request.setSlackId(null);
+
+        userProfileService.updateMyProfile(user.getId(), request);
+
+        var response = userProfileService.getMyProfile(user.getId());
+        assertThat(response.nickname()).isEqualTo("updated-profile");
+        assertThat(response.phone()).isEqualTo("01055556666");
+        assertThat(response.address()).isEqualTo("부산시 예시구 통합로 2");
+        assertThat(response.slackId()).isNull();
+    }
+
+    @Test
+    @DisplayName("탈퇴 회원이 사용한 닉네임으로 수정할 수 없다")
+    void when_deleted_user_has_nickname_update_my_profile_returns_conflict() {
+        User activeUser = createUser(
+                "active-update@example.com", "active-update", "01066667777");
+        User deletedUser = createUser(
+                "deleted-update@example.com", "reserved-nickname", "01077778888");
+        deletedUser.softDelete(deletedUser.getId(), CREATED_AT.plusSeconds(60));
+        userRepository.save(activeUser);
+        userRepository.save(deletedUser);
+        userRepository.flush();
+        UpdateMyProfileRequest request = new UpdateMyProfileRequest();
+        request.setNickname("reserved-nickname");
+
+        assertThatThrownBy(() -> userProfileService.updateMyProfile(activeUser.getId(), request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> assertThat(((BusinessException) exception).getErrorCode())
+                        .isEqualTo(UserErrorCode.NICKNAME_ALREADY_EXISTS));
     }
 
     private User createUser(String email, String nickname, String phone) {

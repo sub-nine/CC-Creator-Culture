@@ -1,8 +1,10 @@
 package com.sub9.userservice.user.presentation.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -12,15 +14,18 @@ import com.sub9.userservice.auth.domain.exception.UserErrorCode;
 import com.sub9.userservice.config.SecurityConfig;
 import com.sub9.userservice.user.application.service.UserProfileService;
 import com.sub9.userservice.user.domain.model.UserRole;
+import com.sub9.userservice.user.presentation.request.UpdateMyProfileRequest;
 import com.sub9.userservice.user.presentation.response.MyProfileResponse;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -83,6 +88,66 @@ class UserControllerTest {
         mockMvc.perform(withGatewayHeaders(get("/api/v1/users/me"), UserRole.CUSTOMER))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("USER_0007"));
+    }
+
+    @Test
+    @DisplayName("인증된 사용자는 전달한 내 정보를 수정할 수 있다")
+    void when_authenticated_user_updates_profile_updated_profile_is_returned() throws Exception {
+        when(userProfileService.updateMyProfile(
+                org.mockito.ArgumentMatchers.eq(USER_ID),
+                org.mockito.ArgumentMatchers.any(UpdateMyProfileRequest.class)))
+                .thenReturn(new MyProfileResponse(
+                        USER_ID, "user@example.com", "변경된 사용자", "01099998888",
+                        "새 주소", null, UserRole.CUSTOMER));
+
+        mockMvc.perform(withGatewayHeaders(patch("/api/v1/users/me"), UserRole.CUSTOMER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "nickname": "  변경된 사용자  ",
+                                  "phone": "010-9999-8888",
+                                  "address": " 새 주소 ",
+                                  "slackId": null
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("내 정보를 수정했습니다."))
+                .andExpect(jsonPath("$.data.nickname").value("변경된 사용자"))
+                .andExpect(jsonPath("$.data.phone").value("01099998888"))
+                .andExpect(jsonPath("$.data.address").value("새 주소"))
+                .andExpect(jsonPath("$.data.slackId").doesNotExist());
+
+        ArgumentCaptor<UpdateMyProfileRequest> requestCaptor =
+                ArgumentCaptor.forClass(UpdateMyProfileRequest.class);
+        verify(userProfileService).updateMyProfile(
+                org.mockito.ArgumentMatchers.eq(USER_ID), requestCaptor.capture());
+        assertThat(requestCaptor.getValue().nickname())
+                .isEqualTo("변경된 사용자");
+        assertThat(requestCaptor.getValue().phone())
+                .isEqualTo("01099998888");
+        assertThat(requestCaptor.getValue().slackIdProvided())
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("수정할 필드가 없으면 400을 반환한다")
+    void when_update_request_is_empty_update_my_profile_returns_bad_request() throws Exception {
+        mockMvc.perform(withGatewayHeaders(patch("/api/v1/users/me"), UserRole.CUSTOMER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("COMMON_0003"));
+    }
+
+    @Test
+    @DisplayName("필수 프로필 값을 null로 수정하면 400을 반환한다")
+    void when_required_profile_value_is_null_update_my_profile_returns_bad_request()
+            throws Exception {
+        mockMvc.perform(withGatewayHeaders(patch("/api/v1/users/me"), UserRole.CUSTOMER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":null}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("COMMON_0003"));
     }
 
     private MyProfileResponse profile(UserRole role) {
