@@ -53,6 +53,10 @@ public class RedisRepositoryImpl implements RedisRepository {
         }
     }
 
+    // TODO: categoryScores/hashtagScores가 둘 다 비어있어도(예: 해시태그-상품 연결이 아직
+    //  안 끝난 시점의 주문) increment_score_if_not_processed.lua의 SET NX는 무조건 성공해
+    //  이 keyId를 처리 완료로 마킹함 - 실제 점수는 하나도 반영 안 됐는데 이후 연결이 끝나도
+    //  영구히 재처리가 안 돼서 점수가 유실됨. 빈 점수일 땐 마커를 찍지 않거나 재처리 경로 필요.
     @Override
     public boolean incrementScoresIfNotProcessed(
             LeaderboardEventType type,

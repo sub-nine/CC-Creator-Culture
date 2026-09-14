@@ -32,6 +32,8 @@ public class LeaderboardService {
     private final RedisRepository redisRepository;
 
     public LeaderboardResponse getCategoryLeaderboard(LeaderboardPeriod period, int limit) {
+        LeaderboardType leaderboardType = LeaderboardType.CATEGORY;
+
         // TODO: 리더보드 조회 로직 다형성 방식으로 전환 필요
 
         LocalDate now = LocalDate.now();
@@ -39,7 +41,7 @@ public class LeaderboardService {
         LocalDate endDate = period.getEndDate(now);
 
         List<RankedMember> aggregatedRankedMembers =
-                fetchAndAggregateRankedMembers(LeaderboardType.CATEGORY, startDate, endDate, limit);
+                fetchAndAggregateRankedMembers(leaderboardType, startDate, endDate, limit);
 
         // 집계된 대상들의 이름 조회
         Map<UUID, String> namesById = getCategoryNamesById(aggregatedRankedMembers);
@@ -48,16 +50,18 @@ public class LeaderboardService {
         List<LeaderboardItemResponse> items = toItems(aggregatedRankedMembers, namesById);
 
         // 응답 조립
-        return new LeaderboardResponse(period, startDate, endDate, items);
+        return new LeaderboardResponse(period, leaderboardType, startDate, endDate, items);
     }
 
     public LeaderboardResponse getHashtagLeaderboard(LeaderboardPeriod period, int limit) {
+        LeaderboardType leaderboardType = LeaderboardType.HASHTAG;
+
         LocalDate now = LocalDate.now();
         LocalDate startDate = period.getStartDate(now);
         LocalDate endDate = period.getEndDate(now);
 
         List<RankedMember> aggregatedRankedMembers =
-                fetchAndAggregateRankedMembers(LeaderboardType.HASHTAG, startDate, endDate, limit);
+                fetchAndAggregateRankedMembers(leaderboardType, startDate, endDate, limit);
 
         // 집계된 대상들의 이름 조회
         Map<UUID, String> namesById = getHashtagNamesById(aggregatedRankedMembers);
@@ -66,7 +70,7 @@ public class LeaderboardService {
         List<LeaderboardItemResponse> items = toItems(aggregatedRankedMembers, namesById);
 
         // 응답 조립
-        return new LeaderboardResponse(period, startDate, endDate, items);
+        return new LeaderboardResponse(period, leaderboardType, startDate, endDate, items);
     }
 
     private List<RankedMember> fetchAndAggregateRankedMembers(

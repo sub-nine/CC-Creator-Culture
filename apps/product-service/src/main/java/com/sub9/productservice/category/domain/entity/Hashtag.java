@@ -38,7 +38,7 @@ public class Hashtag extends BaseEntity {
     @Column(name = "unique_version", nullable = false)
     private UUID uniqueVersion;
 
-    // usage_count 동시 증가 시 lost update 방지를 위한 낙관적 락
+    // 다른 필드 저장 시 stale 엔티티 덮어쓰기 방지용 낙관적 락 (usage_count 증가는 원자적 UPDATE로 별도 처리)
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
@@ -55,10 +55,6 @@ public class Hashtag extends BaseEntity {
                 .name(name)
                 .uniqueVersion(ACTIVE_UNIQUE_VERSION)
                 .build();
-    }
-
-    public void increaseUsageCount() {
-        this.usageCount++;
     }
 
     public void decreaseUsageCount() {

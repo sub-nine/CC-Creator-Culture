@@ -111,9 +111,6 @@ public class CategoryCommandService implements AddHashtagsToProductUseCase, Link
         categoryCommandRepository.linkCategoryHashtag(
                 CategoryHashtag.create(newCategory, hashtag, CategoryHashtagMatchType.PROMOTED, CategoryHashtagStatus.MERGED, 0.0)
         );
-
-        // TODO: usage_count는 상품에 링크될 때만 증가해야 함 - 카테고리 승격 시 증가시키는 이 로직 제거 필요
-        hashtagCommandRepository.increaseUsageCount(hashtag.getId());
     }
 
     private void linkIfAbsent(Category category, Hashtag hashtag, CategoryHashtagStatus status, double similarity) {
@@ -127,11 +124,6 @@ public class CategoryCommandService implements AddHashtagsToProductUseCase, Link
         categoryCommandRepository.linkCategoryHashtag(
                 CategoryHashtag.create(category, hashtag, CategoryHashtagMatchType.ALGORITHM, status, similarity)
         );
-
-        // TODO: usage_count는 상품에 링크될 때만 증가해야 함 - 카테고리 병합(MERGED) 시 증가시키는 이 로직 제거 필요
-        if (status == CategoryHashtagStatus.MERGED) {
-            hashtagCommandRepository.increaseUsageCount(hashtag.getId());
-        }
     }
 
 }

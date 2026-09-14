@@ -13,6 +13,6 @@ public interface HashtagCommandRepository {
 
     HashtagUpsertResult findOrCreateByName(String name);
 
-    // 동시 증가로 인한 낙관적 락 충돌 발생 시 내부적으로 재시도
-    Hashtag increaseUsageCount(UUID hashtagId);
+    // 원자적 UPDATE로 처리되어 동시 증가에도 충돌이 발생하지 않는다
+    void increaseUsageCount(UUID hashtagId);
 }
