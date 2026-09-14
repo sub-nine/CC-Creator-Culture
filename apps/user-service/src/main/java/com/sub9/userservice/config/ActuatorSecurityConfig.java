@@ -10,17 +10,12 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration(proxyBeanMethods = false)
-@Profile({"local", "dev"})
-public class NonProductionActuatorSecurityConfig {
-
-    private static final String[] PUBLIC_SIGNUP_PATHS = {
-            "/api/v1/auth/signup/customer",
-            "/api/v1/auth/signup/creator"
-    };
+@Profile({"local", "dev", "prod"})
+public class ActuatorSecurityConfig {
 
     @Bean
     @Order(1)
-    SecurityFilterChain nonProductionSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
         http.securityMatcher("/actuator/**");
         http.csrf(AbstractHttpConfigurer::disable);
         http.formLogin(AbstractHttpConfigurer::disable);
@@ -31,13 +26,10 @@ public class NonProductionActuatorSecurityConfig {
                 .requestMatchers(
                         "/actuator/health",
                         "/actuator/health/**",
-                        "/actuator/prometheus"
-                )
-                .permitAll()
-                .requestMatchers(PUBLIC_SIGNUP_PATHS)
+                        "/actuator/prometheus")
                 .permitAll()
                 .anyRequest()
-                .authenticated());
+                .denyAll());
 
         return http.build();
     }

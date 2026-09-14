@@ -12,6 +12,12 @@ spring:
     hikari:
       maximum-pool-size: 5
       minimum-idle: 1
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  # 앱 기동 시 Flyway가 db/migration을 적용한다.
+  flyway:
+    enabled: true
 
   data:
     redis:

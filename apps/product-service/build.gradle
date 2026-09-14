@@ -26,6 +26,11 @@ dependencies {
     runtimeOnly 'org.postgresql:postgresql'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
+    // Flyway: 앱 기동 시 스키마 마이그레이션 (dev와 prod에서 spring.flyway.enabled=true)
+    // Spring Boot 4는 Flyway 자동 설정이 spring-boot-flyway 모듈로 분리되어 있어 starter를 사용한다 (flyway-core 포함)
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+
     // QueryDSL
     implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
     annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'

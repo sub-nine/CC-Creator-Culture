@@ -1,0 +1,235 @@
+name: AWS Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: plan, deploy, start, stop, or destroy-runtime
+        required: true
+        type: choice
+        options: [plan, deploy, start, stop, destroy-runtime]
+      release_ref:
+        description: Release tag vMAJOR.MINOR.PATCH. Required for deploy.
+        required: false
+        type: string
+      seed_run_id:
+        description: Optional seed run id. Runs the db-seed task once after deploy.
+        required: false
+        type: string
+      confirm:
+        description: Type destroy to allow destroy-runtime
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: cc-aws-deploy
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  TF_DIR: infra/terraform/aws/runtime
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "0"
+  TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+  TF_VAR_redis_user_group_id: ${{ vars.REDIS_USER_GROUP_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  STATE_BUCKET: ${{ vars.AWS_TF_STATE_BUCKET }}
+  ECR_PREFIX: ${{ vars.AWS_ECR_REPOSITORY_PREFIX || 'cc-test/' }}
+
+jobs:
+  run:
+    name: ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: production
+    steps:
+      - name: Validate inputs
+        env:
+          ACTION: ${{ inputs.action }}
+          RELEASE_REF: ${{ inputs.release_ref }}
+          SEED_RUN_ID: ${{ inputs.seed_run_id }}
+          CONFIRM: ${{ inputs.confirm }}
+          RUNTIME_ROLE: ${{ vars.AWS_RUNTIME_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+          test -n "$AWS_REGION" && test -n "$STATE_BUCKET" && test -n "$RUNTIME_ROLE"
+          if [[ "$ACTION" == deploy && ! "$RELEASE_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "deploy requires release_ref in the form vMAJOR.MINOR.PATCH." >&2; exit 65
+          fi
+          if [[ "$ACTION" != deploy && -n "$SEED_RUN_ID" ]]; then
+            echo "seed_run_id is only accepted with deploy." >&2; exit 65
+          fi
+          if [[ "$ACTION" == destroy-runtime && "$CONFIRM" != destroy ]]; then
+            echo "destroy-runtime requires confirm=destroy." >&2; exit 65
+          fi
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.action == 'deploy' && inputs.release_ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Resolve revision
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "HEAD is not a full lowercase SHA." >&2; exit 65; }
+          echo "HEAD_SHA=$sha" >> "$GITHUB_ENV"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_RUNTIME_ROLE_ARN }}
+          role-session-name: cc-aws-deploy
+          aws-region: ${{ vars.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: |
+          set -euo pipefail
+          for stack in persistent runtime; do
+            dir="infra/terraform/aws/${stack}"
+            cp "$dir/backend.tf.example" "$dir/backend.tf"
+            terraform -chdir="$dir" init -input=false -no-color -reconfigure \
+              -backend-config="bucket=${STATE_BUCKET}" \
+              -backend-config="key=cc-service/aws/${stack}/terraform.tfstate" \
+              -backend-config="region=${AWS_REGION}" \
+              -backend-config="encrypt=true" \
+              -backend-config="use_lockfile=true"
+          done
+          # persistent_config is passed through exactly as the persistent stack outputs it.
+          terraform -chdir=infra/terraform/aws/persistent output -json persistent_config \
+            | jq '{persistent_config: .}' > "$TF_DIR/persistent.auto.tfvars.json"
+
+      - name: Write image_tags and config_labels
+        env:
+          ACTION: ${{ inputs.action }}
+        run: |
+          set -euo pipefail
+          revisions_from_git() {
+            bash .github/scripts/service-revisions.sh "$HEAD_SHA" | jq '{
+              image_tags: (to_entries | map({key: .key, value: .value.image_tag}) | from_entries),
+              config_labels: (
+                to_entries
+                | map(select(.value.config_label != null))
+                | map({key: .key, value: .value.config_label})
+                | from_entries
+              )
+            }'
+          }
+          if [[ "$ACTION" == deploy ]]; then
+            revisions_from_git > "$TF_DIR/revisions.auto.tfvars.json"
+            exit 0
+          fi
+          if image_tags="$(terraform -chdir="$TF_DIR" output -json image_tags 2>/dev/null)" \
+            && config_labels="$(terraform -chdir="$TF_DIR" output -json config_labels 2>/dev/null)" \
+            && jq -e 'type == "object" and (keys | length) == 7' <<<"$image_tags" >/dev/null \
+            && jq -e 'type == "object" and (keys | length) == 6' <<<"$config_labels" >/dev/null; then
+            jq -n --argjson image_tags "$image_tags" --argjson config_labels "$config_labels" \
+              '{image_tags: $image_tags, config_labels: $config_labels}' \
+              > "$TF_DIR/revisions.auto.tfvars.json"
+          else
+            revisions_from_git > "$TF_DIR/revisions.auto.tfvars.json"
+          fi
+
+      - name: Verify ECR tags for the release
+        if: inputs.action == 'deploy'
+        run: |
+          set -euo pipefail
+          for name in config-server eureka-server gateway user-service product-service order-service db-seed; do
+            tag="$(jq -er --arg name "$name" '.image_tags[$name]' "$TF_DIR/revisions.auto.tfvars.json")"
+            aws ecr describe-images --repository-name "${ECR_PREFIX}${name}" --image-ids "imageTag=${tag}" >/dev/null \
+              || { echo "Missing ECR image ${ECR_PREFIX}${name}:${tag}. Run deploy-dev.yml for this revision first." >&2; exit 65; }
+          done
+
+      - name: Resolve release_sha and app_running
+        env:
+          ACTION: ${{ inputs.action }}
+        run: |
+          set -euo pipefail
+          current_sha="$(terraform -chdir="$TF_DIR" output -raw release_sha 2>/dev/null || true)"
+          current_running="$(terraform -chdir="$TF_DIR" output -raw app_running 2>/dev/null || echo false)"
+          case "$ACTION" in
+            deploy) sha="$HEAD_SHA"; running=true ;;
+            start) sha="$current_sha"; running=true ;;
+            stop) sha="$current_sha"; running=false ;;
+            plan) sha="${current_sha:-$HEAD_SHA}"; running="$current_running" ;;
+            destroy-runtime) sha="${current_sha:-$HEAD_SHA}"; running=false ;;
+          esac
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "No release_sha in state. Run deploy first." >&2; exit 65; }
+          echo "RELEASE_SHA=$sha" >> "$GITHUB_ENV"
+          echo "APP_RUNNING=$running" >> "$GITHUB_ENV"
+
+      - name: Terraform plan
+        if: inputs.action == 'plan'
+        run: terraform -chdir="$TF_DIR" plan -input=false -no-color -var "release_sha=$RELEASE_SHA" -var "app_running=$APP_RUNNING"
+
+      - name: Terraform apply
+        if: inputs.action == 'deploy' || inputs.action == 'start' || inputs.action == 'stop'
+        run: terraform -chdir="$TF_DIR" apply -auto-approve -input=false -no-color -var "release_sha=$RELEASE_SHA" -var "app_running=$APP_RUNNING"
+
+      - name: Terraform destroy runtime
+        if: inputs.action == 'destroy-runtime'
+        run: terraform -chdir="$TF_DIR" destroy -auto-approve -input=false -no-color -var "release_sha=$RELEASE_SHA" -var "app_running=false"
+
+      - name: Bootstrap observation and kafka instances
+        if: inputs.action == 'deploy' || inputs.action == 'start'
+        run: |
+          set -euo pipefail
+          # send-command is rejected until the SSM agent reports in after the instance starts, so retry it.
+          bootstrap() {
+            local label="$1" instance doc command_id="" status
+            instance="$(terraform -chdir="$TF_DIR" output -raw "${label}_instance_id")"
+            doc="$(terraform -chdir="$TF_DIR" output -json "${label}_bootstrap_document")"
+            for _ in $(seq 1 60); do
+              command_id="$(aws ssm send-command --instance-ids "$instance" \
+                --document-name "$(jq -r .name <<<"$doc")" --document-version "$(jq -r .version <<<"$doc")" \
+                --query 'Command.CommandId' --output text 2>/dev/null || true)"
+              [[ -n "$command_id" ]] && break
+              sleep 5
+            done
+            [[ -n "$command_id" ]] || { echo "SSM agent on ${instance} (${label}) did not come online." >&2; exit 1; }
+            for _ in $(seq 1 120); do
+              status="$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$instance" \
+                --query Status --output text 2>/dev/null || echo Pending)"
+              case "$status" in
+                Success) echo "${label} bootstrap succeeded."; return 0 ;;
+                Failed|Cancelled|TimedOut) echo "${label} bootstrap ended with $status." >&2; exit 1 ;;
+              esac
+              sleep 5
+            done
+            echo "${label} bootstrap did not finish in time." >&2
+            exit 1
+          }
+          bootstrap observation
+          bootstrap kafka
+
+      - name: Run db-seed task
+        if: inputs.action == 'deploy' && inputs.seed_run_id != ''
+        env:
+          SEED_RUN_ID: ${{ inputs.seed_run_id }}
+        run: |
+          set -euo pipefail
+          cluster="$(terraform -chdir="$TF_DIR" output -raw cluster_name)"
+          subnets="$(terraform -chdir="$TF_DIR" output -json app_subnet_ids | jq -r 'join(",")')"
+          sg="$(terraform -chdir="$TF_DIR" output -raw migration_security_group_id)"
+          # Each per-service task definition already carries SERVICE, DB_* and the secrets; only the run id is overridden.
+          overrides="$(jq -nc --arg r "$SEED_RUN_ID" \
+            '{containerOverrides: [{name: "seed", environment: [{name: "SEED_RUN_ID", value: $r}]}]}')"
+          for service in user-service product-service order-service; do
+            family="$(terraform -chdir="$TF_DIR" output -json seed_task_families | jq -er --arg s "$service" '.[$s]')"
+            task="$(aws ecs run-task --cluster "$cluster" --task-definition "$family" --launch-type FARGATE --count 1 \
+              --network-configuration "awsvpcConfiguration={subnets=[${subnets}],securityGroups=[${sg}],assignPublicIp=DISABLED}" \
+              --overrides "$overrides" --query 'tasks[0].taskArn' --output text)"
+            aws ecs wait tasks-stopped --cluster "$cluster" --tasks "$task"
+            code="$(aws ecs describe-tasks --cluster "$cluster" --tasks "$task" --query 'tasks[0].containers[0].exitCode' --output text)"
+            [[ "$code" == "0" ]] || { echo "db-seed ${service} exited with ${code}." >&2; exit 1; }
+            echo "db-seed ${service} applied run_id=${SEED_RUN_ID}."
+          done

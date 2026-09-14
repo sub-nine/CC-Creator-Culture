@@ -33,8 +33,15 @@ create_manifest() {
   jq -n --arg sha "$NEW_SHA" --arg digest "$NEW_DIGEST" '
     {
       commit_sha: $sha,
-      config_sha: $sha,
       ci_url: "https://example.test/actions/1",
+      config_labels: {
+        "config-server": $sha,
+        "eureka-server": $sha,
+        "gateway": $sha,
+        "user-service": $sha,
+        "product-service": $sha,
+        "order-service": $sha
+      },
       images: {
         "config-server": ("registry.example/config-server@" + $digest),
         "eureka-server": ("registry.example/eureka-server@" + $digest),
@@ -452,6 +459,8 @@ run_deploy "$manifest" "$success_state" > "$TEST_ROOT/success.out" 2>&1
 unset PROM_ATTEMPT_FILE PROM_READY_AFTER LEGACY_POSTGRES_RUNNING
 
 assert_file_line "CANDIDATE_SHA=$NEW_SHA" "$success_state/runtime/current.env"
+assert_file_line "CONFIG_SERVER_CONFIG_LABEL=$NEW_SHA" "$success_state/runtime/current.env"
+assert_file_line "USER_SERVICE_CONFIG_LABEL=$NEW_SHA" "$success_state/runtime/current.env"
 assert_file_line "CANDIDATE_SHA=$OLD_SHA" "$success_state/runtime/previous.env"
 assert_file_mode 600 "$success_state/runtime/current.env"
 assert_file_mode 600 "$success_state/releases/$NEW_SHA/source/deploy/compose.dev.yml"

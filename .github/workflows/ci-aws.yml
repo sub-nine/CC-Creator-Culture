@@ -1,0 +1,143 @@
+name: CI - AWS
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "infra/terraform/aws/**"
+      - "deploy/aws/**"
+      - "config-repo/*-prod.yaml"
+      - "infra/config-server/src/main/resources/application-prod.yaml"
+      - "infra/eureka-server/src/main/resources/application-prod.yaml"
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/ci-aws.yml"
+      - ".github/workflows/aws-deploy.yml"
+      - ".github/workflows/deploy-dev.yml"
+      - ".github/scripts/validate-candidate-manifest.sh"
+      - ".github/scripts/validate-candidate-manifest_test.sh"
+      - ".github/scripts/service-revisions.sh"
+      - ".github/scripts/service-revisions_test.sh"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "infra/terraform/aws/**"
+      - "deploy/aws/**"
+      - "config-repo/*-prod.yaml"
+      - "infra/config-server/src/main/resources/application-prod.yaml"
+      - "infra/eureka-server/src/main/resources/application-prod.yaml"
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/ci-aws.yml"
+      - ".github/workflows/aws-deploy.yml"
+      - ".github/workflows/deploy-dev.yml"
+      - ".github/scripts/validate-candidate-manifest.sh"
+      - ".github/scripts/validate-candidate-manifest_test.sh"
+      - ".github/scripts/service-revisions.sh"
+      - ".github/scripts/service-revisions_test.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-aws-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Lint workflows and scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install actionlint and shellcheck
+        run: |
+          set -euo pipefail
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)"
+          sudo apt-get update -y
+          sudo apt-get install -y shellcheck
+
+      - name: actionlint
+        run: ./actionlint .github/workflows/aws-deploy.yml .github/workflows/ci-aws.yml .github/workflows/deploy-dev.yml
+
+      - name: shellcheck
+        run: |
+          set -euo pipefail
+          shellcheck -x \
+            deploy/aws/seed/scripts/seed.sh \
+            deploy/aws/seed/seed_test.sh \
+            .github/scripts/validate-candidate-manifest.sh \
+            .github/scripts/service-revisions.sh
+
+      - name: Candidate manifest validator tests
+        run: bash .github/scripts/validate-candidate-manifest_test.sh
+
+      - name: Service revision tests
+        run: bash .github/scripts/service-revisions_test.sh
+
+      - name: RDS CA bundle checksum drift
+        run: |
+          set -euo pipefail
+          url="https://truststore.pki.rds.amazonaws.com/ap-northeast-2/ap-northeast-2-bundle.pem"
+          bundle="$(mktemp)"
+          curl -fsSL --retry 3 "$url" -o "$bundle"
+          upstream="$(sha256sum "$bundle" | awk '{print $1}')"
+          rm -f "$bundle"
+          status=0
+          for dockerfile in Dockerfile deploy/aws/seed/Dockerfile; do
+            pinned="$(grep -Eo -- '--checksum=sha256:[0-9a-f]{64}' "$dockerfile" | sed 's/^--checksum=sha256://' | sort -u)"
+            if [[ "$(wc -l <<<"$pinned")" -ne 1 ]]; then
+              echo "$dockerfile must pin exactly one RDS bundle checksum" >&2
+              status=1
+              continue
+            fi
+            if [[ "$pinned" != "$upstream" ]]; then
+              echo "$dockerfile pins sha256:$pinned but upstream bundle is sha256:$upstream" >&2
+              status=1
+            fi
+          done
+          if [[ "$status" -ne 0 ]]; then
+            echo "RDS CA bundle drift detected: update --checksum in the Dockerfiles above" >&2
+            exit 1
+          fi
+          echo "RDS CA bundle checksum matches upstream: sha256:$upstream"
+
+  seed-image:
+    name: Seed image against PostgreSQL 17
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build and apply seed once
+        run: REQUIRE_DOCKER=true bash deploy/aws/seed/seed_test.sh
+
+  terraform:
+    name: Terraform ${{ matrix.stack }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: [bootstrap, persistent, runtime]
+    defaults:
+      run:
+        working-directory: infra/terraform/aws/${{ matrix.stack }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+          terraform_wrapper: false
+
+      - name: fmt
+        run: terraform fmt -check -recursive
+
+      - name: init
+        run: terraform init -backend=false -input=false -no-color
+
+      - name: validate
+        run: terraform validate -no-color
