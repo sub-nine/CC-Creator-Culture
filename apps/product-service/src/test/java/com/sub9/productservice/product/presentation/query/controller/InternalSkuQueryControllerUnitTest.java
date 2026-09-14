@@ -7,8 +7,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.sub9.productservice.product.application.port.in.product.CartProductQueryUseCase;
 import com.sub9.productservice.product.application.query.dto.SkuInfo;
-import com.sub9.productservice.product.application.query.service.ProductQueryService;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.List;
@@ -23,7 +23,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @WebMvcTest(InternalSkuQueryController.class)
 @DisplayName("InternalSkuQueryController - 단위 테스트")
 class InternalSkuQueryControllerUnitTest extends AbstractControllerTest {
-  @MockitoBean ProductQueryService productQueryService;
+  @MockitoBean CartProductQueryUseCase cartProductQueryUseCase;
 
   private final String endPoint = "/internal/v1/skus";
 
@@ -46,7 +46,7 @@ class InternalSkuQueryControllerUnitTest extends AbstractControllerTest {
             10000L,
             10);
 
-    given(productQueryService.getCartItemProducts(skuIds)).willReturn(List.of(response));
+    given(cartProductQueryUseCase.getCartItemProducts(skuIds)).willReturn(List.of(response));
 
     // when & then
     mockMvc
@@ -65,7 +65,7 @@ class InternalSkuQueryControllerUnitTest extends AbstractControllerTest {
         .andExpect(jsonPath("$[0].productStatus").value("ACTIVE"))
         .andExpect(jsonPath("$[0].price").value(10000))
         .andExpect(jsonPath("$[0].quantity").value(10));
-    verify(productQueryService).getCartItemProducts(skuIds);
+    verify(cartProductQueryUseCase).getCartItemProducts(skuIds);
   }
 
   @Test
@@ -73,7 +73,7 @@ class InternalSkuQueryControllerUnitTest extends AbstractControllerTest {
   void getCartItemProducts_success_when_sku_ids_are_empty() throws Exception {
     // given
     List<UUID> skuIds = List.of();
-    given(productQueryService.getCartItemProducts(skuIds)).willReturn(List.of());
+    given(cartProductQueryUseCase.getCartItemProducts(skuIds)).willReturn(List.of());
 
     // when & then
     mockMvc
@@ -85,7 +85,7 @@ class InternalSkuQueryControllerUnitTest extends AbstractControllerTest {
         .andExpect(jsonPath("$").isArray())
         .andExpect(jsonPath("$").isEmpty());
 
-    verify(productQueryService).getCartItemProducts(skuIds);
+    verify(cartProductQueryUseCase).getCartItemProducts(skuIds);
   }
 
   @Test
@@ -103,6 +103,6 @@ class InternalSkuQueryControllerUnitTest extends AbstractControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errorCode").value("COMMON_0003"));
 
-    verifyNoInteractions(productQueryService);
+    verifyNoInteractions(cartProductQueryUseCase);
   }
 }

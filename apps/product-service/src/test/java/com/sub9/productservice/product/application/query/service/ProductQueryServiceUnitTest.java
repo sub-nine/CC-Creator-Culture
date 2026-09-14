@@ -5,10 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
 import com.sub9.common.exception.BusinessException;
-import com.sub9.productservice.product.application.port.out.image.ProductMetadataQueryPort;
+import com.sub9.productservice.product.application.port.out.product.ProductMetadataQueryPort;
+import com.sub9.productservice.product.application.port.out.product.ProductQueryRepository;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
 import com.sub9.productservice.product.application.query.dto.SkuInfo;
-import com.sub9.productservice.product.application.query.repository.ProductQueryRepository;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import java.util.List;

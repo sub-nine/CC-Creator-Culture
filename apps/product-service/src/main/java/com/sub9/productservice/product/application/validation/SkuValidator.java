@@ -24,20 +24,4 @@ public class SkuValidator {
       throw new BusinessException(ProductErrorCode.INVALID_DEFAULT_SKU_COUNT);
     }
   }
-
-  public void validateForUpdate(boolean currentDefault, boolean requestedDefault) {
-    if (currentDefault && !requestedDefault) {
-      throw new BusinessException(ProductErrorCode.DEFAULT_SKU_CANNOT_UNSET);
-    }
-  }
-
-  public void validateForDelete(boolean isDefault, long activeSkuCount) {
-    if (isDefault) {
-      throw new BusinessException(ProductErrorCode.DEFAULT_SKU_CANNOT_DELETED);
-    }
-
-    if (activeSkuCount <= 1) {
-      throw new BusinessException(ProductErrorCode.SKU_REQUIRED);
-    }
-  }
 }

@@ -13,7 +13,7 @@ import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.product.application.command.dto.sku.DeleteSkuCommand;
 import com.sub9.productservice.product.application.command.dto.sku.UpdateSkuCommand;
-import com.sub9.productservice.product.application.command.service.SkuCommandService;
+import com.sub9.productservice.product.application.port.in.sku.SkuCommandUseCase;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -26,8 +26,8 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @WebMvcTest(SkuCommandController.class)
 @DisplayName("SkuCommandController - 단위 테스트")
-class SkuCommandControllerTest extends AbstractControllerTest {
-  @MockitoBean SkuCommandService skuCommandService;
+class SkuCommandControllerUnitTest extends AbstractControllerTest {
+  @MockitoBean SkuCommandUseCase skuCommandUseCase;
 
   private final UUID productId = UUID.randomUUID();
   private final UUID skuId = UUID.randomUUID();
@@ -38,7 +38,8 @@ class SkuCommandControllerTest extends AbstractControllerTest {
   private RequestPostProcessor authUser() {
     return authentication(
         CustomAuthenticationToken.of(
-            SkuCommandControllerTest.authUser.id(), SkuCommandControllerTest.authUser.role()));
+            SkuCommandControllerUnitTest.authUser.id(),
+            SkuCommandControllerUnitTest.authUser.role()));
   }
 
   @Nested
@@ -70,7 +71,7 @@ class SkuCommandControllerTest extends AbstractControllerTest {
           .andExpect(jsonPath("$.message").value("요청 성공"))
           .andExpect(jsonPath("$.data").doesNotExist());
 
-      verify(skuCommandService).updateSku(command);
+      verify(skuCommandUseCase).updateSku(command);
     }
 
     @Test
@@ -97,7 +98,7 @@ class SkuCommandControllerTest extends AbstractControllerTest {
           .andExpect(jsonPath("$.errorCode").value("COMMON_0003"))
           .andExpect(jsonPath("$.errors[0].price").value("가격은 0원 이상이어야 합니다."));
 
-      verify(skuCommandService, never()).updateSku(any());
+      verify(skuCommandUseCase, never()).updateSku(any());
     }
   }
 
@@ -117,7 +118,7 @@ class SkuCommandControllerTest extends AbstractControllerTest {
           .andExpect(jsonPath("$.message").value("요청 성공"))
           .andExpect(jsonPath("$.data").doesNotExist());
 
-      verify(skuCommandService).deleteSku(command);
+      verify(skuCommandUseCase).deleteSku(command);
     }
   }
 }

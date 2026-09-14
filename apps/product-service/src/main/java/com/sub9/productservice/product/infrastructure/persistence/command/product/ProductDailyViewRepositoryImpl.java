@@ -1,7 +1,7 @@
 package com.sub9.productservice.product.infrastructure.persistence.command.product;
 
 import com.sub9.productservice.product.domain.model.ProductDailyView;
-import com.sub9.productservice.product.domain.repository.ProductDailyViewCommandRepository;
+import com.sub9.productservice.product.domain.repository.ProductDailyViewRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 @RequiredArgsConstructor
-public class ProductDailyViewCommandRepositoryImpl implements ProductDailyViewCommandRepository {
+public class ProductDailyViewRepositoryImpl implements ProductDailyViewRepository {
   private final ProductDailyViewCommandJPARepository jpaRepository;
 
   @Override

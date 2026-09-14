@@ -1,7 +1,7 @@
 package com.sub9.productservice.product.infrastructure.persistence.command.product;
 
 import com.sub9.productservice.product.domain.model.Image;
-import com.sub9.productservice.product.domain.repository.ImageCommandRepository;
+import com.sub9.productservice.product.domain.repository.ImageRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 @RequiredArgsConstructor
-public class ImageCommandRepositoryImpl implements ImageCommandRepository {
+public class ImageRepositoryImpl implements ImageRepository {
   private final ImageCommandJpaRepository jpaRepository;
 
   @Override

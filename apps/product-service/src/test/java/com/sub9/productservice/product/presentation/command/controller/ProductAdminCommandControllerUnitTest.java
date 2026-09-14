@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
-import com.sub9.productservice.product.application.command.service.ProductCommandService;
+import com.sub9.productservice.product.application.port.in.product.AdminProductStatusUseCase;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.Map;
 import java.util.UUID;
@@ -23,7 +23,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @WebMvcTest(ProductAdminCommandController.class)
 @DisplayName("ProductAdminCommandController - 단위 테스트")
 class ProductAdminCommandControllerUnitTest extends AbstractControllerTest {
-  @MockitoBean ProductCommandService productCommandService;
+  @MockitoBean AdminProductStatusUseCase adminProductStatusUseCase;
 
   private final UUID masterId = UUID.randomUUID();
   private final UUID productId = UUID.randomUUID();
@@ -52,6 +52,6 @@ class ProductAdminCommandControllerUnitTest extends AbstractControllerTest {
         .andExpect(jsonPath("$.message").value("요청 성공"))
         .andExpect(jsonPath("$.data").doesNotExist());
 
-    verify(productCommandService).updateStatusProduct(command);
+    verify(adminProductStatusUseCase).updateStatusProduct(command);
   }
 }

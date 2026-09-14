@@ -1,7 +1,7 @@
 package com.sub9.productservice.product.infrastructure.persistence.command.product;
 
 import com.sub9.productservice.product.domain.model.Product;
-import com.sub9.productservice.product.domain.repository.ProductCommandRepository;
+import com.sub9.productservice.product.domain.repository.ProductRepository;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 @RequiredArgsConstructor
-public class ProductCommandRepositoryImpl implements ProductCommandRepository {
+public class ProductRepositoryImpl implements ProductRepository {
   private final ProductCommandJpaRepository jpaRepository;
 
   @Override

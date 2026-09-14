@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface SkuCommandRepository {
+public interface SkuRepository {
   Sku save(Sku sku);
 
   List<Sku> findAllByProductIdAndDeletedAtIsNull(UUID productId);

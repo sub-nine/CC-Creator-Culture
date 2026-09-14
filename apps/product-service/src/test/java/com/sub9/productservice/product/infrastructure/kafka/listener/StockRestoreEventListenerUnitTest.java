@@ -9,7 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.kafka.event.StockRestoreEvent;
 import com.sub9.productservice.product.application.command.dto.stock.RestoreStockCommand;
-import com.sub9.productservice.product.application.command.service.StockCommandService;
+import com.sub9.productservice.product.application.port.in.stock.OrderStockUseCase;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.StockHistoryReason;
 import java.util.List;
@@ -26,7 +26,7 @@ import org.springframework.kafka.support.Acknowledgment;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("StockRestoreEventListener - 단위 테스트")
 class StockRestoreEventListenerUnitTest {
-  @Mock private StockCommandService stockCommandService;
+  @Mock private OrderStockUseCase orderStockUseCase;
   @Mock private Acknowledgment acknowledgment;
   @InjectMocks private StockRestoreEventListener stockRestoreEventListener;
 
@@ -56,8 +56,8 @@ class StockRestoreEventListenerUnitTest {
     stockRestoreEventListener.handleStockRestoreEvent(event, acknowledgment);
 
     // then
-    InOrder inOrder = inOrder(stockCommandService, acknowledgment);
-    inOrder.verify(stockCommandService).restore(command);
+    InOrder inOrder = inOrder(orderStockUseCase, acknowledgment);
+    inOrder.verify(orderStockUseCase).restore(command);
     inOrder.verify(acknowledgment).acknowledge();
   }
 
@@ -69,7 +69,7 @@ class StockRestoreEventListenerUnitTest {
         new StockRestoreEvent(
             orderId, List.of(new StockRestoreEvent.Item(skuId, 3)), "ORDER_CANCEL");
     willThrow(new BusinessException(ProductErrorCode.SKU_NOT_FOUND))
-        .given(stockCommandService)
+        .given(orderStockUseCase)
         .restore(any());
 
     // when & then

@@ -10,7 +10,7 @@ import com.sub9.productservice.category.domain.entity.QHashtagProduct;
 import com.sub9.productservice.category.domain.model.CategoryHashtagStatus;
 import com.sub9.productservice.category.domain.model.CategoryStatus;
 import com.sub9.productservice.category.infrastructure.persistence.query.support.QuerydslQuerySupport;
-import com.sub9.productservice.product.application.port.out.image.ProductMetadataQueryPort;
+import com.sub9.productservice.product.application.port.out.product.ProductMetadataQueryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 

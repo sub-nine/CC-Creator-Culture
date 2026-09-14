@@ -1,15 +1,13 @@
 package com.sub9.productservice.product.domain.model;
 
-import com.github.f4b6a3.uuid.UuidCreator;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.common.entity.BaseEntity;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import jakarta.persistence.*;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.util.UUID;
 
 @Getter
 @Entity
@@ -45,11 +43,27 @@ public class Sku extends BaseEntity {
   }
 
   public void update(String name, Long price, boolean isDefault) {
+    if (this.isDefault && !isDefault) {
+      throw new BusinessException(ProductErrorCode.DEFAULT_SKU_CANNOT_UNSET);
+    }
+
     validatePrice(price);
 
     this.name = name;
     this.price = price;
     this.isDefault = isDefault;
+  }
+
+  public void deleteOption(UUID creatorId, long activeSkuCount) {
+    if (this.isDefault()) {
+      throw new BusinessException(ProductErrorCode.DEFAULT_SKU_CANNOT_DELETED);
+    }
+
+    if (activeSkuCount <= 1) {
+      throw new BusinessException(ProductErrorCode.SKU_REQUIRED);
+    }
+
+    super.delete(creatorId);
   }
 
   public void unsetDefault() {

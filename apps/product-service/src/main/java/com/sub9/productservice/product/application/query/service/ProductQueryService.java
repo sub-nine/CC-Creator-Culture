@@ -2,11 +2,13 @@ package com.sub9.productservice.product.application.query.service;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.product.application.event.ProductViewedEvent;
-import com.sub9.productservice.product.application.port.out.image.ProductMetadataQueryPort;
+import com.sub9.productservice.product.application.port.in.product.CartProductQueryUseCase;
+import com.sub9.productservice.product.application.port.in.product.ProductQueryUseCase;
+import com.sub9.productservice.product.application.port.out.product.ProductMetadataQueryPort;
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
 import com.sub9.productservice.product.application.query.dto.SkuInfo;
-import com.sub9.productservice.product.application.query.repository.ProductQueryRepository;
+import com.sub9.productservice.product.application.port.out.product.ProductQueryRepository;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import java.util.List;
@@ -22,19 +24,21 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class ProductQueryService {
+public class ProductQueryService implements ProductQueryUseCase, CartProductQueryUseCase {
   private final ProductQueryRepository productQueryRepository;
   private final ProductMetadataQueryPort metadataQueryPort;
   private final ApplicationEventPublisher eventPublisher;
 
   // TODO : 현재 조회 로직에 정지 상태인 상품을 모두 조회를 할 수 있는 문제가 있어 추후 수정예정
   //        창작자 (본인 상품만), 관리자(정지 상품 전체)
+  @Override
   public Page<ProductInfo> searchProducts(String keyword, Pageable pageable) {
     // HACK : 조회 방법 제대로 정의할 때 까지 임시로 사용
     Set<UUID> metadataProductIds = metadataQueryPort.findProductIdsByMetadataKeyword(keyword, 1000);
     return productQueryRepository.searchProducts(keyword, metadataProductIds, pageable);
   }
 
+  @Override
   public ProductDetailInfo getProductDetail(UUID productId, UUID visitorId) {
     ProductDetailInfo response =
         productQueryRepository
@@ -49,6 +53,7 @@ public class ProductQueryService {
     return response.withMetadata(metadata);
   }
 
+  @Override
   public List<SkuInfo> getCartItemProducts(List<UUID> skuIds) {
     if (skuIds.isEmpty()) {
       return List.of();
@@ -56,6 +61,7 @@ public class ProductQueryService {
     return productQueryRepository.getCartItemProducts(skuIds);
   }
 
+  @Override
   public void validateSkuForCart(UUID skuId) {
     List<SkuInfo> skuinfos = productQueryRepository.getCartItemProducts(List.of(skuId));
 

@@ -4,7 +4,7 @@ import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.common.kafka.topic.KafkaTopics;
 import com.sub9.common.kafka.event.ProductViewSyncEvent;
-import com.sub9.productservice.product.application.port.ProductViewCountPublisher;
+import com.sub9.productservice.product.application.port.out.product.ProductViewCountPublisher;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

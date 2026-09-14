@@ -21,9 +21,8 @@ import com.sub9.productservice.product.application.command.dto.product.CreatePro
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
 import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
-import com.sub9.productservice.product.application.command.service.ProductCommandService;
+import com.sub9.productservice.product.application.port.in.product.ProductCommandUseCase;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
-import com.sub9.productservice.product.presentation.command.dto.product.CreateProductResponse;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.HashMap;
 import java.util.List;
@@ -46,7 +45,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @WebMvcTest(ProductCommandController.class)
 @DisplayName("ProductCommandController - 단위 테스트")
 class ProductCommandControllerUnitTest extends AbstractControllerTest {
-  @MockitoBean ProductCommandService productCommandService;
+  @MockitoBean ProductCommandUseCase productCommandUseCase;
 
   private final UUID userId = UUID.randomUUID();
   private final String endPoint = "/api/v1/products";
@@ -65,8 +64,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
     void when_request_is_valid_create_product_returns_created() throws Exception {
       // given
       UUID productId = UUID.randomUUID();
-      given(productCommandService.createProduct(any(), anyList()))
-          .willReturn(new CreateProductResponse(productId));
+      given(productCommandUseCase.createProduct(any(), anyList())).willReturn(productId);
 
       // when & then
       mockMvc
@@ -92,7 +90,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
       @SuppressWarnings("unchecked")
       ArgumentCaptor<List<UploadImageCommand>> imagesCaptor = ArgumentCaptor.forClass(List.class);
 
-      verify(productCommandService).createProduct(commandCaptor.capture(), imagesCaptor.capture());
+      verify(productCommandUseCase).createProduct(commandCaptor.capture(), imagesCaptor.capture());
       assertThat(imagesCaptor.getValue()).hasSize(2);
       assertThat(imagesCaptor.getValue().get(0).contentType()).isEqualTo("image/png");
       assertThat(imagesCaptor.getValue().get(0).data()).containsExactly((byte) 1, (byte) 2);
@@ -126,7 +124,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
           .andExpect(jsonPath("$.errorCode").value("COMMON_0003"))
           .andExpect(jsonPath("$.errors[0]['" + invalidField + "']").value(errorMessage));
 
-      verify(productCommandService, never()).createProduct(any(), anyList());
+      verify(productCommandUseCase, never()).createProduct(any(), anyList());
     }
 
     @Test
@@ -144,7 +142,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
                           jsonMapper.writeValueAsBytes(validRequest())))
                   .with(authUser(authUser)))
           .andExpect(status().isCreated());
-      verify(productCommandService)
+      verify(productCommandUseCase)
           .createProduct(any(), org.mockito.ArgumentMatchers.eq(List.of()));
     }
 
@@ -219,7 +217,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
           .andExpect(jsonPath("$.message").value("상품 수정에 성공했습니다."))
           .andExpect(jsonPath("$.data").doesNotExist());
 
-      verify(productCommandService).updateProduct(command);
+      verify(productCommandUseCase).updateProduct(command);
     }
 
     @Test
@@ -240,7 +238,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
           .andExpect(jsonPath("$.errorCode").value("COMMON_0003"))
           .andExpect(jsonPath("$.errors[0].name").value("상품명은 필수입니다."));
 
-      verify(productCommandService, never()).updateProduct(any());
+      verify(productCommandUseCase, never()).updateProduct(any());
     }
   }
 
@@ -267,7 +265,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
           .andExpect(jsonPath("$.message").value("상품 상태 변경에 성공했습니다."))
           .andExpect(jsonPath("$.data").doesNotExist());
 
-      verify(productCommandService).updateStatusProduct(command);
+      verify(productCommandUseCase).updateStatusProduct(command);
     }
 
     @Test
@@ -288,7 +286,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
           .andExpect(jsonPath("$.errorCode").value("COMMON_0003"))
           .andExpect(jsonPath("$.errors[0].status").value("상품 상태는 필수 입력 값입니다."));
 
-      verify(productCommandService, never()).updateStatusProduct(any());
+      verify(productCommandUseCase, never()).updateStatusProduct(any());
     }
   }
 
@@ -301,7 +299,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
       // given
       UUID productId = UUID.randomUUID();
       willThrow(new BusinessException(ProductErrorCode.PRODUCT_ACCESS_DENIED))
-          .given(productCommandService)
+          .given(productCommandUseCase)
           .deleteProduct(userId, productId);
 
       // when & then
@@ -324,7 +322,7 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
           .andExpect(jsonPath("$.message").value("상품 삭제에 성공했습니다."))
           .andExpect(jsonPath("$.data").doesNotExist());
 
-      verify(productCommandService).deleteProduct(authUser.id(), productId);
+      verify(productCommandUseCase).deleteProduct(authUser.id(), productId);
     }
   }
 }
