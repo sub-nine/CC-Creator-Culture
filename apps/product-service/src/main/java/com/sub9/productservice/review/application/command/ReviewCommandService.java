@@ -2,12 +2,14 @@ package com.sub9.productservice.review.application.command;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.review.application.command.dto.CreateReviewCommand;
-import com.sub9.productservice.review.application.port.in.ReviewCommandUserCase;
+import com.sub9.productservice.review.application.command.dto.UpdateReviewCommand;
+import com.sub9.productservice.review.application.port.in.ReviewCommandUseCase;
 import com.sub9.productservice.review.application.port.out.ReviewOrderQueryPort;
 import com.sub9.productservice.review.application.port.out.dto.ProductPurchaseInfo;
 import com.sub9.productservice.review.domain.exception.ReviewErrorCode;
 import com.sub9.productservice.review.domain.model.Review;
 import com.sub9.productservice.review.domain.repository.ReviewRepository;
+import com.sub9.productservice.review.application.command.dto.DeleteReviewCommand;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class ReviewCommandService implements ReviewCommandUserCase {
+public class ReviewCommandService implements ReviewCommandUseCase {
   private final ReviewRepository reviewRepository;
   private final ReviewOrderQueryPort reviewOrderQueryPort;
 
@@ -26,23 +28,39 @@ public class ReviewCommandService implements ReviewCommandUserCase {
       throw new BusinessException(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
     }
 
-    ProductPurchaseInfo info =
-        reviewOrderQueryPort.hasPurchasedProduct(command.userId(), command.orderItemId());
+    ProductPurchaseInfo productPurchaseInfo =
+        reviewOrderQueryPort.getPurchaseInfo(command.userId(), command.orderItemId());
 
-    if (!info.purchased()) {
+    if (!productPurchaseInfo.purchased()) {
       throw new BusinessException(ReviewErrorCode.PRODUCT_NOT_PURCHASED);
     }
 
     Review review =
         Review.create(
             command.orderItemId(),
-            info.productId(),
+            productPurchaseInfo.productId(),
             command.userId(),
             command.rating(),
             command.content());
-
-    // TODO : 리뷰 Product 테이블에 반영, 목록 읽기 모델 반영 시 함꼐 작업 예정
-
     return reviewRepository.save(review).getId();
+  }
+
+  @Override
+  public void updateReview(UpdateReviewCommand command) {
+    Review review = getReview(command.reviewId(), command.userId());
+    review.update(command.rating(), command.content());
+  }
+
+  @Override
+  public void deleteReview(DeleteReviewCommand command) {
+    Review review = getReview(command.reviewId(), command.userId());
+    review.delete(command.userId());
+  }
+
+  // ============================== Helper Method ====================================
+  private Review getReview(UUID reviewId, UUID userId) {
+    return reviewRepository
+        .findByIdAndUserIdAndDeletedAtIsNull(reviewId, userId)
+        .orElseThrow(() -> new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND));
   }
 }

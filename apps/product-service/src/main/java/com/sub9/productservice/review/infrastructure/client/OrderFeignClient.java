@@ -14,5 +14,5 @@ import org.springframework.web.bind.annotation.RequestParam;
     configuration = OpenFeignConfig.class)
 public interface OrderFeignClient {
   @GetMapping("/purchase-status")
-  ProductPurchaseInfo hasPurchased(@RequestParam UUID userId, @RequestParam UUID orderItemId);
+  ProductPurchaseInfo getPurchaseInfo(@RequestParam UUID userId, @RequestParam UUID orderItemId);
 }

@@ -4,10 +4,13 @@ import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.common.entity.BaseEntity;
 import com.sub9.productservice.review.domain.exception.ReviewErrorCode;
 import jakarta.persistence.*;
+
+import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.ObjectUtils;
 
 @Getter
 @Entity

@@ -18,12 +18,12 @@ public class OrderFeignAdapter implements ReviewOrderQueryPort {
   private final OrderFeignClient feignClient;
 
   @Override
-  @CircuitBreaker(name = "orderService", fallbackMethod = "hasPurchasedProductFallback")
-  public ProductPurchaseInfo hasPurchasedProduct(UUID userId, UUID orderItemId) {
-    return feignClient.hasPurchased(userId, orderItemId);
+  @CircuitBreaker(name = "orderService", fallbackMethod = "getPurchaseInfoFallback")
+  public ProductPurchaseInfo getPurchaseInfo(UUID userId, UUID orderItemId) {
+    return feignClient.getPurchaseInfo(userId, orderItemId);
   }
 
-  private ProductPurchaseInfo hasPurchasedProductFallback(UUID userId, UUID orderItemId, Throwable throwable) {
+  private ProductPurchaseInfo getPurchaseInfoFallback(UUID userId, UUID orderItemId, Throwable throwable) {
     if (throwable instanceof FeignException.BadRequest) {
       throw new BusinessException(CommonErrorCode.BAD_REQUEST);
     }
