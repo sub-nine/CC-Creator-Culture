@@ -76,6 +76,24 @@ class UserTest {
                 .hasMessage("id must be a UUID v7");
     }
 
+    @Test
+    @DisplayName("사용자 정보 수정은 프로필 값과 수정 감사를 함께 갱신한다")
+    void when_profile_is_updated_profile_fields_and_update_audit_are_recorded() {
+        UUID userId = uuidGenerator.generate();
+        Instant updatedAt = Instant.parse("2026-09-01T04:00:00Z");
+        User user = createUser(userId, "user@example.com", "nickname", "01011112222",
+                Instant.parse("2026-09-01T01:30:00Z"));
+
+        user.updateProfile("new-nickname", "01099998888", "새 주소", null, userId, updatedAt);
+
+        assertThat(user.getNickname()).isEqualTo("new-nickname");
+        assertThat(user.getPhone()).isEqualTo("01099998888");
+        assertThat(user.getAddress()).isEqualTo("새 주소");
+        assertThat(user.getSlackId()).isNull();
+        assertThat(user.getUpdatedBy()).isEqualTo(userId);
+        assertThat(user.getUpdatedAt()).isEqualTo(updatedAt);
+    }
+
     private User createUser(UUID userId, String email, String nickname, String phone, Instant now) {
         return User.create(userId, email, "encoded-password", nickname, phone,
                 "서울시 예시구", null, UserRole.CUSTOMER, now);

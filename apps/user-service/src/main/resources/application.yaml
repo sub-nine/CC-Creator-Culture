@@ -4,3 +4,14 @@ spring:
 
   config:
     import: ${CONFIG_SERVER_IMPORT:optional:configserver:http://localhost:8888}
+
+  # 기본은 비활성. dev와 prod 설정에서 켠다.
+  flyway:
+    enabled: false
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      # @KafkaListener에 groupId가 없으면 이 값을 쓴다. 없으면 컨텍스트 기동이 실패한다.
+      group-id: user-notification
+      auto-offset-reset: latest

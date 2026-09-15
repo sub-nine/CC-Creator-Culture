@@ -1,0 +1,27 @@
+services:
+  k6:
+    build: .
+    networks:
+      - cc-service-apps_default
+    environment:
+      - TARGET=local
+      - K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write
+      - K6_PROMETHEUS_RW_TREND_STATS=avg,min,med,max,p(90),p(95),p(99)
+    volumes:
+      - ./results:/scripts/results
+
+  k6-all:
+    build: .
+    networks:
+      - cc-service-apps_default
+    environment:
+      - TARGET=local
+      - K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write
+      - K6_PROMETHEUS_RW_TREND_STATS=avg,min,med,max,p(90),p(95),p(99)
+    entrypoint: ["sh", "entrypoint.sh"]
+    volumes:
+      - ./results:/scripts/results
+
+networks:
+  cc-service-apps_default:
+    external: true

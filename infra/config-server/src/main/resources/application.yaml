@@ -13,6 +13,9 @@ spring:
       docker:
         - native
 
+      prod:
+        - git
+
 management:
   endpoints:
     web:
