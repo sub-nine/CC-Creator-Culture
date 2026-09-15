@@ -2,6 +2,7 @@ package com.sub9.userservice.creator.infrastructure.persistence;
 
 import com.sub9.userservice.creator.domain.model.Creator;
 import com.sub9.userservice.creator.domain.model.ApprovalStatus;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import jakarta.persistence.LockModeType;
@@ -23,6 +24,15 @@ public interface CreatorJpaRepository extends JpaRepository<Creator, UUID> {
     Optional<Creator> findActiveByIdForUpdate(@Param("creatorId") UUID creatorId);
 
     Optional<Creator> findByUserIdAndDeletedAtIsNull(UUID userId);
+
+    @Query("select creator from Creator creator join creator.user user "
+            + "where creator.userId in :userIds "
+            + "and creator.approvalStatus = :approvalStatus "
+            + "and creator.deletedAt is null "
+            + "and user.deletedAt is null")
+    List<Creator> findApprovedActiveByUserIds(
+            @Param("userIds") List<UUID> userIds,
+            @Param("approvalStatus") ApprovalStatus approvalStatus);
 
     boolean existsByCreatorName(String creatorName);
 
