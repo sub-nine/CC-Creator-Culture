@@ -1,8 +1,17 @@
 package com.sub9.userservice.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.sub9.common.identifier.UuidV7Generator;
+import com.sub9.common.kafka.event.UserDeletedEvent;
+import com.sub9.common.kafka.topic.KafkaTopics;
 import com.sub9.userservice.auth.application.service.LogoutService;
 import com.sub9.userservice.creator.domain.model.Creator;
 import com.sub9.userservice.creator.domain.repository.CreatorRepository;
@@ -16,18 +25,26 @@ import com.sub9.userservice.user.domain.model.UserRole;
 import com.sub9.userservice.user.domain.repository.UserRepository;
 import com.sub9.userservice.user.infrastructure.persistence.UserJpaRepository;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import tools.jackson.databind.json.JsonMapper;
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
@@ -62,9 +79,19 @@ class UserDeletionIntegrationTest {
     @Autowired private UserJpaRepository userJpaRepository;
     @Autowired private CreatorJpaRepository creatorJpaRepository;
     @Autowired private FollowJpaRepository followJpaRepository;
+    @Autowired private JsonMapper jsonMapper;
+    @Autowired private PlatformTransactionManager transactionManager;
 
     @MockitoBean
     private LogoutService logoutService;
+    @MockitoBean
+    private KafkaTemplate<String, String> kafkaTemplate;
+
+    @BeforeEach
+    void setUpKafka() {
+        when(kafkaTemplate.send(anyString(), anyString(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+    }
 
     @DynamicPropertySource
     static void registerDataSourceProperties(DynamicPropertyRegistry registry) {
@@ -102,6 +129,7 @@ class UserDeletionIntegrationTest {
         assertThat(deletedFollow.getDeletedBy()).isEqualTo(customer.getId());
         assertThat(preservedFollow.getDeletedAt()).isEqualTo(previousDeletedAt);
         assertThat(remainingFollow.isDeleted()).isFalse();
+        verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -129,6 +157,39 @@ class UserDeletionIntegrationTest {
         assertThat(deletedCreator.getDeletedBy()).isEqualTo(creatorUser.getId());
         assertThat(deletedFollow.getDeletedBy()).isEqualTo(creatorUser.getId());
         assertThat(remainingFollow.isDeleted()).isFalse();
+
+        ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
+        verify(kafkaTemplate).send(
+                eq(KafkaTopics.USER_DELETED),
+                eq(creatorUser.getId().toString()),
+                payloadCaptor.capture());
+        UserDeletedEvent event =
+                jsonMapper.readValue(payloadCaptor.getValue(), UserDeletedEvent.class);
+        assertThat(event.userId()).isEqualTo(creatorUser.getId());
+        assertThat(event.occurredAt())
+                .isCloseTo(deletedUser.getDeletedAt(), within(1, ChronoUnit.MICROS));
+        assertThat(event.eventId().version()).isEqualTo(7);
+    }
+
+    @Test
+    @DisplayName("CREATOR 탈퇴 트랜잭션이 롤백되면 이벤트를 발행하지 않는다")
+    void when_creator_deletion_rolls_back_event_is_not_published() {
+        User creatorUser = saveUser("rollback-creator", UserRole.CREATOR, "01030000001");
+        Creator creator = saveCreator(creatorUser, "rollback-target", "5555555555");
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+
+        assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
+            userDeletionService.deleteMyAccount(
+                    creatorUser.getId(), uuidGenerator.generate(), EXPIRES_AT);
+            throw new IllegalStateException("force rollback");
+        })).isInstanceOf(IllegalStateException.class);
+
+        verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+        assertThat(userRepository.findActiveById(creatorUser.getId())).isPresent();
+        Creator activeCreator = creatorRepository.findActiveByUserId(creatorUser.getId())
+                .orElseThrow();
+        assertThat(activeCreator.getId()).isEqualTo(creator.getId());
+        assertThat(activeCreator.isDeleted()).isFalse();
     }
 
     private User saveUser(String name, UserRole role, String phone) {

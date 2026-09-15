@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
+import com.sub9.common.kafka.event.UserDeletedEvent;
 import com.sub9.userservice.auth.application.service.LogoutService;
 import com.sub9.userservice.auth.domain.exception.AuthenticationTokenStorageException;
 import com.sub9.userservice.auth.domain.exception.UserErrorCode;
@@ -31,9 +32,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
@@ -55,6 +58,8 @@ class UserDeletionServiceTest {
     private ObjectProvider<LogoutService> logoutServiceProvider;
     @Mock
     private LogoutService logoutService;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private UserDeletionService userDeletionService;
 
@@ -62,7 +67,7 @@ class UserDeletionServiceTest {
     void setUp() {
         userDeletionService = new UserDeletionService(
                 userRepository, creatorRepository, followRepository, logoutServiceProvider,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                Clock.fixed(NOW, ZoneOffset.UTC), uuidGenerator, eventPublisher);
         lenient().when(logoutServiceProvider.getIfAvailable()).thenReturn(logoutService);
     }
 
@@ -83,6 +88,7 @@ class UserDeletionServiceTest {
         order.verify(userRepository).flush();
         assertDeletionAudit(user, userId);
         verifyNoInteractions(creatorRepository);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -104,6 +110,14 @@ class UserDeletionServiceTest {
         verify(followRepository, never()).softDeleteActiveByUserId(userId, userId, NOW);
         assertDeletionAudit(user, userId);
         assertDeletionAudit(creator, userId);
+        ArgumentCaptor<UserDeletedEvent> eventCaptor =
+                ArgumentCaptor.forClass(UserDeletedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        UserDeletedEvent event = eventCaptor.getValue();
+        assertThat(event.userId()).isEqualTo(userId);
+        assertThat(event.occurredAt()).isEqualTo(NOW);
+        assertThat(event.eventId().version()).isEqualTo(7);
+        assertThat(event.eventId().variant()).isEqualTo(2);
     }
 
     @Test
@@ -122,6 +136,7 @@ class UserDeletionServiceTest {
 
         assertThat(user.isDeleted()).isFalse();
         verifyNoInteractions(followRepository, creatorRepository);
+        verifyNoInteractions(eventPublisher);
         verify(userRepository, never()).flush();
     }
 
@@ -137,6 +152,7 @@ class UserDeletionServiceTest {
                         assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_NOT_FOUND));
 
         verifyNoInteractions(logoutService, followRepository, creatorRepository);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -153,6 +169,7 @@ class UserDeletionServiceTest {
         }
 
         verifyNoInteractions(logoutService, followRepository, creatorRepository);
+        verifyNoInteractions(eventPublisher);
     }
 
     private User createUser(UUID userId, UserRole role) {

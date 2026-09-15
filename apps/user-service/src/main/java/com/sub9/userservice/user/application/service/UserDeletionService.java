@@ -1,6 +1,8 @@
 package com.sub9.userservice.user.application.service;
 
 import com.sub9.common.exception.BusinessException;
+import com.sub9.common.identifier.UuidV7Generator;
+import com.sub9.common.kafka.event.UserDeletedEvent;
 import com.sub9.userservice.auth.application.service.LogoutService;
 import com.sub9.userservice.auth.domain.exception.AuthenticationTokenStorageException;
 import com.sub9.userservice.auth.domain.exception.UserErrorCode;
@@ -16,6 +18,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +32,8 @@ public class UserDeletionService {
     private final FollowRepository followRepository;
     private final ObjectProvider<LogoutService> logoutServiceProvider;
     private final Clock clock;
+    private final UuidV7Generator uuidV7Generator;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void deleteMyAccount(
@@ -52,6 +57,11 @@ public class UserDeletionService {
         // 연관 데이터 정리가 끝난 후 사용자 계정을 Soft Delete
         user.softDelete(userId, deletedAt);
         userRepository.flush();
+
+        if (user.getRole() == UserRole.CREATOR) {
+            eventPublisher.publishEvent(
+                    new UserDeletedEvent(uuidV7Generator.generate(), userId, deletedAt));
+        }
     }
 
     private void deleteCreator(UUID userId, Instant deletedAt) {
