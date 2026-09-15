@@ -22,13 +22,19 @@ locals {
   github_oidc_url = "https://token.actions.githubusercontent.com"
   github_oidc_aud = "sts.amazonaws.com"
 
+  github_oidc_repos = distinct(compact([
+    var.github_repository,
+    var.github_oidc_repository,
+  ]))
   production_subs = [
-    "repo:${var.github_repository}:environment:production",
+    for repo in local.github_oidc_repos : "repo:${repo}:environment:production"
   ]
   # deploy-dev image job runs without an environment, so trust the dev and release/* branch refs too.
-  image_publisher_subs = [
-    "repo:${var.github_repository}:environment:development",
-    "repo:${var.github_repository}:ref:refs/heads/dev",
-    "repo:${var.github_repository}:ref:refs/heads/release/*",
-  ]
+  image_publisher_subs = flatten([
+    for repo in local.github_oidc_repos : [
+      "repo:${repo}:environment:development",
+      "repo:${repo}:ref:refs/heads/dev",
+      "repo:${repo}:ref:refs/heads/release/*",
+    ]
+  ])
 }
