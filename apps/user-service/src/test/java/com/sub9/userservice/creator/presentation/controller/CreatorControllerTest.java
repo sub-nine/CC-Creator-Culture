@@ -3,17 +3,20 @@ package com.sub9.userservice.creator.presentation.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.GlobalExceptionHandler;
 import com.sub9.userservice.config.SecurityConfig;
+import com.sub9.userservice.creator.application.service.CreatorProfileService;
 import com.sub9.userservice.creator.application.service.CreatorQueryService;
 import com.sub9.userservice.creator.domain.exception.CreatorErrorCode;
 import com.sub9.userservice.creator.presentation.response.CreatorPageResponse;
 import com.sub9.userservice.creator.presentation.response.CreatorSummaryResponse;
 import com.sub9.userservice.creator.presentation.response.MyCreatorResponse;
+import com.sub9.userservice.creator.presentation.request.UpdateCreatorRequest;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +26,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -44,6 +48,9 @@ class CreatorControllerTest {
 
     @MockitoBean
     private CreatorQueryService creatorQueryService;
+
+    @MockitoBean
+    private CreatorProfileService creatorProfileService;
 
     @ParameterizedTest
     @ValueSource(strings = {"CUSTOMER", "CREATOR", "MANAGER", "MASTER"})
@@ -170,6 +177,78 @@ class CreatorControllerTest {
         mockMvc.perform(withGatewayHeaders(get("/api/v1/creators/me"), "CREATOR"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("CREATOR_0001"));
+    }
+
+    @Test
+    @DisplayName("CREATOR는 자신의 창작자 정보를 수정할 수 있다")
+    void when_creator_updates_my_creator_updated_information_is_returned() throws Exception {
+        when(creatorProfileService.updateMyCreator(
+                org.mockito.ArgumentMatchers.eq(USER_ID),
+                any(UpdateCreatorRequest.class)))
+                .thenReturn(new MyCreatorResponse(CREATOR_ID, "변경상점", "9876543210"));
+
+        mockMvc.perform(withGatewayHeaders(patch("/api/v1/creators/me"), "CREATOR")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "creatorName": "  변경상점  ",
+                                  "businessRegistrationNumber": "987-65-43210"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("내 창작자 정보를 수정했습니다."))
+                .andExpect(jsonPath("$.data.creatorName").value("변경상점"))
+                .andExpect(jsonPath("$.data.businessRegistrationNumber")
+                        .value("9876543210"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"CUSTOMER", "MANAGER", "MASTER"})
+    @DisplayName("CREATOR가 아닌 사용자는 내 창작자 정보를 수정할 수 없다")
+    void when_non_creator_updates_my_creator_forbidden_is_returned(String role) throws Exception {
+        mockMvc.perform(withGatewayHeaders(patch("/api/v1/creators/me"), role)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"creatorName\":\"변경상점\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("COMMON_0008"));
+    }
+
+    @Test
+    @DisplayName("수정할 창작자 정보가 없으면 400을 반환한다")
+    void when_update_request_is_empty_bad_request_is_returned() throws Exception {
+        mockMvc.perform(withGatewayHeaders(patch("/api/v1/creators/me"), "CREATOR")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("명시적으로 빈 창작자 정보를 전달하면 400을 반환한다")
+    void when_update_value_is_blank_bad_request_is_returned() throws Exception {
+        mockMvc.perform(withGatewayHeaders(patch("/api/v1/creators/me"), "CREATOR")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"creatorName\":\"   \"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("사업자등록번호에 숫자와 하이픈 외 문자가 있으면 400을 반환한다")
+    void when_business_number_contains_letters_bad_request_is_returned() throws Exception {
+        mockMvc.perform(withGatewayHeaders(patch("/api/v1/creators/me"), "CREATOR")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"businessRegistrationNumber\":\"123-AB-45678\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("인증 헤더 없이 내 창작자 정보를 수정하면 401을 반환한다")
+    void when_unauthenticated_user_updates_my_creator_unauthorized_is_returned()
+            throws Exception {
+        mockMvc.perform(patch("/api/v1/creators/me")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"creatorName\":\"변경상점\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("COMMON_0007"));
     }
 
     private MockHttpServletRequestBuilder withGatewayHeaders(
