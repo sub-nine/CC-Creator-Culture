@@ -283,6 +283,26 @@ class OrderQueryServiceTest {
         });
     }
 
+    @ParameterizedTest
+    @EnumSource(OrderStatus.class)
+    @DisplayName("운영자 주문 상세는 모든 상태에서 연락처와 주소를 숨기고 원본을 보존한다")
+    void when_admin_queries_any_order_status_shipping_address_is_masked(OrderStatus status) {
+        Order order = order(120, CUSTOMER_ID, status, item(121, CREATOR_ID));
+        ShippingAddress original = order.getShippingAddress();
+        when(orderQueryRepository.findDetailByOrderNumber(order.getOrderNumber()))
+                .thenReturn(Optional.of(order));
+
+        var address = orderQueryService.getAdminOrder(order.getOrderNumber()).shippingAddress();
+
+        assertThat(address.recipientName()).isEqualTo(original.getRecipientName());
+        assertThat(address.recipientPhone()).isEqualTo("****");
+        assertThat(address.postalCode()).isEqualTo("****");
+        assertThat(address.addressLine1()).isEqualTo("****");
+        assertThat(address.addressLine2()).isEqualTo("****");
+        assertThat(order.getShippingAddress()).isSameAs(original);
+        assertThat(original.getRecipientPhone()).isEqualTo("010-1234-5678");
+    }
+
     @Test
     @DisplayName("존재하지 않는 운영자 주문 상세를 조회하면 찾을 수 없음 오류를 반환한다")
     void when_admin_order_does_not_exist_not_found_is_returned() {
