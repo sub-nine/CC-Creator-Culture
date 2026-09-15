@@ -39,16 +39,17 @@ public class ProductQueryService implements ProductQueryUseCase, CartProductQuer
   }
 
   @Override
-  public ProductDetailInfo getProductDetail(UUID productId, UUID visitorId) {
+  public ProductDetailInfo getProductDetail(UUID productId, String visitorId) {
     ProductDetailInfo response =
         productQueryRepository
             .findProductDetailById(productId)
             .orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
+
     var metadata = metadataQueryPort.getProductMetadata(productId);
 
-    // TODO : MVP 단계에선 로그인 유저만 조회수를 증가시키도록 구현한다.
-    if (visitorId != null)
+    if (visitorId != null) {
       eventPublisher.publishEvent(new ProductViewedEvent(productId, visitorId));
+    }
 
     return response.withMetadata(metadata);
   }
