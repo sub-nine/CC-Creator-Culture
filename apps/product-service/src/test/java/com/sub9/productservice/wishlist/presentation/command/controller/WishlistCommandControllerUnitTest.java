@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sub9.common.exception.BusinessException;
+import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.support.AbstractControllerTest;
 import com.sub9.productservice.wishlist.application.command.dto.AddToWishlistCommand;
@@ -27,6 +28,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @WebMvcTest(WishlistCommandController.class)
 @DisplayName("WishlistCommandController - 단위 테스트")
@@ -34,8 +36,13 @@ class WishlistCommandControllerUnitTest extends AbstractControllerTest {
   @MockitoBean WishlistCommandUseCase wishlistCommandUseCase;
 
   private final UUID userId = UUID.randomUUID();
+  private final AuthUser authUser = new AuthUser(userId, "CUSTOMER");
   private final UUID productId = UUID.randomUUID();
   private final String endPoint = "/api/v1/wishlist/{productId}";
+
+  private RequestPostProcessor authUser(AuthUser authUser) {
+    return authentication(CustomAuthenticationToken.of(authUser.id(), authUser.role()));
+  }
 
   @Nested
   @DisplayName("관심상품 등록 테스트")
@@ -47,7 +54,7 @@ class WishlistCommandControllerUnitTest extends AbstractControllerTest {
       mockMvc
           .perform(
               post(endPoint, productId)
-                  .with(authentication(CustomAuthenticationToken.of(userId, "USER")))
+                  .with(authUser(authUser))
                   .contentType(MediaType.APPLICATION_JSON))
           .andExpect(status().isCreated())
           .andExpect(jsonPath("$.message").value("관심상품 등록에 성공했습니다."))
@@ -66,9 +73,7 @@ class WishlistCommandControllerUnitTest extends AbstractControllerTest {
 
       // when & then
       mockMvc
-          .perform(
-              post(endPoint, productId)
-                  .with(authentication(CustomAuthenticationToken.of(userId, "CUSTOMAER"))))
+          .perform(post(endPoint, productId).with(authUser(authUser)))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.errorCode").value(errorCode.code()));
     }
@@ -78,9 +83,7 @@ class WishlistCommandControllerUnitTest extends AbstractControllerTest {
     void addToWishlist_fails_when_product_id_is_invalid() throws Exception {
       // when & then
       mockMvc
-          .perform(
-              post(endPoint, "id")
-                  .with(authentication(CustomAuthenticationToken.of(userId, "CUSTOMAER"))))
+          .perform(post(endPoint, "id").with(authUser(authUser)))
           .andExpect(status().isBadRequest());
       verifyNoInteractions(wishlistCommandUseCase);
     }
@@ -98,7 +101,7 @@ class WishlistCommandControllerUnitTest extends AbstractControllerTest {
       mockMvc
           .perform(
               delete("/api/v1/wishlist")
-                  .with(authentication(CustomAuthenticationToken.of(userId, "CUSTOMAER")))
+                  .with(authUser(authUser))
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(jsonMapper.writeValueAsString(List.of(wishlistId))))
           .andExpect(status().isOk())
@@ -118,7 +121,7 @@ class WishlistCommandControllerUnitTest extends AbstractControllerTest {
       mockMvc
           .perform(
               delete("/api/v1/wishlist")
-                  .with(authentication(CustomAuthenticationToken.of(userId, "CUSTOMAER")))
+                  .with(authUser(authUser))
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(jsonMapper.writeValueAsString(List.of(wishlistId, secondWishlistId))))
           .andExpect(status().isOk())
@@ -141,7 +144,7 @@ class WishlistCommandControllerUnitTest extends AbstractControllerTest {
       mockMvc
           .perform(
               delete("/api/v1/wishlist")
-                  .with(authentication(CustomAuthenticationToken.of(userId, "CUSTOMAER")))
+                  .with(authUser(authUser))
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(jsonMapper.writeValueAsString(List.of(wishlistId))))
           .andExpect(status().isNotFound())
@@ -156,7 +159,7 @@ class WishlistCommandControllerUnitTest extends AbstractControllerTest {
       mockMvc
           .perform(
               delete("/api/v1/wishlist")
-                  .with(authentication(CustomAuthenticationToken.of(userId, "CUSTOMAER")))
+                  .with(authUser(authUser))
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body))
           .andExpect(status().isBadRequest());

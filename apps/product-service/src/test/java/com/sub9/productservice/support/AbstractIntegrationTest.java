@@ -9,7 +9,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 /** 테스트 컨테이너 상속해서 사용 */
-@Testcontainers
+// @Testcontainers
 @ActiveProfiles("test")
 public abstract class AbstractIntegrationTest {
   private static final PostgreSQLContainer<?> POSTGRES =
