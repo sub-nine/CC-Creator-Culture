@@ -551,6 +551,24 @@ complete_public_cutover() {
 
 DEPLOY_DEADLINE=0
 
+record_restart_baseline() {
+  local service="$1"
+  local file="$STATE_DIR/runtime/restart-baseline"
+  local container count
+  container="$(compose ps -q "$service")"
+  if [[ -z "$container" || "$container" == *$'\n'* ]]; then
+    echo "Expected exactly one running container for $service." >&2
+    return 1
+  fi
+  count="$(docker inspect --format '{{.RestartCount}}' "$container")" || return 1
+  mkdir -p "$(dirname "$file")"
+  if [[ -f "$file" ]]; then
+    grep -v "^${service}=" "$file" > "${file}.tmp" || true
+    mv "${file}.tmp" "$file"
+  fi
+  printf '%s=%s\n' "$service" "$count" >> "$file"
+}
+
 wait_healthy() {
   local service="$1"
   while (( SECONDS < DEPLOY_DEADLINE )); do
@@ -559,6 +577,7 @@ wait_healthy() {
     if [[ -n "$container" ]]; then
       health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container" 2>/dev/null || true)"
       if [[ "$health" == "healthy" || "$health" == "running" ]]; then
+        record_restart_baseline "$service" || return 1
         return 0
       fi
       if [[ "$health" == "unhealthy" || "$health" == "exited" || "$health" == "dead" ]]; then
@@ -762,7 +781,8 @@ stop_legacy_postgres() {
 
 verify_container_runtime() {
   local runtime_services=(user-postgres product-postgres order-postgres zipkin config-server eureka-server user-service product-service order-service gateway caddy)
-  local details container detail service
+  local container detail service count oom status baseline file failed
+  file="$STATE_DIR/runtime/restart-baseline"
   if [[ "$ENABLE_MESSAGING_PROFILE" == "true" ]]; then
     runtime_services+=(redis kafka kafka-ui)
   fi
@@ -770,7 +790,7 @@ verify_container_runtime() {
     runtime_services+=(prometheus grafana)
   fi
 
-  details=""
+  failed=0
   for service in "${runtime_services[@]}"; do
     container="$(compose ps -q "$service")"
     if [[ -z "$container" || "$container" == *$'\n'* ]]; then
@@ -778,9 +798,24 @@ verify_container_runtime() {
       return 1
     fi
     detail="$(docker inspect --format '{{.Name}}|{{.RestartCount}}|{{.State.OOMKilled}}|{{.State.Status}}' "$container")" || return 1
-    details+="${detail}"$'\n'
+    count="${detail#*|}"
+    oom="${count#*|}"
+    count="${count%%|*}"
+    status="${oom#*|}"
+    oom="${oom%%|*}"
+    baseline=""
+    if [[ -f "$file" ]]; then
+      baseline="$(awk -F= -v s="$service" '$1 == s {print $2}' "$file")"
+    fi
+    if [[ "$status" != "running" || "$oom" != "false" ]]; then
+      printf '%s\n' "$detail" >&2
+      failed=1
+    elif [[ -n "$baseline" && "$count" -gt "$baseline" ]]; then
+      printf '%s\n' "$detail" >&2
+      failed=1
+    fi
   done
-  if awk -F'|' 'NF == 4 && ($2 != 0 || $3 != "false" || $4 != "running") {print; failed=1} END {exit failed}' <<<"$details"; then
+  if (( failed == 0 )); then
     return 0
   fi
   echo "Container restart, OOM, or runtime state verification failed." >&2

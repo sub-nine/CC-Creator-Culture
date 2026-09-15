@@ -255,7 +255,11 @@ if [[ "$1" == "inspect" ]]; then
       exit 1
     fi
   elif [[ "$*" == *"RestartCount"* ]]; then
-    printf '/%s|0|false|running\n' "$container"
+    if [[ "$*" == *"OOMKilled"* ]]; then
+      printf '/%s|0|false|running\n' "$container"
+    else
+      printf '0\n'
+    fi
   elif [[ "$container" == "${FAIL_CANDIDATE_SHA:-unset}-${FAIL_HEALTH_SERVICE:-unset}-container" ]]; then
     printf 'unhealthy\n'
   else
