@@ -7,7 +7,7 @@ import com.sub9.productservice.category.application.command.port.out.CategoryCom
 import com.sub9.productservice.category.application.command.port.out.HashtagCommandRepository;
 import com.sub9.productservice.category.application.command.port.out.HashtagCreatedEventPort;
 import com.sub9.productservice.category.application.command.port.out.HashtagProductCommandRepository;
-import com.sub9.productservice.category.application.command.port.out.HashtagUpsertResult;
+import com.sub9.productservice.category.application.command.model.HashtagUpsertResult;
 import com.sub9.productservice.category.domain.entity.Category;
 import com.sub9.productservice.category.domain.entity.CategoryHashtag;
 import com.sub9.productservice.category.domain.entity.Hashtag;
