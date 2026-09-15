@@ -56,6 +56,7 @@ public class CreatorRepositoryImpl implements CreatorRepository {
     public List<Creator> findApprovedActiveByUserIds(List<UUID> userIds) {
         return creatorJpaRepository.findApprovedActiveByUserIds(
                 userIds, ApprovalStatus.APPROVED);
+    }
      
     @Override
     public Optional<Creator> findActiveByUserIdForUpdate(UUID userId) {
