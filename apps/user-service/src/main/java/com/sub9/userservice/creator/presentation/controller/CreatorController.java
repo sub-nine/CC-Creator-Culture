@@ -7,6 +7,7 @@ import com.sub9.userservice.creator.application.service.CreatorQueryService;
 import com.sub9.userservice.creator.presentation.request.UpdateCreatorRequest;
 import com.sub9.userservice.creator.presentation.response.CreatorPageResponse;
 import com.sub9.userservice.creator.presentation.response.CreatorSummaryResponse;
+import com.sub9.userservice.creator.presentation.response.FollowerCountResponse;
 import com.sub9.userservice.creator.presentation.response.MyCreatorResponse;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -50,6 +51,14 @@ public class CreatorController {
         return ApiResponse.success(
                 "내 창작자 정보를 조회했습니다.",
                 creatorQueryService.getMyCreator(principal.userId()));
+    }
+
+    @GetMapping("/me/follower-count")
+    public ApiResponse<FollowerCountResponse> getMyFollowerCount(
+            @AuthenticationPrincipal GatewayAuthenticationPrincipal principal) {
+        return ApiResponse.success(
+                "내 팔로워 수를 조회했습니다.",
+                creatorQueryService.getMyFollowerCount(principal.userId()));
     }
 
     @PatchMapping("/me")

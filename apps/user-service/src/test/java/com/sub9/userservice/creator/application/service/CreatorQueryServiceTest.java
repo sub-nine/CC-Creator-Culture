@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.sub9.common.exception.BusinessException;
@@ -12,6 +13,7 @@ import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.userservice.creator.domain.exception.CreatorErrorCode;
 import com.sub9.userservice.creator.domain.model.Creator;
 import com.sub9.userservice.creator.domain.repository.CreatorRepository;
+import com.sub9.userservice.follow.domain.repository.FollowRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -36,11 +38,14 @@ class CreatorQueryServiceTest {
     @Mock
     private CreatorRepository creatorRepository;
 
+    @Mock
+    private FollowRepository followRepository;
+
     private CreatorQueryService creatorQueryService;
 
     @BeforeEach
     void setUp() {
-        creatorQueryService = new CreatorQueryService(creatorRepository);
+        creatorQueryService = new CreatorQueryService(creatorRepository, followRepository);
     }
 
     @Test
@@ -129,6 +134,45 @@ class CreatorQueryServiceTest {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(CreatorErrorCode.CREATOR_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("인증 사용자에게 연결된 창작자의 활성 팔로워 수를 반환한다")
+    void when_my_follower_count_is_requested_active_follow_count_is_returned() {
+        Creator creator = pendingCreator("팔로워상점");
+        when(creatorRepository.findApprovedActiveByUserId(creator.getUserId()))
+                .thenReturn(Optional.of(creator));
+        when(followRepository.countActiveByCreatorId(creator.getId())).thenReturn(12L);
+
+        var response = creatorQueryService.getMyFollowerCount(creator.getUserId());
+
+        assertThat(response.creatorId()).isEqualTo(creator.getId());
+        assertThat(response.followerCount()).isEqualTo(12L);
+    }
+
+    @Test
+    @DisplayName("활성 팔로워가 없으면 팔로워 수로 0을 반환한다")
+    void when_my_creator_has_no_active_follower_zero_is_returned() {
+        Creator creator = pendingCreator("팔로워없는상점");
+        when(creatorRepository.findApprovedActiveByUserId(creator.getUserId()))
+                .thenReturn(Optional.of(creator));
+
+        var response = creatorQueryService.getMyFollowerCount(creator.getUserId());
+
+        assertThat(response.followerCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("조회 가능한 내 창작자가 없으면 팔로워 수를 집계하지 않고 404 오류로 처리한다")
+    void when_my_creator_is_not_queryable_follower_count_is_not_queried() {
+        UUID userId = uuidGenerator.generate();
+        when(creatorRepository.findApprovedActiveByUserId(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> creatorQueryService.getMyFollowerCount(userId))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(CreatorErrorCode.CREATOR_NOT_FOUND));
+        verifyNoInteractions(followRepository);
     }
 
     private Creator pendingCreator(String creatorName) {

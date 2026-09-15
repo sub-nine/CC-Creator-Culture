@@ -15,6 +15,7 @@ import com.sub9.userservice.creator.application.service.CreatorQueryService;
 import com.sub9.userservice.creator.domain.exception.CreatorErrorCode;
 import com.sub9.userservice.creator.presentation.response.CreatorPageResponse;
 import com.sub9.userservice.creator.presentation.response.CreatorSummaryResponse;
+import com.sub9.userservice.creator.presentation.response.FollowerCountResponse;
 import com.sub9.userservice.creator.presentation.response.MyCreatorResponse;
 import com.sub9.userservice.creator.presentation.request.UpdateCreatorRequest;
 import java.util.List;
@@ -175,6 +176,53 @@ class CreatorControllerTest {
                 .thenThrow(new BusinessException(CreatorErrorCode.CREATOR_NOT_FOUND));
 
         mockMvc.perform(withGatewayHeaders(get("/api/v1/creators/me"), "CREATOR"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("CREATOR_0001"));
+    }
+
+    @Test
+    @DisplayName("CREATOR는 자신의 활성 팔로워 수를 조회할 수 있다")
+    void when_creator_reads_my_follower_count_count_is_returned() throws Exception {
+        when(creatorQueryService.getMyFollowerCount(USER_ID))
+                .thenReturn(new FollowerCountResponse(CREATOR_ID, 12L));
+
+        mockMvc.perform(withGatewayHeaders(
+                        get("/api/v1/creators/me/follower-count"), "CREATOR"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("내 팔로워 수를 조회했습니다."))
+                .andExpect(jsonPath("$.data.creatorId").value(CREATOR_ID.toString()))
+                .andExpect(jsonPath("$.data.followerCount").value(12));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"CUSTOMER", "MANAGER", "MASTER"})
+    @DisplayName("CREATOR가 아닌 사용자는 내 팔로워 수를 조회할 수 없다")
+    void when_non_creator_reads_my_follower_count_forbidden_is_returned(String role)
+            throws Exception {
+        mockMvc.perform(withGatewayHeaders(
+                        get("/api/v1/creators/me/follower-count"), role))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("COMMON_0008"));
+    }
+
+    @Test
+    @DisplayName("인증 헤더 없이 내 팔로워 수를 조회하면 401을 반환한다")
+    void when_unauthenticated_user_reads_my_follower_count_unauthorized_is_returned()
+            throws Exception {
+        mockMvc.perform(get("/api/v1/creators/me/follower-count"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("COMMON_0007"));
+    }
+
+    @Test
+    @DisplayName("조회 가능한 내 창작자가 없으면 팔로워 수 조회는 404를 반환한다")
+    void when_my_creator_for_follower_count_is_not_queryable_not_found_is_returned()
+            throws Exception {
+        when(creatorQueryService.getMyFollowerCount(USER_ID))
+                .thenThrow(new BusinessException(CreatorErrorCode.CREATOR_NOT_FOUND));
+
+        mockMvc.perform(withGatewayHeaders(
+                        get("/api/v1/creators/me/follower-count"), "CREATOR"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("CREATOR_0001"));
     }

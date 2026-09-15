@@ -6,7 +6,9 @@ import com.sub9.userservice.creator.domain.model.Creator;
 import com.sub9.userservice.creator.domain.repository.CreatorRepository;
 import com.sub9.userservice.creator.presentation.response.CreatorPageResponse;
 import com.sub9.userservice.creator.presentation.response.CreatorSummaryResponse;
+import com.sub9.userservice.creator.presentation.response.FollowerCountResponse;
 import com.sub9.userservice.creator.presentation.response.MyCreatorResponse;
+import com.sub9.userservice.follow.domain.repository.FollowRepository;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CreatorQueryService {
 
     private final CreatorRepository creatorRepository;
+    private final FollowRepository followRepository;
 
     @Transactional(readOnly = true)
     public CreatorPageResponse getCreators(
@@ -43,6 +46,14 @@ public class CreatorQueryService {
         Creator creator = creatorRepository.findApprovedActiveByUserId(userId)
                 .orElseThrow(() -> new BusinessException(CreatorErrorCode.CREATOR_NOT_FOUND));
         return MyCreatorResponse.from(creator);
+    }
+
+    @Transactional(readOnly = true)
+    public FollowerCountResponse getMyFollowerCount(UUID userId) {
+        Creator creator = creatorRepository.findApprovedActiveByUserId(userId)
+                .orElseThrow(() -> new BusinessException(CreatorErrorCode.CREATOR_NOT_FOUND));
+        long followerCount = followRepository.countActiveByCreatorId(creator.getId());
+        return new FollowerCountResponse(creator.getId(), followerCount);
     }
 
     private String normalizeKeyword(String keyword) {

@@ -19,6 +19,8 @@ public interface FollowRepository {
 
     Page<Follow> findActiveByUserId(UUID userId, Pageable pageable);
 
+    long countActiveByCreatorId(UUID creatorId);
+
     int softDeleteActiveByUserId(UUID userId, UUID actorId, Instant deletedAt);
 
     int softDeleteActiveByCreatorId(UUID creatorId, UUID actorId, Instant deletedAt);
