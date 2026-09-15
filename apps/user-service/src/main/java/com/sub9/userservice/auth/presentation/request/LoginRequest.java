@@ -1,5 +1,6 @@
 package com.sub9.userservice.auth.presentation.request;
 
+import com.sub9.userservice.shared.presentation.request.SignupRequestNormalizer;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

@@ -8,12 +8,12 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration(proxyBeanMethods = false)
-@Profile({"local", "dev"})
-public class NonProductionActuatorSecurityConfig {
+@Profile({"local", "dev", "prod"})
+public class ActuatorSecurityConfig {
 
     @Bean
     @Order(1)
-    SecurityFilterChain nonProductionSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
         http.securityMatcher("/actuator/**")
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(
@@ -23,8 +23,8 @@ public class NonProductionActuatorSecurityConfig {
                 )
                 .permitAll()
                 .anyRequest()
-                .authenticated()
-        );
+                .denyAll()
+            );
 
         return http.build();
     }

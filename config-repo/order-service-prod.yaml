@@ -1,0 +1,19 @@
+server:
+  port: ${ORDER_SERVICE_PORT:8083}
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${ORDER_DB_HOST}:${ORDER_DB_PORT:5432}/${ORDER_DB_NAME}?sslmode=verify-full&sslrootcert=${DB_SSLROOTCERT:/app/certs/rds-ap-northeast-2-bundle.pem}
+    username: ${ORDER_DB_USERNAME}
+    password: ${ORDER_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  # 앱 기동 시 Flyway가 db/migration을 적용한다.
+  flyway:
+    enabled: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}

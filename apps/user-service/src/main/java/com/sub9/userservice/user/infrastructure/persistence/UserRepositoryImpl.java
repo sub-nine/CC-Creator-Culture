@@ -30,6 +30,11 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
+    public Optional<User> findActiveByIdForUpdate(UUID userId) {
+        return userJpaRepository.findActiveByIdForUpdate(userId);
+    }
+
+    @Override
     public Optional<User> findActiveByEmail(String email) {
         return userJpaRepository.findByEmailAndDeletedAtIsNull(email);
     }

@@ -3,6 +3,7 @@ package com.sub9.userservice.follow.infrastructure.persistence;
 import com.sub9.userservice.follow.domain.model.Follow;
 import com.sub9.userservice.follow.domain.repository.FollowRepository;
 import com.sub9.userservice.creator.domain.model.ApprovalStatus;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -41,5 +42,15 @@ public class FollowRepositoryImpl implements FollowRepository {
         return followJpaRepository
                 .findAllByUserIdAndDeletedAtIsNullAndCreator_ApprovalStatusAndCreator_DeletedAtIsNull(
                         userId, ApprovalStatus.APPROVED, pageable);
+    }
+
+    @Override
+    public int softDeleteActiveByUserId(UUID userId, UUID actorId, Instant deletedAt) {
+        return followJpaRepository.softDeleteActiveByUserId(userId, actorId, deletedAt);
+    }
+
+    @Override
+    public int softDeleteActiveByCreatorId(UUID creatorId, UUID actorId, Instant deletedAt) {
+        return followJpaRepository.softDeleteActiveByCreatorId(creatorId, actorId, deletedAt);
     }
 }

@@ -1,0 +1,118 @@
+#!/bin/bash
+set -euo pipefail
+# Do not enable set -x. Grafana secret must not hit SSM logs.
+
+PROM_IMAGE='${prometheus_image}'
+GRAFANA_IMAGE='${grafana_image}'
+ZIPKIN_IMAGE='${zipkin_image}'
+GRAFANA_SECRET_ARN='${grafana_secret_arn}'
+# ponytail: Zipkin heap 256m. Raise JAVA_TOOL_OPTIONS if traces OOM.
+ZIPKIN_JAVA_OPTS='-Xms128m -Xmx256m'
+
+DATA_ROOT=/var/lib/cc-observation
+ETC_ROOT=/etc/cc-observation
+
+if ! command -v docker >/dev/null 2>&1; then
+  dnf install -y docker
+fi
+if ! command -v aws >/dev/null 2>&1; then
+  dnf install -y awscli
+fi
+systemctl enable --now docker
+
+mkdir -p "$DATA_ROOT/prometheus" "$DATA_ROOT/grafana" "$ETC_ROOT"
+chown -R 65534:65534 "$DATA_ROOT/prometheus"
+chown -R 472:472 "$DATA_ROOT/grafana"
+chmod 0775 "$DATA_ROOT/prometheus" "$DATA_ROOT/grafana"
+
+cat > "$ETC_ROOT/prometheus.yml" <<'PROM'
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: spring-apps
+    metrics_path: /actuator/prometheus
+    eureka_sd_configs:
+      - server: http://eureka-server.${cloudmap_namespace}:8761/eureka
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__meta_eureka_app_instance_status]
+        regex: UP
+        action: keep
+      - source_labels: [__meta_eureka_app_name]
+        regex: '(?i)(config-server|eureka-server)'
+        action: drop
+      - source_labels: [__meta_eureka_app_instance_ip_addr]
+        regex: (.+)
+        replacement: $1:9090
+        target_label: __address__
+  - job_name: spring-core
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - config-server.${cloudmap_namespace}:9090
+          - eureka-server.${cloudmap_namespace}:9090
+PROM
+
+raw="$(aws secretsmanager get-secret-value --secret-id "$GRAFANA_SECRET_ARN" --query SecretString --output text)"
+GRAFANA_ADMIN_USER="$(printf '%s' "$raw" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("username") or "admin", end="")')"
+GRAFANA_ADMIN_PASSWORD="$(printf '%s' "$raw" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("password") or "", end="")')"
+unset raw
+if [ -z "$GRAFANA_ADMIN_PASSWORD" ]; then
+  echo "grafana secret is missing password; populate ${name_prefix}/grafana JSON {username,password}" >&2
+  exit 1
+fi
+
+restart_container() {
+  local name="$1"
+  docker rm -f "$name" >/dev/null 2>&1 || true
+}
+
+docker pull "$PROM_IMAGE"
+docker pull "$GRAFANA_IMAGE"
+docker pull "$ZIPKIN_IMAGE"
+
+restart_container prometheus
+docker run -d --name prometheus --restart unless-stopped --network host \
+  -v "$DATA_ROOT/prometheus:/prometheus" \
+  -v "$ETC_ROOT/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+  --user 65534:65534 \
+  "$PROM_IMAGE" \
+  --config.file=/etc/prometheus/prometheus.yml \
+  --storage.tsdb.path=/prometheus \
+  --web.listen-address=127.0.0.1:9090
+
+restart_container grafana
+docker run -d --name grafana --restart unless-stopped --network host \
+  -v "$DATA_ROOT/grafana:/var/lib/grafana" \
+  -e GF_SECURITY_ADMIN_USER="$GRAFANA_ADMIN_USER" \
+  -e GF_SECURITY_ADMIN_PASSWORD="$GRAFANA_ADMIN_PASSWORD" \
+  -e GF_USERS_ALLOW_SIGN_UP=false \
+  -e GF_SERVER_HTTP_ADDR=127.0.0.1 \
+  -e GF_SERVER_HTTP_PORT=3000 \
+  "$GRAFANA_IMAGE"
+
+restart_container zipkin
+docker run -d --name zipkin --restart unless-stopped --network host \
+  -e JAVA_TOOL_OPTIONS="$ZIPKIN_JAVA_OPTS" \
+  "$ZIPKIN_IMAGE"
+
+wait_http() {
+  local url="$1"
+  local i
+  for i in $(seq 1 60); do
+    if curl -fsS "$url" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  echo "timed out waiting for $url" >&2
+  return 1
+}
+
+wait_http http://127.0.0.1:9090/-/ready
+wait_http http://127.0.0.1:3000/api/health
+wait_http http://127.0.0.1:9411/health
+
+echo "observation ready"

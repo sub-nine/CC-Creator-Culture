@@ -4,6 +4,8 @@ import com.sub9.productservice.common.entity.BaseEntity;
 import com.sub9.productservice.leaderboard.domain.model.LeaderboardType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -25,6 +27,7 @@ import java.util.UUID;
         )
 )
 public class LeaderboardSnapshot extends BaseEntity {
+    @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false)
     private LeaderboardType type;
 

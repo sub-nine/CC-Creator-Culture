@@ -18,7 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
         controllers = LogoutController.class,
         properties = "auth.jwt.secret=test-secret")
 @ActiveProfiles("dev")
-@Import({SecurityConfig.class, NonProductionActuatorSecurityConfig.class})
+@Import({SecurityConfig.class, ActuatorSecurityConfig.class})
 @DisplayName("Security Filter Chain 분리")
 class SecurityFilterChainIntegrationTest {
 
