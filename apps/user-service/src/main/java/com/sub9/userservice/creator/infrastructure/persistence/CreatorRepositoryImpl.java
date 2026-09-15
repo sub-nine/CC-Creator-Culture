@@ -36,6 +36,12 @@ public class CreatorRepositoryImpl implements CreatorRepository {
     }
 
     @Override
+    public Optional<Creator> findApprovedActiveByIdForUpdate(UUID creatorId) {
+        return creatorJpaRepository.findApprovedActiveByIdForUpdate(
+                creatorId, ApprovalStatus.APPROVED);
+    }
+
+    @Override
     public Optional<Creator> findActiveByIdForUpdate(UUID creatorId) {
         return creatorJpaRepository.findActiveByIdForUpdate(creatorId);
     }
@@ -43,6 +49,11 @@ public class CreatorRepositoryImpl implements CreatorRepository {
     @Override
     public Optional<Creator> findActiveByUserId(UUID userId) {
         return creatorJpaRepository.findByUserIdAndDeletedAtIsNull(userId);
+    }
+
+    @Override
+    public Optional<Creator> findActiveByUserIdForUpdate(UUID userId) {
+        return creatorJpaRepository.findActiveByUserIdForUpdate(userId);
     }
 
     @Override

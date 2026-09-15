@@ -1,25 +1,25 @@
-package com.sub9.userservice.auth.presentation.request;
+package com.sub9.userservice.shared.presentation.request;
 
 import java.util.Locale;
 
-final class SignupRequestNormalizer {
+public final class SignupRequestNormalizer {
 
     private SignupRequestNormalizer() {
     }
 
-    static String email(String value) {
+    public static String email(String value) {
         return value == null ? null : value.trim().toLowerCase(Locale.ROOT);
     }
 
-    static String number(String value) {
+    public static String number(String value) {
         return value == null ? null : value.trim().replace("-", "");
     }
 
-    static String text(String value) {
+    public static String text(String value) {
         return value == null ? null : value.trim();
     }
 
-    static String nullableText(String value) {
+    public static String nullableText(String value) {
         String normalized = text(value);
         return normalized == null || normalized.isEmpty() ? null : normalized;
     }
