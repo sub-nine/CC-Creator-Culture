@@ -22,7 +22,7 @@ public class InternalSkuQueryController {
   }
 
   @GetMapping("/{skuId}/validation")
-  public void validateSkuForCart(@PathVariable UUID skuId) {
-    cartProductQueryUseCase.validateSkuForCart(skuId);
+  public UUID getValidatedProductIdForCart(@PathVariable UUID skuId) {
+    return cartProductQueryUseCase.getValidatedProductIdForCart(skuId);
   }
 }

@@ -7,5 +7,5 @@ import java.util.UUID;
 public interface CartProductQueryUseCase {
   List<SkuInfo> getCartItemProducts(List<UUID> skuIds);
 
-  void validateSkuForCart(UUID skuId);
+  UUID getValidatedProductIdForCart(UUID skuId);
 }
