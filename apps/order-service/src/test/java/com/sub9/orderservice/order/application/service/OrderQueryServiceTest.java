@@ -304,6 +304,40 @@ class OrderQueryServiceTest {
     }
 
     @Test
+    @DisplayName("운영자 조회 후에도 빈 상세 주소와 소비자 및 창작자의 배송지 원문을 보존한다")
+    void when_admin_queries_shipping_address_other_role_responses_remain_unchanged() {
+        for (String detail : new String[]{"101동 1001호", null, ""}) {
+            OrderItem item = item(131, CREATOR_ID);
+            Order order = order(130, CUSTOMER_ID, OrderStatus.PAID, item);
+            ShippingAddress original = ShippingAddress.of(
+                    "홍길동", "01012345678", "06236", "서울", detail);
+            ReflectionTestUtils.setField(order, "shippingAddress", original);
+            when(orderQueryRepository.findDetailByOrderNumber(order.getOrderNumber()))
+                    .thenReturn(Optional.of(order));
+            when(orderQueryRepository.findItemDetailById(item.getId())).thenReturn(Optional.of(item));
+
+            var admin = orderQueryService.getAdminOrder(order.getOrderNumber()).shippingAddress();
+            var customer = orderQueryService.getCustomerOrder(
+                    CUSTOMER_ID, order.getOrderNumber()).shippingAddress();
+            var creator = orderQueryService.getCreatorOrderItem(CREATOR_ID, item.getId()).shippingAddress();
+
+            assertThat(admin.recipientPhone()).isEqualTo("****");
+            assertThat(admin.addressLine2()).isEqualTo("****");
+            assertThat(customer.recipientName()).isEqualTo("홍길동");
+            assertThat(customer.recipientPhone()).isEqualTo("01012345678");
+            assertThat(customer.postalCode()).isEqualTo("06236");
+            assertThat(customer.addressLine1()).isEqualTo("서울");
+            assertThat(customer.addressLine2()).isEqualTo(detail);
+            assertThat(creator).isEqualTo(customer);
+            assertThat(order.getShippingAddress()).isSameAs(original);
+            assertThat(original.getRecipientPhone()).isEqualTo("01012345678");
+            assertThat(original.getPostalCode()).isEqualTo("06236");
+            assertThat(original.getAddressLine1()).isEqualTo("서울");
+            assertThat(original.getAddressLine2()).isEqualTo(detail);
+        }
+    }
+
+    @Test
     @DisplayName("존재하지 않는 운영자 주문 상세를 조회하면 찾을 수 없음 오류를 반환한다")
     void when_admin_order_does_not_exist_not_found_is_returned() {
         OrderNumber orderNumber = OrderNumber.from("ORD-0198f2a0-76c0-7000-8000-000000000120");
