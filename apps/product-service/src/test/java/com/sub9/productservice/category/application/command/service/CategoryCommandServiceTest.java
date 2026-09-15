@@ -85,8 +85,8 @@ class CategoryCommandServiceTest {
         }
 
         @Test
-        @DisplayName("유사도가 MERGE_THRESHOLD 이상인 카테고리는 MERGED/ALGORITHM으로 연결하고 usage_count를 증가시킨다")
-        void similarityAboveMergeThreshold_linksAsMergedAndIncreasesUsageCount() {
+        @DisplayName("유사도가 MERGE_THRESHOLD 이상인 카테고리는 MERGED/ALGORITHM으로 연결하고, usage_count는 증가시키지 않는다(상품 링크 시에만 증가)")
+        void similarityAboveMergeThreshold_linksAsMergedWithoutIncreasingUsageCount() {
             Category category = Category.create("강아지", null);
             Hashtag hashtag = Hashtag.create("강아지용품");
 
@@ -108,7 +108,7 @@ class CategoryCommandServiceTest {
             assertThat(linked.getStatus()).isEqualTo(CategoryHashtagStatus.MERGED);
             assertThat(linked.getSimilarityScore()).isEqualTo(0.85);
 
-            verify(hashtagCommandRepository).increaseUsageCount(hashtag.getId());
+            verify(hashtagCommandRepository, never()).increaseUsageCount(any());
             verify(categoryCommandRepository, never()).save(any(Category.class));
         }
 
@@ -160,8 +160,8 @@ class CategoryCommandServiceTest {
         }
 
         @Test
-        @DisplayName("활성 카테고리가 하나도 없으면 해시태그 이름으로 새 카테고리를 만들어 PROMOTED/MERGED로 연결한다")
-        void noActiveCategories_promotesHashtagToNewCategory() {
+        @DisplayName("활성 카테고리가 하나도 없으면 해시태그 이름으로 새 카테고리를 만들어 PROMOTED/MERGED로 연결하고, usage_count는 증가시키지 않는다")
+        void noActiveCategories_promotesHashtagToNewCategoryWithoutIncreasingUsageCount() {
             Hashtag hashtag = Hashtag.create("신규카테고리");
 
             when(categoryCommandRepository.findAllActive()).thenReturn(List.of());
@@ -184,7 +184,7 @@ class CategoryCommandServiceTest {
             assertThat(linked.getStatus()).isEqualTo(CategoryHashtagStatus.MERGED);
             assertThat(linked.getSimilarityScore()).isEqualTo(0.0);
 
-            verify(hashtagCommandRepository).increaseUsageCount(hashtag.getId());
+            verify(hashtagCommandRepository, never()).increaseUsageCount(any());
         }
 
         @Test

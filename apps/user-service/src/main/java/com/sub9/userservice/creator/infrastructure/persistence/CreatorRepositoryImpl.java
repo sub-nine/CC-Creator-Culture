@@ -1,6 +1,7 @@
 package com.sub9.userservice.creator.infrastructure.persistence;
 
 import com.sub9.userservice.creator.domain.model.Creator;
+import com.sub9.userservice.creator.domain.model.ApprovalStatus;
 import com.sub9.userservice.creator.domain.repository.CreatorRepository;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,6 +30,18 @@ public class CreatorRepositoryImpl implements CreatorRepository {
     }
 
     @Override
+    public Optional<Creator> findApprovedActiveById(UUID creatorId) {
+        return creatorJpaRepository.findByIdAndApprovalStatusAndDeletedAtIsNull(
+                creatorId, ApprovalStatus.APPROVED);
+    }
+
+    @Override
+    public Optional<Creator> findApprovedActiveByIdForUpdate(UUID creatorId) {
+        return creatorJpaRepository.findApprovedActiveByIdForUpdate(
+                creatorId, ApprovalStatus.APPROVED);
+    }
+
+    @Override
     public Optional<Creator> findActiveByIdForUpdate(UUID creatorId) {
         return creatorJpaRepository.findActiveByIdForUpdate(creatorId);
     }
@@ -36,6 +49,11 @@ public class CreatorRepositoryImpl implements CreatorRepository {
     @Override
     public Optional<Creator> findActiveByUserId(UUID userId) {
         return creatorJpaRepository.findByUserIdAndDeletedAtIsNull(userId);
+    }
+
+    @Override
+    public Optional<Creator> findActiveByUserIdForUpdate(UUID userId) {
+        return creatorJpaRepository.findActiveByUserIdForUpdate(userId);
     }
 
     @Override

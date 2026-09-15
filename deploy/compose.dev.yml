@@ -30,6 +30,7 @@ x-app-environment: &app-environment
   CONFIG_SERVER_IMPORT: configserver:http://config-server:8888
   EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
   MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+  REDIS_HOST: redis
 
 x-platform-depends-on: &platform-depends-on
   config-server:
@@ -100,8 +101,8 @@ services:
     <<: *java-service
     image: ${CONFIG_SERVER_IMAGE:?CONFIG_SERVER_IMAGE is required}
     environment:
-      SPRING_PROFILES_ACTIVE: docker
-      CONFIG_REPO_PATH: /config-repo
+      SPRING_PROFILES_ACTIVE: git
+      CONFIG_GIT_DEFAULT_LABEL: ${CONFIG_SERVER_CONFIG_LABEL:?CONFIG_SERVER_CONFIG_LABEL is required}
       SERVER_PORT: "8888"
       JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m -XX:+ExitOnOutOfMemoryError
     mem_limit: 384m
@@ -130,9 +131,11 @@ services:
     image: ${USER_SERVICE_IMAGE:?USER_SERVICE_IMAGE is required}
     environment:
       <<: *app-environment
+      SPRING_CLOUD_CONFIG_LABEL: ${USER_SERVICE_CONFIG_LABEL:?USER_SERVICE_CONFIG_LABEL is required}
       USER_DATASOURCE_URL: jdbc:postgresql://user-postgres:5432/user_db
       USER_DB_USERNAME: user_app
       USER_DB_PASSWORD: ${USER_DB_PASSWORD:?USER_DB_PASSWORD is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JAVA_TOOL_OPTIONS: -Xms192m -Xmx384m -XX:+ExitOnOutOfMemoryError
     mem_limit: 640m
     networks:
@@ -154,9 +157,15 @@ services:
     image: ${PRODUCT_SERVICE_IMAGE:?PRODUCT_SERVICE_IMAGE is required}
     environment:
       <<: *app-environment
+      SPRING_CLOUD_CONFIG_LABEL: ${PRODUCT_SERVICE_CONFIG_LABEL:?PRODUCT_SERVICE_CONFIG_LABEL is required}
       PRODUCT_DATASOURCE_URL: jdbc:postgresql://product-postgres:5432/product_db
       PRODUCT_DB_USERNAME: product_app
       PRODUCT_DB_PASSWORD: ${PRODUCT_DB_PASSWORD:?PRODUCT_DB_PASSWORD is required}
+      R2_ACCESS_KEY: ${R2_ACCESS_KEY:?R2_ACCESS_KEY is required}
+      R2_SECRET_KEY: ${R2_SECRET_KEY:?R2_SECRET_KEY is required}
+      R2_ENDPOINT: ${R2_ENDPOINT:?R2_ENDPOINT is required}
+      R2_BUCKET: ${R2_BUCKET:?R2_BUCKET is required}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:?R2_PUBLIC_URL is required}
       JAVA_TOOL_OPTIONS: -Xms192m -Xmx384m -XX:+ExitOnOutOfMemoryError
     mem_limit: 640m
     networks:
@@ -178,6 +187,7 @@ services:
     image: ${ORDER_SERVICE_IMAGE:?ORDER_SERVICE_IMAGE is required}
     environment:
       <<: *app-environment
+      SPRING_CLOUD_CONFIG_LABEL: ${ORDER_SERVICE_CONFIG_LABEL:?ORDER_SERVICE_CONFIG_LABEL is required}
       ORDER_DATASOURCE_URL: jdbc:postgresql://order-postgres:5432/order_db
       ORDER_DB_USERNAME: order_app
       ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:?ORDER_DB_PASSWORD is required}
@@ -202,7 +212,9 @@ services:
     image: ${GATEWAY_IMAGE:?GATEWAY_IMAGE is required}
     environment:
       <<: *app-environment
+      SPRING_CLOUD_CONFIG_LABEL: ${GATEWAY_CONFIG_LABEL:?GATEWAY_CONFIG_LABEL is required}
       GATEWAY_PORT: "8080"
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JAVA_TOOL_OPTIONS: -Xms192m -Xmx384m -XX:+ExitOnOutOfMemoryError
     mem_limit: 640m
     depends_on:

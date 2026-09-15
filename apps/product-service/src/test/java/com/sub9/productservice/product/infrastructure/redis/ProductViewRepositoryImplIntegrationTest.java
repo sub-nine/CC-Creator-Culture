@@ -21,7 +21,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 class ProductViewRepositoryImplIntegrationTest extends AbstractIntegrationTest {
   @Autowired private ProductViewRepositoryImpl productViewRepository;
 
-  // 테스트 중 자동 집계와 외부 Kafka 소비가 실행되지 않도록 격리한다.
   @MockitoBean private ProductViewCountScheduler productViewCountScheduler;
   @MockitoBean private ProductTotalViewCountScheduler productTotalViewCountScheduler;
   @MockitoBean private KafkaListenerEndpointRegistry kafkaListenerEndpointRegistry;

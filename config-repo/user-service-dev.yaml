@@ -2,6 +2,9 @@ server:
   port: ${USER_SERVICE_PORT:8081}
 
 spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:19092}
+
   datasource:
     url: ${USER_DATASOURCE_URL}
     username: ${USER_DB_USERNAME}
@@ -9,3 +12,12 @@ spring:
     hikari:
       maximum-pool-size: 5
       minimum-idle: 1
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  # 앱 기동 시 Flyway가 private 스키마를 만들고 db/migration을 적용한다.
+  # hibernate.default_schema=private(user-service.yaml)와 같은 스키마여야 validate가 테이블을 찾는다.
+  flyway:
+    enabled: true
+    schemas: [private]
+    default-schema: private

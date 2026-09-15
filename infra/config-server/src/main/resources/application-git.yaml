@@ -1,0 +1,12 @@
+spring:
+  cloud:
+    config:
+      server:
+        git:
+          uri: ${CONFIG_GIT_URI:https://github.com/sub-nine/CC-Creator-Culture.git}
+          default-label: ${CONFIG_GIT_DEFAULT_LABEL}
+          search-paths:
+            - config-repo
+          clone-on-start: true
+          try-master-branch: false
+          basedir: ${CONFIG_GIT_BASEDIR:/tmp/cc-config-repo}

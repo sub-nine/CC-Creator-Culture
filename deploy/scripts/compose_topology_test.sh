@@ -5,7 +5,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 export CANDIDATE_SHA=test
+export CONFIG_SERVER_CONFIG_LABEL=1111111111111111111111111111111111111111
+export EUREKA_SERVER_CONFIG_LABEL=2222222222222222222222222222222222222222
+export GATEWAY_CONFIG_LABEL=3333333333333333333333333333333333333333
+export USER_SERVICE_CONFIG_LABEL=4444444444444444444444444444444444444444
+export PRODUCT_SERVICE_CONFIG_LABEL=5555555555555555555555555555555555555555
+export ORDER_SERVICE_CONFIG_LABEL=6666666666666666666666666666666666666666
 export DEV_DOMAIN=dev.example.com
+export POSTGRES_ADMIN_PASSWORD=postgres-admin
 export USER_DB_ADMIN_PASSWORD=user-admin
 export PRODUCT_DB_ADMIN_PASSWORD=product-admin
 export ORDER_DB_ADMIN_PASSWORD=order-admin
@@ -13,6 +20,12 @@ export USER_DB_PASSWORD=user-password
 export PRODUCT_DB_PASSWORD=product-password
 export ORDER_DB_PASSWORD=order-password
 export GRAFANA_ADMIN_PASSWORD=grafana-password
+export JWT_SECRET=jwt-test-secret
+export R2_ACCESS_KEY=test-access
+export R2_SECRET_KEY=test-r2-secret
+export R2_ENDPOINT=https://example.r2.cloudflarestorage.com
+export R2_BUCKET=cc-dev-product
+export R2_PUBLIC_URL=https://pub-example.r2.dev
 export CONFIG_SERVER_IMAGE=config-server
 export EUREKA_SERVER_IMAGE=eureka-server
 export GATEWAY_IMAGE=gateway
@@ -61,6 +74,32 @@ jq -e '
       and ($root.services[$item.app].depends_on | has($item.container))
       and ($root.services[$item.app].environment[$item.url_key] == ("jdbc:postgresql://" + $item.container + ":5432/" + $item.database))
   )
+' <<<"$deploy_config" >/dev/null
+
+jq -e \
+  --arg config_server "$CONFIG_SERVER_CONFIG_LABEL" \
+  --arg gateway "$GATEWAY_CONFIG_LABEL" \
+  --arg user_service "$USER_SERVICE_CONFIG_LABEL" \
+  --arg product_service "$PRODUCT_SERVICE_CONFIG_LABEL" \
+  --arg order_service "$ORDER_SERVICE_CONFIG_LABEL" \
+  '
+  .services["config-server"].environment.SPRING_PROFILES_ACTIVE == "git"
+  and .services["config-server"].environment.CONFIG_GIT_DEFAULT_LABEL == $config_server
+  and .services.gateway.environment.SPRING_CLOUD_CONFIG_LABEL == $gateway
+  and .services["user-service"].environment.SPRING_CLOUD_CONFIG_LABEL == $user_service
+  and .services["product-service"].environment.SPRING_CLOUD_CONFIG_LABEL == $product_service
+  and .services["order-service"].environment.SPRING_CLOUD_CONFIG_LABEL == $order_service
+  and .services["user-service"].environment.REDIS_HOST == "redis"
+  and .services["product-service"].environment.REDIS_HOST == "redis"
+  and .services["order-service"].environment.REDIS_HOST == "redis"
+  and .services.gateway.environment.REDIS_HOST == "redis"
+  and .services["user-service"].environment.JWT_SECRET == "jwt-test-secret"
+  and .services.gateway.environment.JWT_SECRET == "jwt-test-secret"
+  and .services["product-service"].environment.R2_ACCESS_KEY == "test-access"
+  and .services["product-service"].environment.R2_SECRET_KEY == "test-r2-secret"
+  and .services["product-service"].environment.R2_ENDPOINT == "https://example.r2.cloudflarestorage.com"
+  and .services["product-service"].environment.R2_BUCKET == "cc-dev-product"
+  and .services["product-service"].environment.R2_PUBLIC_URL == "https://pub-example.r2.dev"
 ' <<<"$deploy_config" >/dev/null
 
 local_config="$(docker compose \

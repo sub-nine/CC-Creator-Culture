@@ -9,6 +9,7 @@ import java.time.Duration;
 @AllArgsConstructor
 public enum LeaderboardEventType {
     ORDER_PAID(Duration.ofDays(1), 1.5), // 주문량은 조회수보다 점수를 높게 책정
+    ORDER_CANCELED(Duration.ofDays(1), -1.5), // 주문 취소 시 ORDER_PAID로 반영했던 점수를 그대로 차감
     PRODUCT_SYNC_VIEW(Duration.ofDays(1), 1.0);
 
     private final Duration idempotencyTtl;

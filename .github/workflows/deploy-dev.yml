@@ -3,6 +3,11 @@ name: Deploy Development
 on:
   workflow_dispatch:
     inputs:
+      candidate_ref:
+        description: Candidate git ref (dev or release/vMAJOR.MINOR.PATCH)
+        required: false
+        default: dev
+        type: string
       first_cutover:
         description: Allow the first guarded handoff of ports 80 and 443 to cc-service
         required: false
@@ -18,20 +23,51 @@ concurrency:
 
 jobs:
   prepare:
-    name: Resolve dev HEAD
+    name: Resolve candidate revision
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
       sha: ${{ steps.revision.outputs.sha }}
+      ref: ${{ steps.revision.outputs.ref }}
+      revisions: ${{ steps.revisions.outputs.revisions }}
     steps:
+      - name: Validate candidate ref
+        id: ref
+        env:
+          CANDIDATE_REF: ${{ inputs.candidate_ref }}
+        run: |
+          ref="${CANDIDATE_REF:-dev}"
+          if [[ "$ref" != "dev" && ! "$ref" =~ ^release/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Candidate ref must be dev or release/vMAJOR.MINOR.PATCH." >&2
+            exit 65
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v6
         with:
-          ref: dev
-          fetch-depth: 1
+          ref: ${{ steps.ref.outputs.ref }}
+          fetch-depth: 0
 
       - id: revision
         name: Record immutable revision
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        env:
+          CANDIDATE_REF: ${{ steps.ref.outputs.ref }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Resolved revision must be a full lowercase Git SHA." >&2
+            exit 65
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "ref=$CANDIDATE_REF" >> "$GITHUB_OUTPUT"
+
+      - id: revisions
+        name: Compute per-service image tags and config labels
+        run: |
+          set -euo pipefail
+          json="$(bash .github/scripts/service-revisions.sh "$(git rev-parse HEAD)")"
+          jq -e 'type == "object"' <<<"$json" >/dev/null
+          echo "revisions=$json" >> "$GITHUB_OUTPUT"
 
   verify-common:
     name: Verify common module
@@ -97,6 +133,9 @@ jobs:
     needs: [prepare, verify-common, storage-budget]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -105,53 +144,180 @@ jobs:
             gradle-task: :infra:config-server:build
             module-dir: infra/config-server
             target: config-server
+            context: .
+            file: Dockerfile
           - service: eureka-server
             gradle-task: :infra:eureka-server:build
             module-dir: infra/eureka-server
             target: service
+            context: .
+            file: Dockerfile
           - service: gateway
             gradle-task: :infra:gateway:build
             module-dir: infra/gateway
             target: service
+            context: .
+            file: Dockerfile
           - service: user-service
             gradle-task: :apps:user-service:build
             module-dir: apps/user-service
             target: service
+            context: .
+            file: Dockerfile
           - service: product-service
             gradle-task: :apps:product-service:build
             module-dir: apps/product-service
             target: service
+            context: .
+            file: Dockerfile
           - service: order-service
             gradle-task: :apps:order-service:build
             module-dir: apps/order-service
             target: service
+            context: .
+            file: Dockerfile
+          # AWS demo seed artifact: ECR only, no Java build, not part of the OCI candidate manifest.
+          # Every step is skipped for this entry when AWS_ECR_REGISTRY is empty.
+          - service: db-seed
+            gradle-task: ""
+            module-dir: ""
+            target: ""
+            context: deploy/aws/seed
+            file: deploy/aws/seed/Dockerfile
     env:
       OCIR_REGISTRY: ${{ vars.OCIR_REGISTRY }}
       OCIR_NAMESPACE: ${{ vars.OCIR_NAMESPACE }}
+      AWS_ECR_REGISTRY: ${{ vars.AWS_ECR_REGISTRY }}
+      AWS_ECR_REPOSITORY_PREFIX: ${{ vars.AWS_ECR_REPOSITORY_PREFIX || 'cc-test/' }}
       SPRING_CLOUD_CONFIG_ENABLED: "false"
       EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
       EUREKA_CLIENT_FETCH_REGISTRY: "false"
       MANAGEMENT_TRACING_EXPORT_ENABLED: "false"
     steps:
       - uses: actions/checkout@v6
+        if: matrix.service != 'db-seed' || vars.AWS_ECR_REGISTRY != ''
         with:
           ref: ${{ needs.prepare.outputs.sha }}
 
+      - uses: docker/setup-qemu-action@v3
+        if: matrix.service != 'db-seed' || vars.AWS_ECR_REGISTRY != ''
+        with:
+          platforms: arm64
+
+      - uses: docker/setup-buildx-action@v3
+        if: matrix.service != 'db-seed' || vars.AWS_ECR_REGISTRY != ''
+
+      - uses: docker/login-action@v4
+        if: matrix.service != 'db-seed'
+        with:
+          registry: ${{ env.OCIR_REGISTRY }}
+          username: ${{ secrets.OCIR_USERNAME }}
+          password: ${{ secrets.OCIR_AUTH_TOKEN }}
+
+      - name: Configure AWS credentials for ECR
+        if: vars.AWS_ECR_REGISTRY != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_IMAGE_PUBLISHER_ROLE_ARN }}
+          role-session-name: cc-image-publisher
+          aws-region: ${{ vars.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Log in to ECR
+        if: vars.AWS_ECR_REGISTRY != ''
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Resolve image tags and build args
+        id: tags
+        if: matrix.service != 'db-seed' || vars.AWS_ECR_REGISTRY != ''
+        env:
+          SERVICE: ${{ matrix.service }}
+          SHA: ${{ needs.prepare.outputs.sha }}
+          IMAGE_TAG: ${{ fromJson(needs.prepare.outputs.revisions)[matrix.service].image_tag }}
+          GRADLE_TASK: ${{ matrix.gradle-task }}
+        run: |
+          set -euo pipefail
+          [[ "$IMAGE_TAG" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid image tag for ${SERVICE}." >&2; exit 65; }
+
+          ocir_image=""
+          ecr_image=""
+          ocir_exists=false
+          ecr_exists=false
+          if [[ "$SERVICE" != db-seed ]]; then
+            ocir_image="${OCIR_REGISTRY}/${OCIR_NAMESPACE}/cc-dev/${SERVICE}:${IMAGE_TAG}"
+            if docker buildx imagetools inspect "$ocir_image" >/dev/null 2>&1; then
+              ocir_exists=true
+              echo "OCIR ${SERVICE}:${IMAGE_TAG} already exists."
+            fi
+          fi
+          if [[ -n "$AWS_ECR_REGISTRY" ]]; then
+            ecr_repo="${AWS_ECR_REPOSITORY_PREFIX}${SERVICE}"
+            ecr_image="${AWS_ECR_REGISTRY}/${ecr_repo}:${IMAGE_TAG}"
+            if aws ecr batch-get-image --repository-name "$ecr_repo" --image-ids "imageTag=${IMAGE_TAG}" \
+                --query 'images[0].imageId.imageTag' --output text 2>/dev/null | grep -qx "$IMAGE_TAG"; then
+              ecr_exists=true
+              echo "ECR ${ecr_repo}:${IMAGE_TAG} already exists."
+            fi
+          fi
+
+          tags=()
+          copy_src=""
+          copy_dst=""
+          need_gradle=false
+          if [[ "$SERVICE" == db-seed ]]; then
+            if [[ "$ecr_exists" != true ]]; then
+              tags+=("$ecr_image")
+            fi
+          elif [[ "$ocir_exists" == true && ( -z "$AWS_ECR_REGISTRY" || "$ecr_exists" == true ) ]]; then
+            :
+          elif [[ "$ocir_exists" == true && "$ecr_exists" != true ]]; then
+            copy_src="$ocir_image"
+            copy_dst="$ecr_image"
+          elif [[ "$ocir_exists" != true && "$ecr_exists" == true ]]; then
+            copy_src="$ecr_image"
+            copy_dst="$ocir_image"
+          else
+            [[ -n "$GRADLE_TASK" ]] && need_gradle=true
+            tags+=("$ocir_image")
+            if [[ -n "$ecr_image" ]]; then
+              tags+=("$ecr_image")
+            fi
+          fi
+
+          if [[ -n "$GRADLE_TASK" ]]; then
+            build_args="JAR_FILE=.image/app.jar"
+          else
+            build_args="RELEASE_SHA=${SHA}"
+          fi
+
+          {
+            echo "need_gradle=$need_gradle"
+            echo "tags=$(IFS=,; echo "${tags[*]}")"
+            echo "copy_src=$copy_src"
+            echo "copy_dst=$copy_dst"
+            echo "digest_ref=${ocir_image}"
+            echo "build_args=$build_args"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-java@v5
+        if: steps.tags.outputs.need_gradle == 'true'
         with:
           distribution: temurin
           java-version: "21"
 
       - uses: gradle/actions/setup-gradle@v6
+        if: steps.tags.outputs.need_gradle == 'true'
         with:
           cache-provider: basic
 
       - name: Build and test module
+        if: steps.tags.outputs.need_gradle == 'true'
         env:
           GRADLE_TASK: ${{ matrix.gradle-task }}
         run: bash ./gradlew "$GRADLE_TASK" --no-daemon
 
       - name: Prepare bootJar for image packaging
+        if: steps.tags.outputs.need_gradle == 'true'
         env:
           MODULE_DIR: ${{ matrix.module-dir }}
         run: |
@@ -160,40 +326,55 @@ jobs:
           mkdir -p .image
           cp "${boot_jars[0]}" .image/app.jar
 
-      - uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v4
-        with:
-          registry: ${{ env.OCIR_REGISTRY }}
-          username: ${{ secrets.OCIR_USERNAME }}
-          password: ${{ secrets.OCIR_AUTH_TOKEN }}
-
       - id: build
+        if: steps.tags.outputs.tags != ''
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: Dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           target: ${{ matrix.target }}
           platforms: linux/arm64
           push: true
-          build-args: |
-            JAR_FILE=.image/app.jar
-          tags: ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_NAMESPACE }}/cc-dev/${{ matrix.service }}:${{ needs.prepare.outputs.sha }}
+          build-args: ${{ steps.tags.outputs.build_args }}
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.prepare.outputs.sha }}
+
+      - name: Copy existing image between registries
+        if: steps.tags.outputs.copy_src != ''
+        env:
+          COPY_SRC: ${{ steps.tags.outputs.copy_src }}
+          COPY_DST: ${{ steps.tags.outputs.copy_dst }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create --tag "$COPY_DST" "$COPY_SRC"
+          echo "Copied ${COPY_SRC} to ${COPY_DST}."
 
       - name: Record immutable image reference
+        if: matrix.gradle-task != ''
         env:
           SERVICE: ${{ matrix.service }}
           DIGEST: ${{ steps.build.outputs.digest }}
+          DIGEST_REF: ${{ steps.tags.outputs.digest_ref }}
           IMAGE_BASE: ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_NAMESPACE }}/cc-dev/${{ matrix.service }}
         run: |
-          jq -n --arg service "$SERVICE" --arg image "${IMAGE_BASE}@${DIGEST}" \
+          set -euo pipefail
+          digest="$DIGEST"
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            digest="$(docker buildx imagetools inspect "$DIGEST_REF" --format '{{.Manifest.Digest}}' 2>/dev/null || true)"
+          fi
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            digest="$(docker buildx imagetools inspect "$DIGEST_REF" | awk '/^Digest:/{print $2; exit}')"
+          fi
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo "Could not resolve digest for ${SERVICE}." >&2
+            exit 1
+          }
+          jq -n --arg service "$SERVICE" --arg image "${IMAGE_BASE}@${digest}" \
             '{service: $service, image: $image}' > "$RUNNER_TEMP/${SERVICE}.json"
 
       - uses: actions/upload-artifact@v4
+        if: matrix.gradle-task != ''
         with:
           name: image-digest-${{ matrix.service }}
           path: ${{ runner.temp }}/${{ matrix.service }}.json
@@ -224,14 +405,27 @@ jobs:
           merge-multiple: true
 
       - name: Build candidate manifest
+        env:
+          REVISIONS: ${{ needs.prepare.outputs.revisions }}
         run: |
           jq -s \
             --arg commit_sha "${{ needs.prepare.outputs.sha }}" \
-            --arg config_sha "${{ needs.prepare.outputs.sha }}" \
             --arg ci_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            '{commit_sha: $commit_sha, config_sha: $config_sha, ci_url: $ci_url, images: (map({key: .service, value: .image}) | from_entries)}' \
+            --argjson revisions "$REVISIONS" \
+            '{
+              commit_sha: $commit_sha,
+              ci_url: $ci_url,
+              images: (map({key: .service, value: .image}) | from_entries),
+              config_labels: (
+                $revisions
+                | to_entries
+                | map(select(.value.config_label != null))
+                | map({key: .key, value: .value.config_label})
+                | from_entries
+              )
+            }' \
             image-digests/*.json > candidate.json
-          test "$(jq '.images | length' candidate.json)" -eq 6
+          bash .github/scripts/validate-candidate-manifest.sh candidate.json
 
       - uses: actions/setup-python@v6
         with:
@@ -269,6 +463,8 @@ jobs:
       PRODUCT_DB_PASSWORD_SECRET_OCID: ${{ secrets.PRODUCT_DB_PASSWORD_SECRET_OCID }}
       ORDER_DB_PASSWORD_SECRET_OCID: ${{ secrets.ORDER_DB_PASSWORD_SECRET_OCID }}
       GRAFANA_ADMIN_PASSWORD_SECRET_OCID: ${{ secrets.GRAFANA_ADMIN_PASSWORD_SECRET_OCID }}
+      JWT_SECRET_SECRET_OCID: ${{ secrets.JWT_SECRET_SECRET_OCID }}
+      R2_SECRET_OCID: ${{ secrets.R2_SECRET_OCID }}
       ENABLE_MESSAGING_PROFILE: "true"
       ENABLE_OBSERVABILITY_PROFILE: "true"
       ALLOW_FIRST_CUTOVER: ${{ inputs.first_cutover }}

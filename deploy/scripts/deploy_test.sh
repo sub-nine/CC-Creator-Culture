@@ -33,8 +33,15 @@ create_manifest() {
   jq -n --arg sha "$NEW_SHA" --arg digest "$NEW_DIGEST" '
     {
       commit_sha: $sha,
-      config_sha: $sha,
       ci_url: "https://example.test/actions/1",
+      config_labels: {
+        "config-server": $sha,
+        "eureka-server": $sha,
+        "gateway": $sha,
+        "user-service": $sha,
+        "product-service": $sha,
+        "order-service": $sha
+      },
       images: {
         "config-server": ("registry.example/config-server@" + $digest),
         "eureka-server": ("registry.example/eureka-server@" + $digest),
@@ -59,6 +66,7 @@ write_current_env() {
     printf 'PRODUCT_DB_PASSWORD=old-secret\n'
     printf 'ORDER_DB_PASSWORD=old-secret\n'
     printf 'GRAFANA_ADMIN_PASSWORD=old-secret\n'
+    printf 'JWT_SECRET=old-secret\n'
     while IFS='=' read -r key _; do
       [[ -n "$key" && "$key" != \#* ]] || continue
       printf '%s=registry.example/%s@%s\n' "$key" "$key" "$OLD_DIGEST"
@@ -247,7 +255,11 @@ if [[ "$1" == "inspect" ]]; then
       exit 1
     fi
   elif [[ "$*" == *"RestartCount"* ]]; then
-    printf '/%s|0|false|running\n' "$container"
+    if [[ "$*" == *"OOMKilled"* ]]; then
+      printf '/%s|0|false|running\n' "$container"
+    else
+      printf '0\n'
+    fi
   elif [[ "$container" == "${FAIL_CANDIDATE_SHA:-unset}-${FAIL_HEALTH_SERVICE:-unset}-container" ]]; then
     printf 'unhealthy\n'
   else
@@ -267,20 +279,45 @@ fi
 if [[ "${EMPTY_SECRET:-false}" == "true" ]]; then
   exit 0
 fi
+
+secret_id=""
+while [[ "$#" -gt 0 ]]; do
+  if [[ "$1" == "--secret-id" ]]; then
+    secret_id="${2:-}"
+    shift 2
+    continue
+  fi
+  shift
+done
+
+if [[ "$secret_id" == "r2" ]]; then
+  python3 - <<'PY'
+import base64, json, sys
+payload = {
+    "access_key": "test-access",
+    "secret_key": "test-r2-secret",
+    "endpoint": "https://example.r2.cloudflarestorage.com",
+    "bucket": "cc-dev-product",
+    "public_url": "https://pub-example.r2.dev",
+}
+sys.stdout.write(base64.b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode())
+PY
+  exit 0
+fi
 printf 'dGVzdC1zZWNyZXQ='
 EOF
 
   cat > "$FAKE_BIN/base64" <<'EOF'
 #!/usr/bin/env bash
 input="$(cat)"
-if [[ -n "$input" ]]; then
-  if [[ "${UNSAFE_SECRET:-false}" == "true" ]]; then
-    printf 'unsafe$secret'
-  else
-    printf 'test-secret'
-  fi
+if [[ "${UNSAFE_SECRET:-false}" == "true" ]]; then
+  printf 'unsafe$secret'
+  exit 0
 fi
-exit 0
+if [[ -z "$input" ]]; then
+  exit 0
+fi
+printf '%s' "$input" | python3 -c 'import base64,sys; sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))'
 EOF
 
   cat > "$FAKE_BIN/docker-credential-ocir" <<'EOF'
@@ -353,6 +390,8 @@ run_deploy() {
   PRODUCT_DB_PASSWORD_SECRET_OCID=product \
   ORDER_DB_PASSWORD_SECRET_OCID=order \
   GRAFANA_ADMIN_PASSWORD_SECRET_OCID=grafana \
+  JWT_SECRET_SECRET_OCID=jwt \
+  R2_SECRET_OCID=r2 \
   OCIR_REGISTRY=nrt.ocir.io \
   ENABLE_MESSAGING_PROFILE="${TEST_ENABLE_MESSAGING_PROFILE:-true}" \
   ENABLE_OBSERVABILITY_PROFILE="${TEST_ENABLE_OBSERVABILITY_PROFILE:-true}" \
@@ -452,6 +491,21 @@ run_deploy "$manifest" "$success_state" > "$TEST_ROOT/success.out" 2>&1
 unset PROM_ATTEMPT_FILE PROM_READY_AFTER LEGACY_POSTGRES_RUNNING
 
 assert_file_line "CANDIDATE_SHA=$NEW_SHA" "$success_state/runtime/current.env"
+assert_file_line "JWT_SECRET=test-secret" "$success_state/runtime/current.env"
+assert_file_line "R2_ACCESS_KEY=test-access" "$success_state/runtime/current.env"
+assert_file_line "R2_SECRET_KEY=test-r2-secret" "$success_state/runtime/current.env"
+assert_file_line "R2_ENDPOINT=https://example.r2.cloudflarestorage.com" "$success_state/runtime/current.env"
+assert_file_line "R2_BUCKET=cc-dev-product" "$success_state/runtime/current.env"
+assert_file_line "R2_PUBLIC_URL=https://pub-example.r2.dev" "$success_state/runtime/current.env"
+assert_file_line "CONFIG_SERVER_CONFIG_LABEL=$NEW_SHA" "$success_state/runtime/current.env"
+user_up_line="$(grep -nF "candidate=$NEW_SHA command=up args=-d user-service" "$DOCKER_LOG" | head -n 1 | cut -d: -f1)"
+redis_up_line="$(grep -nF "candidate=$NEW_SHA command=up args=-d redis kafka" "$DOCKER_LOG" | head -n 1 | cut -d: -f1)"
+[[ -n "$user_up_line" && -n "$redis_up_line" ]]
+(( redis_up_line < user_up_line )) || {
+  echo "Redis and Kafka must start before user-service when messaging is enabled." >&2
+  exit 1
+}
+assert_file_line "USER_SERVICE_CONFIG_LABEL=$NEW_SHA" "$success_state/runtime/current.env"
 assert_file_line "CANDIDATE_SHA=$OLD_SHA" "$success_state/runtime/previous.env"
 assert_file_mode 600 "$success_state/runtime/current.env"
 assert_file_mode 600 "$success_state/releases/$NEW_SHA/source/deploy/compose.dev.yml"
