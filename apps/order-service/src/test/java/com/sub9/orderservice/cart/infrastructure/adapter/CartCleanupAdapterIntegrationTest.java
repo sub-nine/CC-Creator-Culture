@@ -1,7 +1,7 @@
 package com.sub9.orderservice.cart.infrastructure.adapter;
 
-import com.sub9.orderservice.cart.application.port.out.CartProductPort;
 import com.sub9.orderservice.cart.domain.model.Cart;
+import com.sub9.orderservice.cart.application.port.out.CartProductPort;
 import com.sub9.orderservice.cart.infrastructure.persistence.CartJpaRepository;
 import com.sub9.orderservice.order.application.port.output.*;
 import com.sub9.orderservice.support.AbstractIntegrationTest;
@@ -24,15 +24,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @DisplayName("CartCleanupAdapter - 통합 테스트")
 class CartCleanupAdapterIntegrationTest extends AbstractIntegrationTest {
+  @MockitoBean private CartProductPort cartProductPort;
   @Autowired private CartCleanupPort cartCleanupPort;
   @Autowired private CartJpaRepository cartRepository;
   @Autowired private EntityManager entityManager;
-
-  @MockitoBean private CartProductPort cartProductPort;
-  @MockitoBean private CouponApplicationPort couponApplicationPort;
-  @MockitoBean private CouponUsagePort couponUsagePort;
-  @MockitoBean private StockPort stockPort;
-  @MockitoBean private PaymentCancellationPort paymentCancellationPort;
 
   private UUID userId;
 
@@ -86,7 +81,7 @@ class CartCleanupAdapterIntegrationTest extends AbstractIntegrationTest {
       entityManager.clear();
 
       Cart added = cartRepository.save(
-          Cart.create(UUID.randomUUID(), userId, selected.getSkuId(), 2));
+          Cart.create(UUID.randomUUID(), userId, selected.getProductId(), selected.getSkuId(), 2));
 
       entityManager.flush();
       entityManager.clear();
@@ -105,6 +100,6 @@ class CartCleanupAdapterIntegrationTest extends AbstractIntegrationTest {
 
   private Cart saveCart(UUID ownerId) {
     return cartRepository.save(
-        Cart.create(UUID.randomUUID(), ownerId, UUID.randomUUID(), 3));
+        Cart.create(UUID.randomUUID(), ownerId, UUID.randomUUID(), UUID.randomUUID(), 3));
   }
 }

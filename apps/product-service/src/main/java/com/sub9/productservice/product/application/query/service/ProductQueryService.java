@@ -5,10 +5,10 @@ import com.sub9.productservice.product.application.event.ProductViewedEvent;
 import com.sub9.productservice.product.application.port.in.product.CartProductQueryUseCase;
 import com.sub9.productservice.product.application.port.in.product.ProductQueryUseCase;
 import com.sub9.productservice.product.application.port.out.product.ProductMetadataQueryPort;
+import com.sub9.productservice.product.application.port.out.product.ProductQueryRepository;
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
 import com.sub9.productservice.product.application.query.dto.SkuInfo;
-import com.sub9.productservice.product.application.port.out.product.ProductQueryRepository;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import java.util.List;
@@ -62,7 +62,7 @@ public class ProductQueryService implements ProductQueryUseCase, CartProductQuer
   }
 
   @Override
-  public void validateSkuForCart(UUID skuId) {
+  public UUID getValidatedProductIdForCart(UUID skuId) {
     List<SkuInfo> skuinfos = productQueryRepository.getCartItemProducts(List.of(skuId));
 
     if (skuinfos.isEmpty()) throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
@@ -71,5 +71,7 @@ public class ProductQueryService implements ProductQueryUseCase, CartProductQuer
     if (skuInfo.productStatus() != ProductStatus.ACTIVE)
       throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOR_SALE);
     if (skuInfo.quantity() <= 0) throw new BusinessException(ProductErrorCode.SKU_SOLD_OUT);
+
+    return skuInfo.productId();
   }
 }
