@@ -123,6 +123,31 @@ class CreatorQueryIntegrationTest {
                                 .isEqualTo(CreatorErrorCode.CREATOR_NOT_FOUND));
     }
 
+    @Test
+    @DisplayName("내 창작자 조회는 승인되고 사용자와 창작자가 모두 활성인 경우에만 성공한다")
+    void when_my_creator_is_requested_only_approved_active_creator_is_returned() {
+        User admin = saveUser("my-admin@example.com", "my-admin", "01040000000",
+                UserRole.MASTER);
+        Creator active = saveApprovedCreator(
+                admin.getId(), "내활성상점", "8111111111", false, false);
+        Creator deletedCreator = saveApprovedCreator(
+                admin.getId(), "내삭제상점", "8222222222", true, false);
+        Creator deletedUserCreator = saveApprovedCreator(
+                admin.getId(), "내탈퇴상점", "8333333333", false, true);
+        Creator pending = savePendingCreator("내대기상점", "8444444444");
+        Creator rejected = saveRejectedCreator(
+                admin.getId(), "내거절상점", "8555555555");
+
+        var response = creatorQueryService.getMyCreator(active.getUserId());
+
+        assertThat(response.creatorId()).isEqualTo(active.getId());
+        assertThat(response.businessRegistrationNumber()).isEqualTo("8111111111");
+        assertMyCreatorNotFound(deletedCreator.getUserId());
+        assertMyCreatorNotFound(deletedUserCreator.getUserId());
+        assertMyCreatorNotFound(pending.getUserId());
+        assertMyCreatorNotFound(rejected.getUserId());
+    }
+
     private Creator saveApprovedCreator(
             UUID adminId,
             String creatorName,
@@ -160,6 +185,21 @@ class CreatorQueryIntegrationTest {
         creatorRepository.save(creator);
         creatorRepository.flush();
         return creator;
+    }
+
+    private Creator saveRejectedCreator(
+            UUID adminId, String creatorName, String businessNumber) {
+        Creator creator = savePendingCreator(creatorName, businessNumber);
+        creator.reject(adminId, CREATED_AT.plusSeconds(10));
+        creatorRepository.flush();
+        return creator;
+    }
+
+    private void assertMyCreatorNotFound(UUID userId) {
+        assertThatThrownBy(() -> creatorQueryService.getMyCreator(userId))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(CreatorErrorCode.CREATOR_NOT_FOUND));
     }
 
     private User saveUser(String email, String nickname, String phone, UserRole role) {

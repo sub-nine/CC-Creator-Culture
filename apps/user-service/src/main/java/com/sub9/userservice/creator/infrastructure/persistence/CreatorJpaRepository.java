@@ -59,6 +59,15 @@ public interface CreatorJpaRepository extends JpaRepository<Creator, UUID> {
 
     Optional<Creator> findByUserIdAndDeletedAtIsNull(UUID userId);
 
+    @Query("select creator from Creator creator join creator.user user "
+            + "where creator.userId = :userId "
+            + "and creator.approvalStatus = :approvalStatus "
+            + "and creator.deletedAt is null "
+            + "and user.deletedAt is null")
+    Optional<Creator> findApprovedActiveByUserId(
+            @Param("userId") UUID userId,
+            @Param("approvalStatus") ApprovalStatus approvalStatus);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select creator from Creator creator "
             + "where creator.userId = :userId and creator.deletedAt is null")

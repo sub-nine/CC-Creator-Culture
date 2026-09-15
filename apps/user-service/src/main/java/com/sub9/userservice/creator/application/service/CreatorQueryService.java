@@ -6,6 +6,7 @@ import com.sub9.userservice.creator.domain.model.Creator;
 import com.sub9.userservice.creator.domain.repository.CreatorRepository;
 import com.sub9.userservice.creator.presentation.response.CreatorPageResponse;
 import com.sub9.userservice.creator.presentation.response.CreatorSummaryResponse;
+import com.sub9.userservice.creator.presentation.response.MyCreatorResponse;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,13 @@ public class CreatorQueryService {
         Creator creator = creatorRepository.findApprovedActiveById(creatorId)
                 .orElseThrow(() -> new BusinessException(CreatorErrorCode.CREATOR_NOT_FOUND));
         return CreatorSummaryResponse.from(creator);
+    }
+
+    @Transactional(readOnly = true)
+    public MyCreatorResponse getMyCreator(UUID userId) {
+        Creator creator = creatorRepository.findApprovedActiveByUserId(userId)
+                .orElseThrow(() -> new BusinessException(CreatorErrorCode.CREATOR_NOT_FOUND));
+        return MyCreatorResponse.from(creator);
     }
 
     private String normalizeKeyword(String keyword) {

@@ -105,6 +105,32 @@ class CreatorQueryServiceTest {
                                 .isEqualTo(CreatorErrorCode.CREATOR_NOT_FOUND));
     }
 
+    @Test
+    @DisplayName("인증 사용자에게 연결된 승인된 활성 창작자 정보를 조회한다")
+    void when_approved_active_creator_is_linked_to_user_my_creator_is_returned() {
+        Creator creator = pendingCreator("내창작상점");
+        when(creatorRepository.findApprovedActiveByUserId(creator.getUserId()))
+                .thenReturn(Optional.of(creator));
+
+        var response = creatorQueryService.getMyCreator(creator.getUserId());
+
+        assertThat(response.creatorId()).isEqualTo(creator.getId());
+        assertThat(response.creatorName()).isEqualTo("내창작상점");
+        assertThat(response.businessRegistrationNumber()).isEqualTo("1234567890");
+    }
+
+    @Test
+    @DisplayName("인증 사용자에게 조회 가능한 창작자 정보가 없으면 404 오류로 처리한다")
+    void when_user_has_no_queryable_creator_not_found_error_is_returned() {
+        UUID userId = uuidGenerator.generate();
+        when(creatorRepository.findApprovedActiveByUserId(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> creatorQueryService.getMyCreator(userId))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(CreatorErrorCode.CREATOR_NOT_FOUND));
+    }
+
     private Creator pendingCreator(String creatorName) {
         return Creator.createPending(
                 uuidGenerator.generate(),

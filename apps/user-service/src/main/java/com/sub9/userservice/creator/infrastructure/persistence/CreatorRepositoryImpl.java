@@ -60,6 +60,12 @@ public class CreatorRepositoryImpl implements CreatorRepository {
     }
 
     @Override
+    public Optional<Creator> findApprovedActiveByUserId(UUID userId) {
+        return creatorJpaRepository.findApprovedActiveByUserId(
+                userId, ApprovalStatus.APPROVED);
+    }
+
+    @Override
     public Optional<Creator> findActiveByUserIdForUpdate(UUID userId) {
         return creatorJpaRepository.findActiveByUserIdForUpdate(userId);
     }
