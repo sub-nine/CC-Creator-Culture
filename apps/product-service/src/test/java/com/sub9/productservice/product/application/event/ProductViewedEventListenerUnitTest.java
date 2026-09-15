@@ -22,10 +22,11 @@ class ProductViewedEventListenerUnitTest {
   @InjectMocks private ProductViewedEventListener productViewedEventListener;
 
   @Test
-  @DisplayName("Redis 연결 실패가 상품 조회 호출자에게 전파되지 않는다.")
+  @DisplayName("Redis 연결 장애가 상품 조회에 전파되지 않는다.")
   void handleProductViewedEvent_fails_when_redis_unavailable() {
     // given
-    ProductViewedEvent event = new ProductViewedEvent(UUID.randomUUID(), UUID.randomUUID());
+    ProductViewedEvent event =
+        new ProductViewedEvent(UUID.randomUUID(), "guest:" + UUID.randomUUID());
     Duration ttl = Duration.ofMinutes(30);
 
     willThrow(new DataAccessResourceFailureException("Redis 연결 실패"))

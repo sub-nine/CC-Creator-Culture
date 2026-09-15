@@ -1,6 +1,7 @@
 package com.sub9.userservice.creator.domain.repository;
 
 import com.sub9.userservice.creator.domain.model.Creator;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,6 +21,8 @@ public interface CreatorRepository {
 
     Optional<Creator> findActiveByUserId(UUID userId);
 
+    List<Creator> findApprovedActiveByUserIds(List<UUID> userIds);
+  
     Optional<Creator> findActiveByUserIdForUpdate(UUID userId);
 
     // 삭제된 창작자 정보의 고유 값도 재사용할 수 없으므로 전체 행을 검사한다.

@@ -1,9 +1,9 @@
 package com.sub9.orderservice.cart.presentation.controller;
 
-import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.BDDMockito.given;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -19,8 +19,8 @@ import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import com.sub9.orderservice.cart.presentation.request.AddCartItemRequest;
 import com.sub9.orderservice.cart.presentation.request.DeleteCartItemRequest;
 import com.sub9.orderservice.cart.presentation.request.UpdateCartItemRequest;
-import com.sub9.orderservice.support.AbstractControllerTest;
 import com.sub9.orderservice.cart.presentation.response.CartItemResponse;
+import com.sub9.orderservice.support.AbstractControllerTest;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.*;
@@ -48,12 +48,16 @@ class CartControllerUnitTest extends AbstractControllerTest {
     void addCartItem_success() throws Exception {
       // given
       AddCartItemRequest request = new AddCartItemRequest(skuId, 2);
+      UUID cartId = UUID.randomUUID();
+      given(cartCommandService.addCartItem(new AddCartItemCommand(userId, skuId, 2)))
+          .willReturn(cartId);
 
       // when & then
       mockMvc
           .perform(authenticatedRequest().content(jsonMapper.writeValueAsString(request)))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.message").value("장바구니 등록 성공"));
+          .andExpect(jsonPath("$.message").value("장바구니 등록 성공"))
+          .andExpect(jsonPath("$.data").value(cartId.toString()));
       verify(cartCommandService).addCartItem(new AddCartItemCommand(userId, skuId, 2));
     }
 
@@ -216,11 +220,12 @@ class CartControllerUnitTest extends AbstractControllerTest {
     void getCartItems_success() throws Exception {
       // given
       UUID cartId = UUID.randomUUID();
-      given(cartQueryService.getCart(userId)).willReturn(List.of(
-          new CartItemResponse(cartId, skuId, "상품", "옵션", "ACTIVE", 3, 1000)));
+      given(cartQueryService.getCart(userId))
+          .willReturn(List.of(new CartItemResponse(cartId, skuId, "상품", "옵션", "ACTIVE", 3, 1000)));
 
       // when & then
-      mockMvc.perform(authenticatedRequest(get("/api/v1/cart/items")))
+      mockMvc
+          .perform(authenticatedRequest(get("/api/v1/cart/items")))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.message").value("장바구니 조회 성공"))
           .andExpect(jsonPath("$.data.length()").value(1))
@@ -241,7 +246,8 @@ class CartControllerUnitTest extends AbstractControllerTest {
       given(cartQueryService.getCart(userId)).willReturn(List.of());
 
       // when & then
-      mockMvc.perform(authenticatedRequest(get("/api/v1/cart/items")))
+      mockMvc
+          .perform(authenticatedRequest(get("/api/v1/cart/items")))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data").isArray())
           .andExpect(jsonPath("$.data").isEmpty());
@@ -251,20 +257,20 @@ class CartControllerUnitTest extends AbstractControllerTest {
     @DisplayName("인증 정보가 없으면 401 예외가 발생해야한다.")
     void getCartItems_fails_when_unauthenticated() throws Exception {
       // when & then
-      mockMvc.perform(get("/api/v1/cart/items"))
-          .andExpect(status().isUnauthorized());
+      mockMvc.perform(get("/api/v1/cart/items")).andExpect(status().isUnauthorized());
       verifyNoInteractions(cartQueryService);
     }
 
     @Test
-    @DisplayName("상품 서비스 연결에 실패하면 503과 SERVICE_UNAVAILABLE 오류 코드를 반환한다.")
+    @DisplayName("상품 서비스 연결에 실패하면 503과 SERVICE_UNAVAILABLE 예외를 반환한다.")
     void getCartItems_fails_when_service_unavailable() throws Exception {
       // given
       given(cartQueryService.getCart(userId))
           .willThrow(new BusinessException(CommonErrorCode.SERVICE_UNAVAILABLE));
 
       // when & then
-      mockMvc.perform(authenticatedRequest(get("/api/v1/cart/items")))
+      mockMvc
+          .perform(authenticatedRequest(get("/api/v1/cart/items")))
           .andExpect(status().isServiceUnavailable())
           .andExpect(jsonPath("$.errorCode").value(CommonErrorCode.SERVICE_UNAVAILABLE.code()));
     }

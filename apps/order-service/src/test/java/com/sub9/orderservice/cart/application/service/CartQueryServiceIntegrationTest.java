@@ -1,17 +1,19 @@
 package com.sub9.orderservice.cart.application.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.*;
+
 import com.sub9.orderservice.cart.application.dto.CartItemInfo;
 import com.sub9.orderservice.cart.application.dto.CartProductInfo;
 import com.sub9.orderservice.cart.application.port.out.CartProductPort;
 import com.sub9.orderservice.cart.domain.model.Cart;
 import com.sub9.orderservice.cart.infrastructure.persistence.CartJpaRepository;
 import com.sub9.orderservice.cart.presentation.response.CartItemResponse;
-import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
-import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
-import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
-import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.support.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -21,34 +23,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
-
 @Transactional
 @SpringBootTest
 @DisplayName("CartQueryService - 통합 테스트")
 class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
-  @Autowired
-  private CartQueryService cartQueryService;
-  @Autowired
-  private CartJpaRepository cartRepository;
-  @Autowired
-  private EntityManager entityManager;
-
-  @MockitoBean
-  private CartProductPort cartProductPort;
-  @MockitoBean
-  private CouponApplicationPort couponApplicationPort;
-  @MockitoBean
-  private CouponUsagePort couponUsagePort;
-  @MockitoBean
-  private StockPort stockPort;
-  @MockitoBean
-  private PaymentCancellationPort paymentCancellationPort;
+  @MockitoBean private CartProductPort cartProductPort;
+  @Autowired private CartQueryService cartQueryService;
+  @Autowired private CartJpaRepository cartRepository;
+  @Autowired private EntityManager entityManager;
 
   private UUID userId;
 
@@ -175,8 +157,7 @@ class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
       entityManager.clear();
 
       // when
-      List<CartItemInfo> result =
-          cartQueryService.getCartItems(userId, List.of(selected.getId()));
+      List<CartItemInfo> result = cartQueryService.getCartItems(userId, List.of(selected.getId()));
 
       // then
       assertThat(result)
@@ -196,7 +177,7 @@ class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
 
   private Cart saveCart(UUID ownerId, int quantity) {
     return cartRepository.save(
-        Cart.create(UUID.randomUUID(), ownerId, UUID.randomUUID(), quantity));
+        Cart.create(UUID.randomUUID(), ownerId, UUID.randomUUID(), UUID.randomUUID(), quantity));
   }
 
   private CartProductInfo productInfo(UUID skuId, String name, long price) {

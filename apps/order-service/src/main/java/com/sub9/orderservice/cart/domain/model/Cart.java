@@ -1,10 +1,6 @@
 package com.sub9.orderservice.cart.domain.model;
 
-import com.sub9.common.exception.BusinessException;
-import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import jakarta.persistence.*;
-
-import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -20,7 +16,10 @@ import lombok.NoArgsConstructor;
           name = "uk_carts_user_id_sku_id",
           columnNames = {"user_id", "sku_id"})
     },
-    indexes = {@Index(name = "idx_carts_user_id", columnList = "user_id")})
+    indexes = {
+      @Index(name = "idx_carts_user_id", columnList = "user_id"),
+      @Index(name = "idx_carts_product_id", columnList = "product_id")
+    })
 public class Cart {
   @Id UUID id;
 
@@ -28,15 +27,19 @@ public class Cart {
   UUID userId;
 
   @Column(nullable = false)
+  UUID productId;
+
+  @Column(nullable = false)
   UUID skuId;
 
   @Column(nullable = false)
   int quantity;
 
-  public static Cart create(UUID id, UUID userId, UUID skuId, int quantity) {
+  public static Cart create(UUID id, UUID userId, UUID productId, UUID skuId, int quantity) {
     Cart cart = new Cart();
     cart.id = id;
     cart.userId = userId;
+    cart.productId = productId;
     cart.skuId = skuId;
     cart.quantity = quantity;
 
