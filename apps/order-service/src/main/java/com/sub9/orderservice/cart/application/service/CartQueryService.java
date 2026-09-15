@@ -5,14 +5,14 @@ import com.sub9.orderservice.cart.application.dto.CartItemInfo;
 import com.sub9.orderservice.cart.application.dto.CartProductInfo;
 import com.sub9.orderservice.cart.application.port.in.CartQueryUseCase;
 import com.sub9.orderservice.cart.application.port.out.CartProductPort;
+import com.sub9.orderservice.cart.application.port.out.CartUserPort;
+import com.sub9.orderservice.cart.application.dto.CreatorNameInfo;
 import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import com.sub9.orderservice.cart.domain.model.Cart;
 import com.sub9.orderservice.cart.domain.repository.CartRepository;
 import com.sub9.orderservice.cart.presentation.response.CartItemResponse;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -23,14 +23,31 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class CartQueryService implements CartQueryUseCase {
-  private final CartRepository cartRepository;
   private final CartProductPort cartProductPort;
+  private final CartRepository cartRepository;
+  private final CartUserPort cartUserPort;
 
   @Override
   public List<CartItemResponse> getCart(UUID userId) {
     List<Cart> cartItems = cartRepository.findAllByUserId(userId);
+    List<CartItemInfo> itemInfos = getCartItemInfos(cartItems, false);
 
-    return getCartItemInfos(cartItems, false).stream().map(CartItemResponse::from).toList();
+    Set<UUID> creatorIds =
+        itemInfos.stream()
+            .map(CartItemInfo::creatorId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+
+    Map<UUID, String> creatorName =
+        creatorIds.isEmpty()
+            ? Map.of()
+            : cartUserPort.getCreatorNamesByIds(List.copyOf(creatorIds)).stream()
+                .collect(
+                    Collectors.toMap(CreatorNameInfo::creatorId, CreatorNameInfo::creatorName));
+
+    return itemInfos.stream()
+        .map(info -> CartItemResponse.of(info, creatorName.get(info.creatorId())))
+        .toList();
   }
 
   @Override
