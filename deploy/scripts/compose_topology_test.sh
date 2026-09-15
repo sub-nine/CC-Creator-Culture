@@ -20,6 +20,7 @@ export USER_DB_PASSWORD=user-password
 export PRODUCT_DB_PASSWORD=product-password
 export ORDER_DB_PASSWORD=order-password
 export GRAFANA_ADMIN_PASSWORD=grafana-password
+export JWT_SECRET=jwt-test-secret
 export CONFIG_SERVER_IMAGE=config-server
 export EUREKA_SERVER_IMAGE=eureka-server
 export GATEWAY_IMAGE=gateway
@@ -83,6 +84,12 @@ jq -e \
   and .services["user-service"].environment.SPRING_CLOUD_CONFIG_LABEL == $user_service
   and .services["product-service"].environment.SPRING_CLOUD_CONFIG_LABEL == $product_service
   and .services["order-service"].environment.SPRING_CLOUD_CONFIG_LABEL == $order_service
+  and .services["user-service"].environment.REDIS_HOST == "redis"
+  and .services["product-service"].environment.REDIS_HOST == "redis"
+  and .services["order-service"].environment.REDIS_HOST == "redis"
+  and .services.gateway.environment.REDIS_HOST == "redis"
+  and .services["user-service"].environment.JWT_SECRET == "jwt-test-secret"
+  and .services.gateway.environment.JWT_SECRET == "jwt-test-secret"
 ' <<<"$deploy_config" >/dev/null
 
 local_config="$(docker compose \

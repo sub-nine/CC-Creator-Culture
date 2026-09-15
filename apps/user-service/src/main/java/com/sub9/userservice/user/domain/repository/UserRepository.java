@@ -13,6 +13,8 @@ public interface UserRepository {
 
     Optional<User> findActiveById(UUID userId);
 
+    Optional<User> findActiveByIdForUpdate(UUID userId);
+
     Optional<User> findActiveByEmail(String email);
 
     // 탈퇴한 계정의 고유 값도 재사용할 수 없으므로 삭제 여부와 관계없이 검사한다.

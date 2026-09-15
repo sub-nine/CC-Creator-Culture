@@ -4,16 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
+import com.sub9.userservice.auth.domain.exception.UserErrorCode;
 import com.sub9.userservice.creator.domain.model.Creator;
 import com.sub9.userservice.creator.domain.repository.CreatorRepository;
 import com.sub9.userservice.follow.domain.exception.FollowErrorCode;
 import com.sub9.userservice.follow.domain.model.Follow;
 import com.sub9.userservice.follow.domain.repository.FollowRepository;
+import com.sub9.userservice.user.domain.model.User;
+import com.sub9.userservice.user.domain.repository.UserRepository;
 import java.util.List;
 import java.time.Clock;
 import java.time.Instant;
@@ -44,6 +48,8 @@ class FollowServiceTest {
     private FollowRepository followRepository;
     @Mock
     private CreatorRepository creatorRepository;
+    @Mock
+    private UserRepository userRepository;
 
     private FollowService followService;
 
@@ -52,6 +58,7 @@ class FollowServiceTest {
         followService = new FollowService(
                 followRepository,
                 creatorRepository,
+                userRepository,
                 uuidGenerator,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
@@ -61,7 +68,8 @@ class FollowServiceTest {
     void when_customer_follows_approved_creator_new_follow_is_saved() {
         UUID userId = uuidGenerator.generate();
         UUID creatorId = uuidGenerator.generate();
-        givenApprovedCreator(creatorId);
+        givenActiveUser(userId);
+        givenApprovedCreatorForUpdate(creatorId);
         when(followRepository.findByUserIdAndCreatorIdForUpdate(userId, creatorId))
                 .thenReturn(Optional.empty());
 
@@ -87,7 +95,8 @@ class FollowServiceTest {
         follow.unfollow(userId, NOW.minusSeconds(30));
         UUID followId = follow.getId();
         Instant createdAt = follow.getCreatedAt();
-        givenApprovedCreator(creatorId);
+        givenActiveUser(userId);
+        givenApprovedCreatorForUpdate(creatorId);
         when(followRepository.findByUserIdAndCreatorIdForUpdate(userId, creatorId))
                 .thenReturn(Optional.of(follow));
 
@@ -107,7 +116,8 @@ class FollowServiceTest {
         UUID userId = uuidGenerator.generate();
         UUID creatorId = uuidGenerator.generate();
         Follow follow = Follow.create(uuidGenerator.generate(), userId, creatorId, NOW);
-        givenApprovedCreator(creatorId);
+        givenActiveUser(userId);
+        givenApprovedCreatorForUpdate(creatorId);
         when(followRepository.findByUserIdAndCreatorIdForUpdate(userId, creatorId))
                 .thenReturn(Optional.of(follow));
 
@@ -121,7 +131,9 @@ class FollowServiceTest {
     void when_approved_active_creator_does_not_exist_follow_returns_not_found() {
         UUID userId = uuidGenerator.generate();
         UUID creatorId = uuidGenerator.generate();
-        when(creatorRepository.findApprovedActiveById(creatorId)).thenReturn(Optional.empty());
+        givenActiveUser(userId);
+        when(creatorRepository.findApprovedActiveByIdForUpdate(creatorId))
+                .thenReturn(Optional.empty());
 
         assertFollowError(
                 () -> followService.follow(userId, creatorId),
@@ -133,7 +145,8 @@ class FollowServiceTest {
     void when_concurrent_follow_insert_conflicts_follow_returns_conflict() {
         UUID userId = uuidGenerator.generate();
         UUID creatorId = uuidGenerator.generate();
-        givenApprovedCreator(creatorId);
+        givenActiveUser(userId);
+        givenApprovedCreatorForUpdate(creatorId);
         when(followRepository.findByUserIdAndCreatorIdForUpdate(userId, creatorId))
                 .thenReturn(Optional.empty());
         org.mockito.Mockito.doThrow(new DataIntegrityViolationException("duplicate"))
@@ -142,6 +155,20 @@ class FollowServiceTest {
         assertFollowError(
                 () -> followService.follow(userId, creatorId),
                 FollowErrorCode.FOLLOW_ALREADY_EXISTS);
+    }
+
+    @Test
+    @DisplayName("활성 사용자가 없으면 팔로우를 생성할 수 없다")
+    void when_active_user_does_not_exist_follow_returns_user_not_found() {
+        UUID userId = uuidGenerator.generate();
+        UUID creatorId = uuidGenerator.generate();
+        when(userRepository.findActiveByIdForUpdate(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> followService.follow(userId, creatorId))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_NOT_FOUND));
+
+        verify(creatorRepository, never()).findApprovedActiveByIdForUpdate(creatorId);
     }
 
     @Test
@@ -249,6 +276,16 @@ class FollowServiceTest {
 
     private void givenApprovedCreator(UUID creatorId) {
         when(creatorRepository.findApprovedActiveById(creatorId))
+                .thenReturn(Optional.of(mock(Creator.class)));
+    }
+
+    private void givenActiveUser(UUID userId) {
+        when(userRepository.findActiveByIdForUpdate(userId))
+                .thenReturn(Optional.of(mock(User.class)));
+    }
+
+    private void givenApprovedCreatorForUpdate(UUID creatorId) {
+        when(creatorRepository.findApprovedActiveByIdForUpdate(creatorId))
                 .thenReturn(Optional.of(mock(Creator.class)));
     }
 

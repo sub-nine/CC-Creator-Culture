@@ -20,6 +20,15 @@ public interface CreatorJpaRepository extends JpaRepository<Creator, UUID> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select creator from Creator creator "
+            + "where creator.id = :creatorId "
+            + "and creator.approvalStatus = :approvalStatus "
+            + "and creator.deletedAt is null")
+    Optional<Creator> findApprovedActiveByIdForUpdate(
+            @Param("creatorId") UUID creatorId,
+            @Param("approvalStatus") ApprovalStatus approvalStatus);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select creator from Creator creator "
             + "where creator.id = :creatorId and creator.deletedAt is null")
     Optional<Creator> findActiveByIdForUpdate(@Param("creatorId") UUID creatorId);
 
@@ -33,6 +42,11 @@ public interface CreatorJpaRepository extends JpaRepository<Creator, UUID> {
     List<Creator> findApprovedActiveByUserIds(
             @Param("userIds") List<UUID> userIds,
             @Param("approvalStatus") ApprovalStatus approvalStatus);
+  
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select creator from Creator creator "
+            + "where creator.userId = :userId and creator.deletedAt is null")
+    Optional<Creator> findActiveByUserIdForUpdate(@Param("userId") UUID userId);
 
     boolean existsByCreatorName(String creatorName);
 

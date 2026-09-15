@@ -15,11 +15,15 @@ public interface CreatorRepository {
 
     Optional<Creator> findApprovedActiveById(UUID creatorId);
 
+    Optional<Creator> findApprovedActiveByIdForUpdate(UUID creatorId);
+
     Optional<Creator> findActiveByIdForUpdate(UUID creatorId);
 
     Optional<Creator> findActiveByUserId(UUID userId);
 
     List<Creator> findApprovedActiveByUserIds(List<UUID> userIds);
+  
+    Optional<Creator> findActiveByUserIdForUpdate(UUID userId);
 
     // 삭제된 창작자 정보의 고유 값도 재사용할 수 없으므로 전체 행을 검사한다.
     boolean existsByCreatorNameIncludingDeleted(String creatorName);
