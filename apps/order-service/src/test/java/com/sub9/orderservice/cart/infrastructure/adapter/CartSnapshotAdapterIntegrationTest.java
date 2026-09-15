@@ -7,15 +7,11 @@ import static org.mockito.Mockito.*;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.orderservice.cart.application.dto.CartProductInfo;
-import com.sub9.orderservice.cart.application.port.out.CartProductPort;
 import com.sub9.orderservice.cart.domain.model.Cart;
+import com.sub9.orderservice.cart.application.port.out.CartProductPort;
 import com.sub9.orderservice.cart.infrastructure.persistence.CartJpaRepository;
 import com.sub9.orderservice.order.application.port.output.CartSnapshotPort.CartItemSnapshot;
 import com.sub9.orderservice.order.application.port.output.CartSnapshotPort;
-import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
-import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
-import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
-import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import com.sub9.orderservice.support.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
@@ -31,15 +27,10 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest
 @DisplayName("CartSnapshotAdapter - 통합 테스트")
 class CartSnapshotAdapterIntegrationTest extends AbstractIntegrationTest {
+  @MockitoBean private CartProductPort cartProductPort;
   @Autowired private CartSnapshotPort cartSnapshotPort;
   @Autowired private CartJpaRepository cartRepository;
   @Autowired private EntityManager entityManager;
-
-  @MockitoBean private CartProductPort cartProductPort;
-  @MockitoBean private CouponApplicationPort couponApplicationPort;
-  @MockitoBean private CouponUsagePort couponUsagePort;
-  @MockitoBean private StockPort stockPort;
-  @MockitoBean private PaymentCancellationPort paymentCancellationPort;
 
   private UUID userId;
 
@@ -127,7 +118,7 @@ class CartSnapshotAdapterIntegrationTest extends AbstractIntegrationTest {
 
   private Cart saveCart(UUID ownerId, int quantity) {
     return cartRepository.save(
-        Cart.create(UUID.randomUUID(), ownerId, UUID.randomUUID(), quantity));
+        Cart.create(UUID.randomUUID(), ownerId, UUID.randomUUID(), UUID.randomUUID(), quantity));
   }
 
   private CartProductInfo productInfo(UUID skuId, String name, long price) {

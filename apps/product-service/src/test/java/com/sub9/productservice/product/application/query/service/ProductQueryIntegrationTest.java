@@ -169,7 +169,7 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
 
   @Test
   @DisplayName("판매 중이고 재고가 남아있는 SKU는 장바구니에 등록할 수 있다.")
-  void validateSkuForCart_success_when_active_product_has_stock() {
+  void getValidatedProductIdForCart_success_when_active_product_has_stock() {
     // given
     entityManager
         .createQuery("UPDATE Stock s SET s.quantity = 1 WHERE s.skuId = :skuId")
@@ -178,7 +178,7 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
     entityManager.clear();
 
     // when & then
-    assertThatCode(() -> productQueryService.validateSkuForCart(normalSku.getId()))
+    assertThatCode(() -> productQueryService.getValidatedProductIdForCart(normalSku.getId()))
         .doesNotThrowAnyException();
   }
 
