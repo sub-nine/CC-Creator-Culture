@@ -7,6 +7,8 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Repository
 @RequiredArgsConstructor
@@ -31,8 +33,14 @@ public class CreatorRepositoryImpl implements CreatorRepository {
 
     @Override
     public Optional<Creator> findApprovedActiveById(UUID creatorId) {
-        return creatorJpaRepository.findByIdAndApprovalStatusAndDeletedAtIsNull(
+        return creatorJpaRepository.findApprovedActiveById(
                 creatorId, ApprovalStatus.APPROVED);
+    }
+
+    @Override
+    public Page<Creator> findApprovedActiveByCreatorName(String keyword, Pageable pageable) {
+        return creatorJpaRepository.findApprovedActiveByCreatorName(
+                ApprovalStatus.APPROVED, keyword, pageable);
     }
 
     @Override

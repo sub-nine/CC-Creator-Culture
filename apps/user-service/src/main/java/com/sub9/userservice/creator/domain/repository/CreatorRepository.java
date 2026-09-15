@@ -3,6 +3,8 @@ package com.sub9.userservice.creator.domain.repository;
 import com.sub9.userservice.creator.domain.model.Creator;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface CreatorRepository {
 
@@ -13,6 +15,8 @@ public interface CreatorRepository {
     Optional<Creator> findActiveById(UUID creatorId);
 
     Optional<Creator> findApprovedActiveById(UUID creatorId);
+
+    Page<Creator> findApprovedActiveByCreatorName(String keyword, Pageable pageable);
 
     Optional<Creator> findApprovedActiveByIdForUpdate(UUID creatorId);
 
