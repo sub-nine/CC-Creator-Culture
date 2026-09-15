@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.infrastructure.kafka.publisher;
+package com.sub9.productservice.product.infrastructure.kafka.publisher;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
