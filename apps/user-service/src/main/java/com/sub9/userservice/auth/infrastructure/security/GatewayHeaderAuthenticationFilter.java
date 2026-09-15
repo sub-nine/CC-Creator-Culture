@@ -38,7 +38,7 @@ public class GatewayHeaderAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        return PUBLIC_AUTH_PATHS.contains(path);
+        return PUBLIC_AUTH_PATHS.contains(path) || path.startsWith("/internal/");
     }
 
     @Override
