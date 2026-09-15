@@ -68,6 +68,20 @@ class OrderCommandControllerTest {
     private OrderCancellationService orderCancellationService;
 
     @Test
+    @DisplayName("판매 중지 상품을 주문하면 ORDER_0011과 400을 반환한다")
+    void when_product_is_not_for_sale_order_returns_bad_request() throws Exception {
+        when(orderCreationService.create(USER_ID, IDEMPOTENCY_KEY, expectedCommand()))
+                .thenThrow(new BusinessException(OrderErrorCode.PRODUCT_NOT_FOR_SALE));
+
+        mockMvc.perform(orderRequest(GatewayAuthenticationPrincipal.Role.CUSTOMER)
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .content(validRequest()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("ORDER_0011"))
+                .andExpect(jsonPath("$.message").value("판매 중지된 상품이 포함되어 있어 주문할 수 없습니다."));
+    }
+
+    @Test
     @DisplayName("본문 없이 취소하면 인증 사용자와 주문번호를 전달하고 취소 결과를 반환한다")
     void when_customer_cancels_without_body_result_is_returned() throws Exception {
         OrderNumber number = OrderNumber.issue(USER_ID);
