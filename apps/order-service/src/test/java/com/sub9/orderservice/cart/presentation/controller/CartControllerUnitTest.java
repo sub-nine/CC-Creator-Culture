@@ -221,7 +221,10 @@ class CartControllerUnitTest extends AbstractControllerTest {
       // given
       UUID cartId = UUID.randomUUID();
       given(cartQueryService.getCart(userId))
-          .willReturn(List.of(new CartItemResponse(cartId, skuId, "상품", "옵션", "ACTIVE", 3, 1000)));
+          .willReturn(
+              List.of(
+                  new CartItemResponse(
+                      cartId, skuId, "상호", "상품", "옵션", "ACTIVE", 3, 1000)));
 
       // when & then
       mockMvc
@@ -231,6 +234,7 @@ class CartControllerUnitTest extends AbstractControllerTest {
           .andExpect(jsonPath("$.data.length()").value(1))
           .andExpect(jsonPath("$.data[0].cartId").value(cartId.toString()))
           .andExpect(jsonPath("$.data[0].skuId").value(skuId.toString()))
+          .andExpect(jsonPath("$.data[0].creatorName").value("상호"))
           .andExpect(jsonPath("$.data[0].productName").value("상품"))
           .andExpect(jsonPath("$.data[0].skuName").value("옵션"))
           .andExpect(jsonPath("$.data[0].productStatus").value("ACTIVE"))
