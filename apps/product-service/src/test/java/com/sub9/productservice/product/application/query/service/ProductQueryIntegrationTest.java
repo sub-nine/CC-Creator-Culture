@@ -10,8 +10,10 @@ import com.sub9.productservice.category.domain.entity.HashtagProduct;
 import com.sub9.productservice.category.domain.model.CategoryHashtagMatchType;
 import com.sub9.productservice.category.domain.model.CategoryHashtagStatus;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
+import com.sub9.productservice.product.application.port.out.product.ProductViewRepository;
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
+import com.sub9.productservice.product.application.query.dto.ProductViewCount;
 import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import com.sub9.productservice.product.domain.model.Image;
 import com.sub9.productservice.product.domain.model.Product;
@@ -21,6 +23,8 @@ import com.sub9.productservice.product.domain.model.Stock;
 import com.sub9.productservice.product.infrastructure.persistence.command.product.ProductCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.sku.SkuCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.stock.StockCommandJpaRepository;
+import com.sub9.productservice.product.infrastructure.scheduler.ProductTotalViewCountScheduler;
+import com.sub9.productservice.product.infrastructure.scheduler.ProductViewCountScheduler;
 import com.sub9.productservice.support.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
 import java.util.List;
@@ -29,11 +33,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
@@ -45,6 +53,11 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
   @Autowired SkuCommandJpaRepository skuRepository;
   @Autowired StockCommandJpaRepository stockRepository;
   @Autowired EntityManager entityManager;
+  @Autowired ProductViewRepository productViewRepository;
+
+  @MockitoBean ProductViewCountScheduler productViewCountScheduler;
+  @MockitoBean ProductTotalViewCountScheduler productTotalViewCountScheduler;
+  @MockitoBean KafkaListenerEndpointRegistry kafkaListenerEndpointRegistry;
 
   private final UUID creatorId = UUID.randomUUID();
   private Product dummyProduct;
@@ -53,6 +66,7 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
 
   @BeforeEach
   void setUp() {
+    productViewRepository.deleteAllViewCount();
     SecurityContextHolder.getContext()
         .setAuthentication(CustomAuthenticationToken.of(creatorId, "CREATOR"));
 
@@ -71,6 +85,7 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
   @AfterEach
   void tearDown() {
     SecurityContextHolder.clearContext();
+    productViewRepository.deleteAllViewCount();
   }
 
   @Test
@@ -80,6 +95,7 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
     ProductDetailInfo response = productQueryService.getProductDetail(dummyProduct.getId(), null);
 
     // then
+    assertThat(productViewRepository.findAllViewCounts()).isEmpty();
     assertThat(response.productId()).isEqualTo(dummyProduct.getId());
     assertThat(response.creatorId()).isEqualTo(creatorId);
     assertThat(response.name()).isEqualTo("말랑이");
@@ -169,7 +185,7 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
 
   @Test
   @DisplayName("판매 중이고 재고가 남아있는 SKU는 장바구니에 등록할 수 있다.")
-  void validateSkuForCart_success_when_active_product_has_stock() {
+  void getValidatedProductIdForCart_success_when_active_product_has_stock() {
     // given
     entityManager
         .createQuery("UPDATE Stock s SET s.quantity = 1 WHERE s.skuId = :skuId")
@@ -178,7 +194,7 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
     entityManager.clear();
 
     // when & then
-    assertThatCode(() -> productQueryService.validateSkuForCart(normalSku.getId()))
+    assertThatCode(() -> productQueryService.getValidatedProductIdForCart(normalSku.getId()))
         .doesNotThrowAnyException();
   }
 
@@ -214,8 +230,6 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
         productQueryService.searchProducts("여름", PageRequest.of(1, 1));
 
     // then
-    // dummyProduct와 otherProduct 모두 "여름 추천" 해시태그를 공유하고, 그 해시태그가 "여름 의류" 카테고리에 MERGED돼있으므로
-    // 카테고리 키워드 검색에도 둘 다 매칭된다
     assertThat(categoryResponses.getTotalElements()).isEqualTo(2);
     assertThat(hashtagResponses.getTotalElements()).isEqualTo(2);
     assertThat(responses.getTotalElements()).isEqualTo(2);
@@ -266,6 +280,39 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
             new ProductDetailInfo.ImageInfo(processedImage.getId(), "processed/main.webp", 0),
             new ProductDetailInfo.ImageInfo(originalImage.getId(), "original/detail.png", 1));
     assertThat(responses.getContent().getFirst().imageKey()).isEqualTo("processed/main.webp");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"user:", "guest:"})
+  @DisplayName("회원과 비회원의 상품 상세 조회는 조회수를 기록하고 같은 방문자의 재조회는 중복 집계하지 않는다.")
+  void getProductDetail_success_when_same_visitor_returns(String prefix) {
+    // given
+    String visitorId = prefix + UUID.randomUUID();
+
+    // when
+    ProductDetailInfo response =
+        productQueryService.getProductDetail(dummyProduct.getId(), visitorId);
+    productQueryService.getProductDetail(dummyProduct.getId(), visitorId);
+
+    // then
+    assertThat(response.productId()).isEqualTo(dummyProduct.getId());
+    assertThat(productViewRepository.findAllViewCounts())
+        .containsExactly(new ProductViewCount(dummyProduct.getId(), 1L));
+  }
+
+  @Test
+  @DisplayName("UUID가 같아도 회원과 비회원의 상품 조회는 별도로 집계한다.")
+  void getProductDetail_success_when_member_and_guest_have_same_uuid() {
+    // given
+    UUID visitorId = UUID.randomUUID();
+
+    // when
+    productQueryService.getProductDetail(dummyProduct.getId(), "user:" + visitorId);
+    productQueryService.getProductDetail(dummyProduct.getId(), "guest:" + visitorId);
+
+    // then
+    assertThat(productViewRepository.findAllViewCounts())
+        .containsExactly(new ProductViewCount(dummyProduct.getId(), 2L));
   }
 
   private SkuInfo findSkuResponse(List<SkuInfo> responses, UUID skuId) {

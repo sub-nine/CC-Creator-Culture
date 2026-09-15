@@ -26,29 +26,32 @@ class InternalSkuValidationControllerUnitTest extends AbstractControllerTest {
   private final String endPoint = "/internal/v1/skus/{skuId}/validation";
 
   @Test
-  @DisplayName("상품 검증 성공 시 200과 빈 응답을 반환한다.")
-  void validateSkuForCart_success() throws Exception {
+  @DisplayName("상품 검증 성공 시 200과 productId을 반환한다.")
+  void getValidatedProductIdForCart_success() throws Exception {
+    UUID productId = UUID.randomUUID();
+    org.mockito.BDDMockito.given(cartProductQueryUseCase.getValidatedProductIdForCart(skuId))
+        .willReturn(productId);
     // when & then
     mockMvc
         .perform(get(endPoint, skuId))
         .andExpect(status().isOk())
-        .andExpect(content().string(""));
-    verify(cartProductQueryUseCase).validateSkuForCart(skuId);
+        .andExpect(jsonPath("$").value(productId.toString()));
+    verify(cartProductQueryUseCase).getValidatedProductIdForCart(skuId);
   }
 
   @Test
   @DisplayName("품절 검증 실패 시 409와 SKU_SOLD_OUT 에러 코드를 반환한다.")
-  void validateSkuForCart_fails_when_sku_is_sold_out() throws Exception {
+  void getValidatedProductIdForCart_fails_when_sku_is_sold_out() throws Exception {
     // given
     willThrow(new BusinessException(ProductErrorCode.SKU_SOLD_OUT))
         .given(cartProductQueryUseCase)
-        .validateSkuForCart(skuId);
+        .getValidatedProductIdForCart(skuId);
 
     // when & then
     mockMvc
         .perform(get(endPoint, skuId))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.errorCode").value(ProductErrorCode.SKU_SOLD_OUT.code()));
-    verify(cartProductQueryUseCase).validateSkuForCart(skuId);
+    verify(cartProductQueryUseCase).getValidatedProductIdForCart(skuId);
   }
 }

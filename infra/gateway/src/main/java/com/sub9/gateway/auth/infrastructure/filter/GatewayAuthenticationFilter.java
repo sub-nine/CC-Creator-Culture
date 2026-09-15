@@ -39,8 +39,11 @@ public class GatewayAuthenticationFilter implements GlobalFilter, Ordered {
         ServerWebExchange sanitizedExchange = exchange.mutate()
                 .request(sanitizedRequest)
                 .build();
+
+        String authorization = sanitizedRequest.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+
         // 공개 요청은 JWT와 Redis를 검증하지 않고 정제된 상태로 전달
-        if (publicAuthEndpointMatcher.matches(sanitizedRequest)) {
+        if (publicAuthEndpointMatcher.matches(sanitizedRequest) && !StringUtils.hasText(authorization)) {
             return chain.filter(sanitizedExchange);
         }
 

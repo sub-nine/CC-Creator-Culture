@@ -1,11 +1,15 @@
 package com.sub9.productservice.product.presentation.query.controller;
 
+import static com.sub9.productservice.product.presentation.support.VisitorCookieResolver.VISITOR_COOKIE;
+
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.productservice.common.config.r2.R2Properties;
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.product.application.port.in.product.ProductQueryUseCase;
 import com.sub9.productservice.product.presentation.query.dto.ProductDetailResponse;
 import com.sub9.productservice.product.presentation.query.dto.ProductResponse;
+import com.sub9.productservice.product.presentation.support.VisitorCookieResolver;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -19,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/products")
 public class ProductQueryController {
+
   private final ProductQueryUseCase productQueryUseCase;
   private final R2Properties r2Properties;
 
@@ -38,10 +43,14 @@ public class ProductQueryController {
 
   @GetMapping("/{productId}")
   public ApiResponse<ProductDetailResponse> getProductDetail(
-      @AuthenticationPrincipal AuthUser authUser, @PathVariable UUID productId) {
-    UUID visitorId = authUser != null ? authUser.id() : null;
-    var response = productQueryUseCase.getProductDetail(productId, visitorId);
+      @AuthenticationPrincipal AuthUser authUser,
+      @CookieValue(value = VISITOR_COOKIE, required = false) String visitorCookie,
+      @PathVariable UUID productId,
+      HttpServletResponse response) {
 
-    return ApiResponse.success(ProductDetailResponse.of(response, r2Properties.publicUrl()));
+    String visitorId = VisitorCookieResolver.resolve(authUser, visitorCookie, response);
+    var result = productQueryUseCase.getProductDetail(productId, visitorId);
+
+    return ApiResponse.success(ProductDetailResponse.of(result, r2Properties.publicUrl()));
   }
 }

@@ -1,5 +1,10 @@
 package com.sub9.orderservice.cart.application.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyNoInteractions;
+
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.orderservice.cart.application.dto.CartItemInfo;
@@ -8,6 +13,8 @@ import com.sub9.orderservice.cart.application.port.out.CartProductPort;
 import com.sub9.orderservice.cart.domain.model.Cart;
 import com.sub9.orderservice.cart.domain.repository.CartRepository;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -17,23 +24,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verifyNoInteractions;
-
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CartQueryService - 단위 테스트")
 class CartQueryServiceUnitTest {
-  @Mock
-  private CartRepository cartRepository;
-  @Mock
-  private CartProductPort cartProductPort;
-  @InjectMocks
-  private CartQueryService cartQueryService;
+  @Mock private CartRepository cartRepository;
+  @Mock private CartProductPort cartProductPort;
+  @InjectMocks private CartQueryService cartQueryService;
 
   private UUID userId;
   private Cart cart;
@@ -41,7 +37,7 @@ class CartQueryServiceUnitTest {
   @BeforeEach
   void setUp() {
     userId = UUID.randomUUID();
-    cart = Cart.create(UUID.randomUUID(), userId, UUID.randomUUID(), 3);
+    cart = Cart.create(UUID.randomUUID(), userId, UUID.randomUUID(), UUID.randomUUID(), 3);
   }
 
   @Nested
@@ -70,8 +66,9 @@ class CartQueryServiceUnitTest {
     void getCartItems_success_when_some_items_not_found() {
       // given
       List<UUID> ids = List.of(cart.getId(), UUID.randomUUID());
-      CartProductInfo product = new CartProductInfo(
-          cart.getSkuId(), UUID.randomUUID(), UUID.randomUUID(), "상품", "옵션", "ACTIVE", 1000L);
+      CartProductInfo product =
+          new CartProductInfo(
+              cart.getSkuId(), UUID.randomUUID(), UUID.randomUUID(), "상품", "옵션", "ACTIVE", 1000L);
 
       given(cartRepository.findAllByUserIdAndIdIn(userId, ids)).willReturn(List.of(cart));
       given(cartProductPort.getCartItemProducts(List.of(cart.getSkuId())))
@@ -81,9 +78,18 @@ class CartQueryServiceUnitTest {
       List<CartItemInfo> result = cartQueryService.getCartItems(userId, ids);
 
       // then
-      assertThat(result).containsExactly(new CartItemInfo(
-          cart.getId(), cart.getSkuId(), product.productId(), product.creatorId(),
-          "상품", "옵션", "ACTIVE", 1000L, 3));
+      assertThat(result)
+          .containsExactly(
+              new CartItemInfo(
+                  cart.getId(),
+                  cart.getSkuId(),
+                  product.productId(),
+                  product.creatorId(),
+                  "상품",
+                  "옵션",
+                  "ACTIVE",
+                  1000L,
+                  3));
     }
 
     @Test

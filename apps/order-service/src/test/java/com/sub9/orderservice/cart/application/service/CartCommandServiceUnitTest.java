@@ -1,5 +1,10 @@
 package com.sub9.orderservice.cart.application.service;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.*;
+
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.orderservice.cart.application.dto.AddCartItemCommand;
@@ -8,6 +13,8 @@ import com.sub9.orderservice.cart.application.port.out.CartProductPort;
 import com.sub9.orderservice.cart.domain.exception.CartErrorCode;
 import com.sub9.orderservice.cart.domain.repository.CartRepository;
 import com.sub9.orderservice.cart.infrastructure.client.exception.CartProductClientErrorCode;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -18,23 +25,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willThrow;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CartService - 단위 테스트")
 class CartCommandServiceUnitTest {
-  @Mock
-  private CartRepository cartRepository;
-  @Mock
-  private CartProductPort cartProductPort;
-  @InjectMocks
-  private CartCommandService cartCommandService;
+  @Mock private CartRepository cartRepository;
+  @Mock private CartProductPort cartProductPort;
+  @InjectMocks private CartCommandService cartCommandService;
 
   private AddCartItemCommand command;
 
@@ -71,7 +67,7 @@ class CartCommandServiceUnitTest {
       assertThatThrownBy(() -> cartCommandService.addCartItem(command))
           .isInstanceOf(BusinessException.class)
           .hasMessage(CartErrorCode.CART_ITEM_ALREADY_EXISTS.message());
-      verify(cartProductPort).validateSkuForCart(command.skuId());
+      verify(cartProductPort).getValidatedProductIdForCart(command.skuId());
     }
 
     @Test
@@ -80,7 +76,7 @@ class CartCommandServiceUnitTest {
       // given
       willThrow(new BusinessException(CartProductClientErrorCode.INVALID_CART_PRODUCT))
           .given(cartProductPort)
-          .validateSkuForCart(command.skuId());
+          .getValidatedProductIdForCart(command.skuId());
 
       // when & then
       assertThatThrownBy(() -> cartCommandService.addCartItem(command))
@@ -95,7 +91,7 @@ class CartCommandServiceUnitTest {
       // given
       willThrow(new BusinessException(CommonErrorCode.SERVICE_UNAVAILABLE))
           .given(cartProductPort)
-          .validateSkuForCart(command.skuId());
+          .getValidatedProductIdForCart(command.skuId());
 
       // when & then
       assertThatThrownBy(() -> cartCommandService.addCartItem(command))

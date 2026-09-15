@@ -9,5 +9,5 @@ import org.springframework.data.domain.Pageable;
 public interface ProductQueryUseCase {
   Page<ProductInfo> searchProducts(String keyword, Pageable pageable);
 
-  ProductDetailInfo getProductDetail(UUID productId, UUID visitorId);
+  ProductDetailInfo getProductDetail(UUID productId, String visitorId);
 }
