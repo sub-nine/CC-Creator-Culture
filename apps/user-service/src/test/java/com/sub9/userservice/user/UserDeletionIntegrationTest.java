@@ -52,7 +52,7 @@ import tools.jackson.databind.json.JsonMapper;
         "eureka.client.enabled=false",
         "spring.jpa.open-in-view=false",
         "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.jpa.properties.hibernate.default_schema=private",
+        "spring.jpa.properties.hibernate.default_schema=public",
         "spring.jpa.properties.hibernate.hbm2ddl.create_namespaces=true",
         "spring.jpa.properties.hibernate.jdbc.time_zone=UTC",
         "spring.datasource.hikari.connection-init-sql=SET TIME ZONE 'UTC'"
