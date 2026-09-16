@@ -1,9 +1,11 @@
 package com.sub9.productservice.category.application.command.service;
 
 import com.sub9.common.exception.BusinessException;
+import com.sub9.common.kafka.event.CategoryCreatedEvent;
 import com.sub9.productservice.category.application.command.port.in.LinkHashtagToCategoryUseCase;
 import com.sub9.productservice.category.application.command.port.out.CategoryCommandRepository;
 import com.sub9.productservice.category.application.command.port.out.HashtagCommandRepository;
+import com.sub9.productservice.category.application.command.port.out.OutboxRepository;
 import com.sub9.productservice.category.application.command.similarity.CategorySimilarityPipeline;
 import com.sub9.productservice.category.domain.entity.Category;
 import com.sub9.productservice.category.domain.entity.CategoryHashtag;
@@ -29,6 +31,7 @@ public class CategoryHashtagLinkService implements LinkHashtagToCategoryUseCase 
     private final CategoryCommandRepository categoryCommandRepository;
     private final HashtagCommandRepository hashtagCommandRepository;
     private final CategorySimilarityPipeline categorySimilarityPipeline;
+    private final OutboxRepository outboxRepository;
 
     @Override
     @Transactional
@@ -91,6 +94,9 @@ public class CategoryHashtagLinkService implements LinkHashtagToCategoryUseCase 
     private void promoteToNewCategory(Hashtag hashtag, CategoryHashtagStatus status) {
         // findOrCreateByName 자체가 원자적이라, 동시에 같은 이름으로 승격을 시도해도 카테고리는 하나만 생성됨
         Category newCategory = categoryCommandRepository.findOrCreateByName(hashtag.getName());
+
+        // TODO: findOrCreateByName이 기존 카테고리를 반환한 경우(이미 벡터 있음)에도 중복 발행됨 - created 여부 구분 필요
+        outboxRepository.record(new CategoryCreatedEvent(newCategory.getId()));
 
         linkIfAbsent(newCategory, hashtag, status, CategoryHashtagMatchType.PROMOTED, 0.0);
     }
