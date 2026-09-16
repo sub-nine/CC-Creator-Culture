@@ -3,6 +3,7 @@ package com.sub9.productservice.category.application.command.service;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.category.application.command.port.out.CategoryCommandRepository;
 import com.sub9.productservice.category.application.command.port.out.HashtagCommandRepository;
+import com.sub9.productservice.category.application.command.port.out.OutboxRepository;
 import com.sub9.productservice.category.application.command.similarity.CategorySimilarityPipeline;
 import com.sub9.productservice.category.domain.entity.Category;
 import com.sub9.productservice.category.domain.entity.CategoryHashtag;
@@ -12,6 +13,7 @@ import com.sub9.productservice.category.domain.model.CategoryCandidateResult;
 import com.sub9.productservice.category.domain.model.CategoryHashtagMatchType;
 import com.sub9.productservice.category.domain.model.CategoryHashtagStatus;
 import com.sub9.productservice.category.domain.model.CategoryMatchResult;
+import com.sub9.common.kafka.event.CategoryCreatedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,13 +44,15 @@ class CategoryHashtagLinkServiceTest {
     private HashtagCommandRepository hashtagCommandRepository;
     @Mock
     private CategorySimilarityPipeline categorySimilarityPipeline;
+    @Mock
+    private OutboxRepository outboxRepository;
 
     private CategoryHashtagLinkService categoryHashtagLinkService;
 
     @BeforeEach
     void setUp() {
         categoryHashtagLinkService = new CategoryHashtagLinkService(
-                categoryCommandRepository, hashtagCommandRepository, categorySimilarityPipeline);
+                categoryCommandRepository, hashtagCommandRepository, categorySimilarityPipeline, outboxRepository);
     }
 
     @Test
@@ -111,6 +115,7 @@ class CategoryHashtagLinkServiceTest {
         categoryHashtagLinkService.tryLink(hashtag.getId());
 
         verify(categoryCommandRepository).findOrCreateByName(hashtag.getName());
+        verify(outboxRepository).record(new CategoryCreatedEvent(newCategory.getId()));
 
         ArgumentCaptor<CategoryHashtag> linkCaptor = ArgumentCaptor.forClass(CategoryHashtag.class);
         verify(categoryCommandRepository).linkCategoryHashtagIfAbsent(linkCaptor.capture());
@@ -127,13 +132,14 @@ class CategoryHashtagLinkServiceTest {
         when(hashtagCommandRepository.findById(hashtag.getId())).thenReturn(Optional.of(hashtag));
         when(categoryCommandRepository.findAllActive()).thenReturn(List.of());
         when(categorySimilarityPipeline.resolve(hashtag, List.of())).thenReturn(List.of());
-        when(categoryCommandRepository.findOrCreateByName(hashtag.getName()))
-                .thenReturn(Category.create(hashtag.getName(), null));
+        Category newCategory = Category.create(hashtag.getName(), null);
+        when(categoryCommandRepository.findOrCreateByName(hashtag.getName())).thenReturn(newCategory);
 
         categoryHashtagLinkService.tryLink(hashtag.getId());
 
         verify(categoryCommandRepository).findOrCreateByName(hashtag.getName());
         verify(categoryCommandRepository).linkCategoryHashtagIfAbsent(any());
+        verify(outboxRepository).record(new CategoryCreatedEvent(newCategory.getId()));
     }
 
     @Test
