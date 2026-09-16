@@ -15,6 +15,7 @@ import com.sub9.productservice.product.application.command.dto.product.UpdatePro
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
 import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
 import com.sub9.productservice.product.application.port.in.image.ProductImageCommandUseCase;
+import com.sub9.productservice.product.domain.exception.SkuErrorCode;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
@@ -52,7 +53,7 @@ class ProductCommandServiceUnitTest {
     // when & then
     assertThatThrownBy(() -> productCommandService.createProduct(command, List.of(image)))
         .isInstanceOf(BusinessException.class)
-        .hasMessage(ProductErrorCode.SKU_REQUIRED.message());
+        .hasMessage(SkuErrorCode.SKU_REQUIRED.message());
     verifyNoInteractions(imageCommandService, productRepository);
   }
 

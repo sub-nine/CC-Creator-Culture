@@ -10,7 +10,7 @@ import com.sub9.common.exception.BusinessException;
 import com.sub9.common.kafka.event.StockRestoreEvent;
 import com.sub9.productservice.product.application.command.dto.stock.RestoreStockCommand;
 import com.sub9.productservice.product.application.port.in.stock.OrderStockUseCase;
-import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.product.domain.exception.StockErrorCode;
 import com.sub9.productservice.product.domain.model.StockHistoryReason;
 import java.util.List;
 import java.util.UUID;
@@ -34,7 +34,7 @@ class StockRestoreEventListenerUnitTest {
   private final UUID skuId = UUID.randomUUID();
 
   @Test
-  @DisplayName("재고 복구에 성공하고 ACK를 호출한다.")
+  @DisplayName("재고 복구에 성공하고 ACK 처리한다.")
   void handleStockRestoreEvent_success() {
     // given
     UUID secondSkuId = UUID.randomUUID();
@@ -62,13 +62,13 @@ class StockRestoreEventListenerUnitTest {
   }
 
   @Test
-  @DisplayName("재고 복구 실패 시 SKU_NOT_FOUND 예외를 반환하고 ACK를 호출하지 않는다.")
+  @DisplayName("재고 복구 실패 시 STOCK_NOT_FOUND 예외를 반환하고 ACK 처리하지 않는다.")
   void handleStockRestoreEvent_fails_when_restore_fails() {
     // given
     StockRestoreEvent event =
         new StockRestoreEvent(
             orderId, List.of(new StockRestoreEvent.Item(skuId, 3)), "ORDER_CANCEL");
-    willThrow(new BusinessException(ProductErrorCode.SKU_NOT_FOUND))
+    willThrow(new BusinessException(StockErrorCode.STOCK_NOT_FOUND))
         .given(orderStockUseCase)
         .restore(any());
 

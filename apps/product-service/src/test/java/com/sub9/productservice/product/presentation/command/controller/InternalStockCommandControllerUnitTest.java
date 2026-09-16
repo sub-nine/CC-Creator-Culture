@@ -12,7 +12,8 @@ import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.product.application.command.dto.stock.DeductStockCommand;
 import com.sub9.productservice.product.application.command.dto.stock.RestoreStockCommand;
 import com.sub9.productservice.product.application.port.in.stock.OrderStockUseCase;
-import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.product.domain.exception.SkuErrorCode;
+import com.sub9.productservice.product.domain.exception.StockErrorCode;
 import com.sub9.productservice.product.domain.model.StockHistoryReason;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.List;
@@ -70,7 +71,7 @@ class InternalStockCommandControllerUnitTest extends AbstractControllerTest {
     @DisplayName("재고 차감 실패 시 예외와 에러 코드를 반환한다.")
     void deduct_fails_when_service_rejects_request() throws Exception {
       // given
-      ProductErrorCode errorCode = ProductErrorCode.INSUFFICIENT_STOCK;
+      StockErrorCode errorCode = StockErrorCode.INSUFFICIENT_STOCK;
       willThrow(new BusinessException(errorCode)).given(orderStockUseCase).deduct(any());
 
       // when & then
@@ -111,7 +112,7 @@ class InternalStockCommandControllerUnitTest extends AbstractControllerTest {
     @DisplayName("재고 복구 실패 시 예외와 에러 코드를 반환한다.")
     void restore_fails_when_service_rejects_request() throws Exception {
       // given
-      ProductErrorCode errorCode = ProductErrorCode.SKU_NOT_FOUND;
+      StockErrorCode errorCode = StockErrorCode.STOCK_NOT_FOUND;
       willThrow(new BusinessException(errorCode)).given(orderStockUseCase).restore(any());
 
       // when & then

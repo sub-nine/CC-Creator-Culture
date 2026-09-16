@@ -14,6 +14,7 @@ import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.product.application.command.dto.stock.AdjustStockCommand;
 import com.sub9.productservice.product.application.port.in.stock.AdjustStockUseCase;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.product.domain.exception.StockErrorCode;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -58,7 +59,7 @@ class StockCommandControllerUnitTest extends AbstractControllerTest {
     @DisplayName("재고 조정 실패 시 비즈니스 예외의 상태와 에러 코드를 반환한다.")
     void adjustStock_fails_when_service_rejects_request() throws Exception {
       // given
-      ProductErrorCode errorCode = ProductErrorCode.INSUFFICIENT_STOCK;
+      StockErrorCode errorCode = StockErrorCode.INSUFFICIENT_STOCK;
       int quantity = -11;
       willThrow(new BusinessException(errorCode)).given(adjustStockUseCase).adjust(any());
 

@@ -12,6 +12,8 @@ import com.sub9.productservice.product.application.command.dto.stock.AdjustStock
 import com.sub9.productservice.product.application.command.dto.stock.DeductStockCommand;
 import com.sub9.productservice.product.application.command.dto.stock.RestoreStockCommand;
 import com.sub9.productservice.product.application.port.out.product.ProductQueryRepository;
+import com.sub9.productservice.product.domain.exception.SkuErrorCode;
+import com.sub9.productservice.product.domain.exception.StockErrorCode;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.StockHistoryReason;
 import com.sub9.productservice.product.domain.repository.StockHistoryRepository;
@@ -65,7 +67,7 @@ class StockCommandServiceUnitTest {
       // when & then
       assertThatThrownBy(() -> stockCommandService.adjust(command))
           .isInstanceOf(BusinessException.class)
-          .hasMessage(ProductErrorCode.INVALID_STOCK_ADJUSTMENT.message());
+          .hasMessage(StockErrorCode.INVALID_STOCK_ADJUSTMENT.message());
       verifyNoInteractions(stockRepository, stockHistoryRepository);
     }
 
@@ -81,7 +83,7 @@ class StockCommandServiceUnitTest {
       // when & then
       assertThatThrownBy(() -> stockCommandService.adjust(command))
           .isInstanceOf(BusinessException.class)
-          .hasMessage(ProductErrorCode.INSUFFICIENT_STOCK.message());
+          .hasMessage(StockErrorCode.INSUFFICIENT_STOCK.message());
       verifyNoInteractions(stockHistoryRepository);
     }
   }
@@ -107,7 +109,7 @@ class StockCommandServiceUnitTest {
       // when & then
       assertThatThrownBy(() -> stockCommandService.deduct(command))
           .isInstanceOf(BusinessException.class)
-          .hasMessage(ProductErrorCode.INSUFFICIENT_STOCK.message());
+          .hasMessage(StockErrorCode.INSUFFICIENT_STOCK.message());
       verify(stockRepository, never()).decreaseStock(nextSkuId, 2);
     }
   }
@@ -134,7 +136,7 @@ class StockCommandServiceUnitTest {
       // when & then
       assertThatThrownBy(() -> stockCommandService.restore(command))
           .isInstanceOf(BusinessException.class)
-          .hasMessage(ProductErrorCode.SKU_NOT_FOUND.message());
+          .hasMessage(StockErrorCode.STOCK_NOT_FOUND.message());
       verify(stockRepository, never()).increaseStock(nextSkuId, 2);
     }
   }

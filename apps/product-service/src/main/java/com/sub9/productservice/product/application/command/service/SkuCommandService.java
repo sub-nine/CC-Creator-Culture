@@ -7,6 +7,7 @@ import com.sub9.productservice.product.application.command.dto.sku.DeleteSkuComm
 import com.sub9.productservice.product.application.command.dto.sku.UpdateSkuCommand;
 import com.sub9.productservice.product.application.port.in.sku.SkuCommandUseCase;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.product.domain.exception.SkuErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.Sku;
 import com.sub9.productservice.product.domain.repository.ProductRepository;
@@ -37,7 +38,7 @@ public class SkuCommandService implements SkuCommandUseCase {
       Sku defaultSku =
           skuRepository
               .findByProductIdAndIsDefaultTrue(command.productId())
-              .orElseThrow(() -> new BusinessException(ProductErrorCode.DEFAULT_SKU_NOT_FOUND));
+              .orElseThrow(() -> new BusinessException(SkuErrorCode.DEFAULT_SKU_NOT_FOUND));
 
       defaultSku.unsetDefault();
     }
@@ -69,6 +70,6 @@ public class SkuCommandService implements SkuCommandUseCase {
   private Sku findBySkuIdAndProductId(UUID skuId, UUID productId) {
     return skuRepository
         .findByIdAndProductIdAndDeletedAtIsNull(skuId, productId)
-        .orElseThrow(() -> new BusinessException(ProductErrorCode.SKU_NOT_FOUND));
+        .orElseThrow(() -> new BusinessException(SkuErrorCode.SKU_NOT_FOUND));
   }
 }
