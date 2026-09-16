@@ -3,6 +3,9 @@ CREATE UNIQUE INDEX uk_skus_product_default
     WHERE is_default = TRUE
     AND deleted_at IS NULL;
 
+ALTER TABLE p_images
+    DROP CONSTRAINT uk_images_product_id_image_order;
+
 CREATE INDEX idx_images_product_id_deleted_at
     ON p_images (product_id, deleted_at);
 
