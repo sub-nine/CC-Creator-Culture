@@ -2,6 +2,10 @@ spring:
   config:
     activate:
       on-profile: test
+  datasource:
+    hikari:
+      maximum-pool-size: 3
+      minimum-idle: 1
   cloud:
     discovery:
       enabled: false
