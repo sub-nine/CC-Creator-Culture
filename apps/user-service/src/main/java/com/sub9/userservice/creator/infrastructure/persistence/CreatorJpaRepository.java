@@ -9,13 +9,50 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface CreatorJpaRepository extends JpaRepository<Creator, UUID> {
 
     Optional<Creator> findByIdAndDeletedAtIsNull(UUID id);
 
-    Optional<Creator> findByIdAndApprovalStatusAndDeletedAtIsNull(
-            UUID id, ApprovalStatus approvalStatus);
+    @Query("select creator from Creator creator join creator.user user "
+            + "where creator.id = :creatorId "
+            + "and creator.approvalStatus = :approvalStatus "
+            + "and creator.deletedAt is null "
+            + "and user.deletedAt is null")
+    Optional<Creator> findApprovedActiveById(
+            @Param("creatorId") UUID creatorId,
+            @Param("approvalStatus") ApprovalStatus approvalStatus);
+
+    @Query(
+            value = "select creator from Creator creator join creator.user user "
+                    + "where creator.approvalStatus = :approvalStatus "
+                    + "and creator.deletedAt is null "
+                    + "and user.deletedAt is null",
+            countQuery = "select count(creator) from Creator creator join creator.user user "
+                    + "where creator.approvalStatus = :approvalStatus "
+                    + "and creator.deletedAt is null "
+                    + "and user.deletedAt is null")
+    Page<Creator> findApprovedActive(
+            @Param("approvalStatus") ApprovalStatus approvalStatus,
+            Pageable pageable);
+
+    @Query(
+            value = "select creator from Creator creator join creator.user user "
+                    + "where creator.approvalStatus = :approvalStatus "
+                    + "and creator.deletedAt is null "
+                    + "and user.deletedAt is null "
+                    + "and lower(creator.creatorName) like lower(concat('%', :keyword, '%'))",
+            countQuery = "select count(creator) from Creator creator join creator.user user "
+                    + "where creator.approvalStatus = :approvalStatus "
+                    + "and creator.deletedAt is null "
+                    + "and user.deletedAt is null "
+                    + "and lower(creator.creatorName) like lower(concat('%', :keyword, '%'))")
+    Page<Creator> findApprovedActiveByCreatorName(
+            @Param("approvalStatus") ApprovalStatus approvalStatus,
+            @Param("keyword") String keyword,
+            Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select creator from Creator creator "
@@ -32,6 +69,25 @@ public interface CreatorJpaRepository extends JpaRepository<Creator, UUID> {
     Optional<Creator> findActiveByIdForUpdate(@Param("creatorId") UUID creatorId);
 
     Optional<Creator> findByUserIdAndDeletedAtIsNull(UUID userId);
+
+    @Query("select creator from Creator creator join creator.user user "
+            + "where creator.userId = :userId "
+            + "and creator.approvalStatus = :approvalStatus "
+            + "and creator.deletedAt is null "
+            + "and user.deletedAt is null")
+    Optional<Creator> findApprovedActiveByUserId(
+            @Param("userId") UUID userId,
+            @Param("approvalStatus") ApprovalStatus approvalStatus);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select creator from Creator creator join creator.user user "
+            + "where creator.userId = :userId "
+            + "and creator.approvalStatus = :approvalStatus "
+            + "and creator.deletedAt is null "
+            + "and user.deletedAt is null")
+    Optional<Creator> findApprovedActiveByUserIdForUpdate(
+            @Param("userId") UUID userId,
+            @Param("approvalStatus") ApprovalStatus approvalStatus);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select creator from Creator creator "

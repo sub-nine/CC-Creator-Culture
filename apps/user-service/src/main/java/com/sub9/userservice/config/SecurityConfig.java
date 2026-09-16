@@ -55,6 +55,12 @@ public class SecurityConfig {
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(PUBLIC_AUTH_PATHS)
                 .permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/creators/me")
+                .hasRole("CREATOR")
+                .requestMatchers(HttpMethod.GET, "/api/v1/creators/me/follower-count")
+                .hasRole("CREATOR")
+                .requestMatchers(HttpMethod.PATCH, "/api/v1/creators/me")
+                .hasRole("CREATOR")
                 .requestMatchers("/api/v1/admin/managers")
                 .hasRole("MASTER")
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/admin/creators/*/approval")

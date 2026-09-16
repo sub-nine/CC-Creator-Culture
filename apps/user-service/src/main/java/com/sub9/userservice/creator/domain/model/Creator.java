@@ -136,6 +136,26 @@ public class Creator extends BaseAuditEntity {
         markDeleted(actorId, now);
     }
 
+    public boolean updateProfile(
+            String creatorName,
+            String businessRegistrationNumber,
+            UUID actorId,
+            Instant now) {
+        String updatedCreatorName = Objects.requireNonNull(
+                creatorName, "creatorName must not be null");
+        String updatedBusinessNumber = Objects.requireNonNull(
+                businessRegistrationNumber, "businessRegistrationNumber must not be null");
+        if (this.creatorName.equals(updatedCreatorName)
+                && this.businessRegistrationNumber.equals(updatedBusinessNumber)) {
+            return false;
+        }
+
+        this.creatorName = updatedCreatorName;
+        this.businessRegistrationNumber = updatedBusinessNumber;
+        recordUpdate(actorId, now);
+        return true;
+    }
+
     private void ensurePending() {
         if (approvalStatus != ApprovalStatus.PENDING) {
             throw new IllegalStateException("Only pending creators can be reviewed");

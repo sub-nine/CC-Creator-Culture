@@ -298,6 +298,55 @@ class PersistenceIntegrationTest {
     }
 
     @Test
+    @DisplayName("창작자의 팔로워 수는 활성 관계만 집계한다")
+    void when_creator_follower_count_is_read_only_active_relationships_are_counted() {
+        User activeCustomer = createUser(
+                "count-active@example.com", "count-active", "010-6111-1111",
+                UserRole.CUSTOMER);
+        User deletedCustomer = createUser(
+                "count-deleted@example.com", "count-deleted", "010-6222-2222",
+                UserRole.CUSTOMER);
+        User creatorUser = createUser(
+                "count-creator@example.com", "count-creator", "010-6333-3333",
+                UserRole.CREATOR);
+        User otherCreatorUser = createUser(
+                "count-other@example.com", "count-other", "010-6444-4444",
+                UserRole.CREATOR);
+        userRepository.save(activeCustomer);
+        userRepository.save(deletedCustomer);
+        userRepository.save(creatorUser);
+        userRepository.save(otherCreatorUser);
+
+        Creator creator = Creator.createPending(
+                uuidGenerator.generate(), creatorUser.getId(), "집계상점", "511-11-11111",
+                Instant.parse("2026-09-10T01:00:00Z"));
+        Creator otherCreator = Creator.createPending(
+                uuidGenerator.generate(), otherCreatorUser.getId(), "다른상점", "522-22-22222",
+                Instant.parse("2026-09-10T01:00:00Z"));
+        creatorRepository.save(creator);
+        creatorRepository.save(otherCreator);
+
+        followRepository.save(Follow.create(
+                uuidGenerator.generate(), activeCustomer.getId(), creator.getId(),
+                Instant.parse("2026-09-10T02:00:00Z")));
+        Follow deletedFollow = Follow.create(
+                uuidGenerator.generate(), deletedCustomer.getId(), creator.getId(),
+                Instant.parse("2026-09-10T03:00:00Z"));
+        deletedFollow.unfollow(
+                deletedCustomer.getId(), Instant.parse("2026-09-10T04:00:00Z"));
+        followRepository.save(deletedFollow);
+        followRepository.save(Follow.create(
+                uuidGenerator.generate(), activeCustomer.getId(), otherCreator.getId(),
+                Instant.parse("2026-09-10T05:00:00Z")));
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(followRepository.countActiveByCreatorId(creator.getId())).isEqualTo(1L);
+        assertThat(followRepository.countActiveByCreatorId(otherCreator.getId())).isEqualTo(1L);
+        assertThat(followRepository.countActiveByCreatorId(uuidGenerator.generate())).isZero();
+    }
+
+    @Test
     @DisplayName("팔로우 테이블의 사용자 및 창작자 외래 키를 생성한다")
     void when_follow_schema_is_created_expected_foreign_keys_exist() {
         Integer foreignKeyCount = jdbcTemplate.queryForObject("""
