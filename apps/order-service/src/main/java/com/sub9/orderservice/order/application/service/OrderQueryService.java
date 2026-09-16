@@ -4,6 +4,7 @@ import com.sub9.common.exception.BusinessException;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.model.OrderItem;
+import com.sub9.orderservice.order.domain.model.OrderItemStatus;
 import com.sub9.orderservice.order.domain.model.OrderNumber;
 import com.sub9.orderservice.order.domain.repository.OrderQueryRepository;
 import com.sub9.orderservice.order.presentation.response.OrderQueryResponse.AdminOrderDetail;
@@ -12,6 +13,7 @@ import com.sub9.orderservice.order.presentation.response.OrderQueryResponse.Crea
 import com.sub9.orderservice.order.presentation.response.OrderQueryResponse.CreatorOrderItemSummary;
 import com.sub9.orderservice.order.presentation.response.OrderQueryResponse.CustomerOrderDetail;
 import com.sub9.orderservice.order.presentation.response.OrderQueryResponse.CustomerOrderSummary;
+import com.sub9.orderservice.order.presentation.response.ProductPurchaseInfo;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,6 +27,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderQueryService {
 
     private final OrderQueryRepository orderQueryRepository;
+
+    public ProductPurchaseInfo getPurchaseStatus(UUID userId, UUID orderItemId) {
+        return orderQueryRepository.findItemDetailById(orderItemId)
+                .filter(item -> item.getOrder().getCustomerId().equals(userId))
+                .filter(item -> item.getStatus() == OrderItemStatus.COMPLETED)
+                .map(item -> new ProductPurchaseInfo(item.getProductId(), true))
+                .orElseGet(() -> new ProductPurchaseInfo(null, false));
+    }
 
     public Page<CustomerOrderSummary> getCustomerOrders(UUID customerId, Pageable pageable) {
         return orderQueryRepository.findAllByCustomerId(customerId, pageable)
