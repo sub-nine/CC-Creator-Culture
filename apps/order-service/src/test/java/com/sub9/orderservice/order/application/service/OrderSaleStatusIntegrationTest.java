@@ -175,6 +175,7 @@ class OrderSaleStatusIntegrationTest {
 
     private Cart addCart() {
         UUID skuId = UUID.randomUUID();
+        when(cartProductPort.getValidatedProductIdForCart(skuId)).thenReturn(UUID.randomUUID());
         cartCommandService.addCartItem(new AddCartItemCommand(CUSTOMER_ID, skuId, 1));
         return cartRepository.findAll().stream().filter(cart -> cart.getSkuId().equals(skuId))
                 .findFirst().orElseThrow();
