@@ -1,47 +1,54 @@
 package com.sub9.orderservice.order.application.service;
 
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static com.sub9.orderservice.support.PostgresConcurrencySupport.await;
+import static com.sub9.orderservice.support.PostgresConcurrencySupport.awaitOrderLock;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.ArgumentMatchers.*;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.sub9.orderservice.coupon.domain.model.Coupon;
+import com.sub9.orderservice.coupon.domain.model.UserCoupon;
+import com.sub9.orderservice.order.infrastructure.persistence.OrderRepositoryAdapter;
+import com.sub9.orderservice.order.infrastructure.scheduling.OrderExpirationScheduler;
+import com.sub9.orderservice.payment.application.service.MockPaymentService;
+import com.sub9.orderservice.payment.domain.model.PaymentStatus;
+import jakarta.persistence.EntityManager;
+import java.time.Clock;
+import java.time.ZoneOffset;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.orderservice.cart.application.service.CartQueryService;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
-import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.application.port.output.StockPort.RestoreReason;
-import com.sub9.orderservice.order.application.port.output.StockRestoreCommand;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import com.sub9.orderservice.order.domain.model.Money;
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.model.OrderItem;
-import com.sub9.orderservice.order.domain.model.OrderStatus;
 import com.sub9.orderservice.order.domain.model.ProductSnapshot;
 import com.sub9.orderservice.order.domain.model.ShippingAddress;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.kafka.core.KafkaTemplate;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -68,7 +75,6 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @MockitoBean(types = {
         CartQueryService.class,
         CouponApplicationPort.class,
-        CouponUsagePort.class,
         StockPort.class,
         KafkaTemplate.class,
         PaymentCancellationPort.class
@@ -87,7 +93,7 @@ class OrderPaymentExpirationConcurrencyIntegrationTest {
             .withPassword("test");
 
     @Autowired
-    private OrderPaymentResultService paymentResultService;
+    private MockPaymentService paymentService;
 
     @Autowired
     private OrderExpirationTransactionService expirationService;
@@ -95,8 +101,9 @@ class OrderPaymentExpirationConcurrencyIntegrationTest {
     @Autowired
     private OrderRepository orderRepository;
 
-    @Autowired
-    private CouponUsagePort couponUsagePort;
+    @Autowired private EntityManager em;
+    @MockitoBean private Clock clock;
+    @MockitoSpyBean private OrderRepositoryAdapter lockedOrders;
 
     @Autowired
     private StockPort stockPort;
@@ -112,6 +119,8 @@ class OrderPaymentExpirationConcurrencyIntegrationTest {
 
     @BeforeEach
     void setKafkaResult() {
+        org.mockito.Mockito.clearInvocations(kafka, stockPort);
+        when(clock.instant()).thenReturn(CREATED_AT.plusSeconds(30));
         when(kafka.send(org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(CompletableFuture.completedFuture(null));
@@ -126,91 +135,74 @@ class OrderPaymentExpirationConcurrencyIntegrationTest {
 
     @AfterEach
     void cleanDatabase() {
-        reset(couponUsagePort, stockPort);
+        jdbcTemplate.update("delete from p_payment_cancellations");
+        jdbcTemplate.update("delete from p_payments");
+        jdbcTemplate.update("delete from p_order_cart_cleanup_tasks");
         jdbcTemplate.update("delete from p_order_items");
         jdbcTemplate.update("delete from p_orders");
+        jdbcTemplate.update("delete from p_user_coupons");
+        jdbcTemplate.update("delete from p_coupons");
     }
 
-    @Test
-    @DisplayName("결제 성공이 잠금을 먼저 얻으면 만료 처리를 건너뛴다")
-    void when_payment_success_locks_first_expiration_is_skipped() throws Exception {
+    @ParameterizedTest
+    @EnumSource(PaymentStatus.class)
+    @DisplayName("결제가 선점하면 결제와 쿠폰을 확정하고 만료 처리는 건너뛴다")
+    void when_payment_locks_first_payment_and_coupon_are_committed(PaymentStatus result) throws Exception {
         Order order = savedOrder(10);
+        var race = runRace(order.getId(),
+                () -> paymentService.process(order.getCustomerId(), order.getOrderNumber(), result),
+                () -> expire(order));
 
-        RaceResult<Void, Optional<StockRestoreCommand>> race = runRace(
-                order.getId(),
-                () -> {
-                    paymentResultService.markPaid(
-                            order.getId(), order.getExpiresAt().minusNanos(1));
-                    return null;
-                },
-                () -> expirationService.expire(order.getId(), order.getExpiresAt()));
-
+        assertThat(race.winner().status()).isEqualTo(result);
         assertThat(race.contender().failure()).isNull();
-        assertThat(race.contender().value()).isEmpty();
-        assertThat(status(order.getId())).isEqualTo(OrderStatus.PAID.name());
-        assertThat(paidAt(order.getId())).isNotNull();
-        verifyNoInteractions(couponUsagePort, stockPort);
+        assertFinalState(order, result == PaymentStatus.SUCCESS ? "PAID" : "FAILED", result);
+        if (result == PaymentStatus.FAILED) {
+            verify(stockPort).restore(eq(order.getId()), anyList(), eq(RestoreReason.PAYMENT_FAILED));
+        } else {
+            verify(kafka).send(eq("order.paid"), eq(order.getId().toString()), anyString());
+        }
+        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
+        verifyNoMoreInteractions(stockPort, kafka);
     }
 
-    @Test
-    @DisplayName("주문 만료가 잠금을 먼저 얻으면 뒤늦은 결제 성공을 거부한다")
-    void when_expiration_locks_first_payment_success_is_rejected() throws Exception {
+    @ParameterizedTest
+    @EnumSource(PaymentStatus.class)
+    @DisplayName("만료가 선점하면 결제 행 없이 쿠폰을 복구하고 뒤늦은 결제를 거부한다")
+    void when_expiration_locks_first_no_payment_is_saved(PaymentStatus result) throws Exception {
         Order order = savedOrder(20);
+        var race = runRace(order.getId(), () -> expire(order),
+                () -> paymentService.process(order.getCustomerId(), order.getOrderNumber(), result));
 
-        RaceResult<Optional<StockRestoreCommand>, Void> race = runRace(
-                order.getId(),
-                () -> expirationService.expire(order.getId(), order.getExpiresAt()),
-                () -> {
-                    paymentResultService.markPaid(
-                            order.getId(), order.getExpiresAt().minusNanos(1));
-                    return null;
-                });
-
-        StockRestoreCommand command = race.winner().orElseThrow();
         assertExpiredError(race.contender().failure());
-        assertThat(command.reason()).isEqualTo(RestoreReason.ORDER_EXPIRED);
-        assertThat(status(order.getId())).isEqualTo(OrderStatus.EXPIRED.name());
-        assertThat(paidAt(order.getId())).isNull();
-        verify(couponUsagePort).restore(order.getId(), List.of(USER_COUPON_ID));
-        verifyNoInteractions(stockPort);
+        assertFinalState(order, "EXPIRED", null);
+        verify(stockPort).restore(eq(order.getId()), anyList(), eq(RestoreReason.ORDER_EXPIRED));
+        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
+        verifyNoMoreInteractions(stockPort, kafka);
     }
 
-    @Test
-    @DisplayName("결제 실패가 잠금을 먼저 얻으면 실패 복구만 남기고 만료를 건너뛴다")
-    void when_payment_failure_locks_first_expiration_is_skipped() throws Exception {
-        Order order = savedOrder(30);
-
-        RaceResult<StockRestoreCommand, Optional<StockRestoreCommand>> race = runRace(
-                order.getId(),
-                () -> paymentResultService.markPaymentFailed(
-                        order.getId(), order.getExpiresAt().minusNanos(1)),
-                () -> expirationService.expire(order.getId(), order.getExpiresAt()));
-
-        assertThat(race.contender().failure()).isNull();
-        assertThat(race.contender().value()).isEmpty();
-        assertThat(race.winner().reason()).isEqualTo(RestoreReason.PAYMENT_FAILED);
-        assertThat(status(order.getId())).isEqualTo(OrderStatus.FAILED.name());
-        verify(couponUsagePort).restore(order.getId(), List.of(USER_COUPON_ID));
-        verifyNoInteractions(stockPort);
+    private Void expire(Order order) {
+        new OrderExpirationScheduler(orderRepository, expirationService, stockPort,
+                Clock.fixed(order.getExpiresAt(), ZoneOffset.UTC)).expireOrders();
+        return null;
     }
 
-    @Test
-    @DisplayName("주문 만료가 잠금을 먼저 얻으면 뒤늦은 결제 실패를 거부한다")
-    void when_expiration_locks_first_payment_failure_is_rejected() throws Exception {
-        Order order = savedOrder(40);
-
-        RaceResult<Optional<StockRestoreCommand>, StockRestoreCommand> race = runRace(
-                order.getId(),
-                () -> expirationService.expire(order.getId(), order.getExpiresAt()),
-                () -> paymentResultService.markPaymentFailed(
-                        order.getId(), order.getExpiresAt().minusNanos(1)));
-
-        StockRestoreCommand command = race.winner().orElseThrow();
-        assertExpiredError(race.contender().failure());
-        assertThat(command.reason()).isEqualTo(RestoreReason.ORDER_EXPIRED);
-        assertThat(status(order.getId())).isEqualTo(OrderStatus.EXPIRED.name());
-        verify(couponUsagePort).restore(order.getId(), List.of(USER_COUPON_ID));
-        verifyNoInteractions(stockPort);
+    private void assertFinalState(Order order, String expected, PaymentStatus payment) {
+        assertThat(status(order.getId())).isEqualTo(expected);
+        assertThat(jdbcTemplate.queryForList("select status from p_payments", String.class))
+                .containsExactlyElementsOf(payment == null ? List.of() : List.of(payment.name()));
+        assertThat(jdbcTemplate.queryForObject("select count(*) from p_payment_cancellations", Integer.class)).isZero();
+        var coupon = jdbcTemplate.queryForMap("select status, used_at, order_id from p_user_coupons where id = ?",
+                USER_COUPON_ID);
+        boolean paid = expected.equals("PAID");
+        assertThat(coupon.get("status")).isEqualTo(paid ? "USED" : "ISSUED");
+        assertThat(coupon.get("order_id")).isEqualTo(paid ? order.getId() : null);
+        if (paid) {
+            assertThat(coupon.get("used_at")).isNotNull();
+            assertThat(paidAt(order.getId())).isNotNull();
+        } else {
+            assertThat(coupon.get("used_at")).isNull();
+            assertThat(paidAt(order.getId())).isNull();
+        }
     }
 
     private <W, C> RaceResult<W, C> runRace(
@@ -219,35 +211,31 @@ class OrderPaymentExpirationConcurrencyIntegrationTest {
             Supplier<C> contender) throws Exception {
         CountDownLatch winnerLocked = new CountDownLatch(1);
         CountDownLatch releaseWinner = new CountDownLatch(1);
-        CountDownLatch contenderStarted = new CountDownLatch(1);
-
+        AtomicBoolean first = new AtomicBoolean(true);
+        org.mockito.stubbing.Answer<Object> pause = call -> {
+            Object value = call.callRealMethod();
+            if (first.getAndSet(false)) {
+                winnerLocked.countDown();
+                await(releaseWinner);
+            }
+            return value;
+        };
+        doAnswer(pause).when(lockedOrders).findByIdForUpdate(orderId);
+        doAnswer(pause).when(lockedOrders).findByOrderNumberForUpdate(any());
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
             try {
-                Future<W> winnerFuture = executor.submit(() -> transaction().execute(status -> {
-                    orderRepository.findByIdForUpdate(orderId).orElseThrow();
-                    winnerLocked.countDown();
-                    await(releaseWinner);
-                    return winner.get();
-                }));
-
+                Future<W> winnerFuture = executor.submit(winner::get);
                 assertThat(winnerLocked.await(5, SECONDS)).isTrue();
                 Future<Attempt<C>> contenderFuture = executor.submit(() -> {
-                    contenderStarted.countDown();
                     try {
                         return new Attempt<>(contender.get(), null);
                     } catch (RuntimeException exception) {
                         return new Attempt<>(null, exception);
                     }
                 });
-
-                assertThat(contenderStarted.await(5, SECONDS)).isTrue();
-                assertThatThrownBy(() -> contenderFuture.get(200, MILLISECONDS))
-                        .isInstanceOf(TimeoutException.class);
+                awaitOrderLock(jdbcTemplate, contenderFuture);
                 releaseWinner.countDown();
-
-                return new RaceResult<>(
-                        winnerFuture.get(5, SECONDS),
-                        contenderFuture.get(5, SECONDS));
+                return new RaceResult<>(winnerFuture.get(10, SECONDS), contenderFuture.get(10, SECONDS));
             } finally {
                 releaseWinner.countDown();
             }
@@ -269,7 +257,15 @@ class OrderPaymentExpirationConcurrencyIntegrationTest {
                         ProductSnapshot.of("아크릴 스탠드", "A 타입", Money.won(18_000), 2),
                         Money.won(1_800))),
                 CREATED_AT);
-        return orderRepository.save(order);
+        return transaction().execute(ignored -> {
+            Coupon coupon = Coupon.create(uuid(sequence + 5000), "만료 경쟁 쿠폰", 5, 10,
+                    CREATED_AT.minusSeconds(60), CREATED_AT.plusSeconds(3600), order.getCustomerId(), CREATED_AT);
+            em.persist(coupon);
+            UserCoupon issued = UserCoupon.issue(USER_COUPON_ID, coupon, order.getCustomerId(), CREATED_AT);
+            issued.use(order.getCustomerId(), order.getId(), CREATED_AT);
+            em.persist(issued);
+            return orderRepository.save(order);
+        });
     }
 
     private TransactionTemplate transaction() {
@@ -291,17 +287,6 @@ class OrderPaymentExpirationConcurrencyIntegrationTest {
                 .isInstanceOfSatisfying(BusinessException.class,
                         businessException -> assertThat(businessException.getErrorCode())
                                 .isSameAs(OrderErrorCode.ORDER_ALREADY_EXPIRED));
-    }
-
-    private static void await(CountDownLatch latch) {
-        try {
-            if (!latch.await(5, TimeUnit.SECONDS)) {
-                throw new IllegalStateException("동시성 테스트 대기 시간이 초과되었습니다.");
-            }
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("동시성 테스트가 중단되었습니다.", exception);
-        }
     }
 
     private static UUID uuid(long sequence) {
