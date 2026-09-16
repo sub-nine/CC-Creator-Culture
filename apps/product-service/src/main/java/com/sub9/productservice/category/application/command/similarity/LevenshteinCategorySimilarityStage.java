@@ -13,8 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-// 파이프라인의 1번째 스테이지 - Levenshtein Distance 기반 문자열 유사도(빠름).
-// 후보 카테고리 각각에 대해 독립적으로 threshold와 비교해 판정한다 (여러 후보가 동시에 병합/승인대기될 수 있음)
+// 파이프라인의 1번째 스테이지 - Levenshtein Distance 기반 문자열 유사도(빠름)
 @Order(1)
 @Component
 @RequiredArgsConstructor
