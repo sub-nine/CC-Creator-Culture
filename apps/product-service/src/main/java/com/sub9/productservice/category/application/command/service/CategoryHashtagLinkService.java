@@ -39,45 +39,59 @@ public class CategoryHashtagLinkService implements LinkHashtagToCategoryUseCase 
         List<CategoryCandidateResult> candidateResults = categorySimilarityPipeline.resolve(hashtag, categories);
 
         boolean matchedAnyCategory = false;
-        for (CategoryCandidateResult candidateResult : candidateResults) {
-            Category category = candidateResult.category();
+        boolean anyFailed = false;
 
-            switch (candidateResult.result()) {
-                case CategoryMatchResult.Merge merge -> {
-                    linkIfAbsent(category, hashtag, CategoryHashtagStatus.MERGED, merge.matchType(), merge.similarity());
-                    matchedAnyCategory = true;
-                }
-                case CategoryMatchResult.PendingApproval pendingApproval -> {
-                    linkIfAbsent(category, hashtag, CategoryHashtagStatus.PENDING_APPROVAL,
-                            pendingApproval.matchType(), pendingApproval.similarity());
-                    matchedAnyCategory = true;
-                }
-                case CategoryMatchResult.Failed failed -> {
-                    // 판단 자체가 실패한 것이라 자동 확정(MERGED) 대신 승인 대기로 걸어 관리자가 검토하게 함.
-                    // matchType/similarity는 Failed가 갖고 있지 않아 판단 불가를 나타내는 placeholder 값을 씀
-                    log.warn("[CATEGORY] 유사도 판단 실패로 승인 대기 처리 - hashtagId: {}, categoryId: {}, reason: {}",
-                            hashtagId, category.getId(), failed.reason());
-                    linkIfAbsent(category, hashtag, CategoryHashtagStatus.PENDING_APPROVAL,
-                            CategoryHashtagMatchType.ALGORITHM, 0.0);
-                    matchedAnyCategory = true;
-                }
-                case CategoryMatchResult.NotSimilar notSimilar -> {
-                    // 이 후보와는 연결하지 않음
-                }
+        for (CategoryCandidateResult candidateResult : candidateResults) {
+            CandidateOutcome outcome = linkCandidate(hashtagId, hashtag, candidateResult);
+            if (outcome == CandidateOutcome.MATCHED) {
+                matchedAnyCategory = true;
+            } else if (outcome == CandidateOutcome.FAILED) {
+                anyFailed = true;
             }
         }
 
-        if (!matchedAnyCategory) {
+        if (!matchedAnyCategory && !anyFailed) {
+            // 아무 카테고리와 연결되지 않았으며, 검사 실패가 없었던 경우 (해시태그를 신규 카테고리로 승격할 수 있는 확신)
             promoteToNewCategory(hashtag, CategoryHashtagStatus.MERGED);
+        } else if (!matchedAnyCategory) {
+            // anyFailed가 true인 경우 - 검사 실패로 이번엔 보류, 스케줄러가 나중에 재시도
+            // TODO: 최종적으로 아무런 카테고리와 연결되지 않은 해시태그는 스케줄러를 통해 재검사
+            log.warn("[CATEGORY] 검사 실패로 카테고리 연결 보류 - hashtagId: {}", hashtagId);
         }
     }
 
-    private void promoteToNewCategory(Hashtag hashtag, CategoryHashtagStatus status) {
-        Category newCategory = categoryCommandRepository.save(Category.create(hashtag.getName(), null));
+    private enum CandidateOutcome {
+        MATCHED, FAILED, NOT_SIMILAR
+    }
 
-        categoryCommandRepository.linkCategoryHashtag(
-                CategoryHashtag.create(newCategory, hashtag, CategoryHashtagMatchType.PROMOTED, status, 0.0)
-        );
+    private CandidateOutcome linkCandidate(UUID hashtagId, Hashtag hashtag, CategoryCandidateResult candidateResult) {
+        Category category = candidateResult.category();
+
+        return switch (candidateResult.result()) {
+            case CategoryMatchResult.Merge merge -> {
+                linkIfAbsent(category, hashtag, CategoryHashtagStatus.MERGED, merge.matchType(), merge.similarity());
+                yield CandidateOutcome.MATCHED;
+            }
+            case CategoryMatchResult.PendingApproval pendingApproval -> {
+                linkIfAbsent(category, hashtag, CategoryHashtagStatus.PENDING_APPROVAL,
+                        pendingApproval.matchType(), pendingApproval.similarity());
+                yield CandidateOutcome.MATCHED;
+            }
+            case CategoryMatchResult.Failed failed -> {
+                log.warn("[CATEGORY] 유사도 판단 실패 - hashtagId: {}, categoryId: {}, reason: {}",
+                        hashtagId, category.getId(), failed.reason());
+                yield CandidateOutcome.FAILED;
+            }
+            // 이 후보와는 연결하지 않음
+            case CategoryMatchResult.NotSimilar notSimilar -> CandidateOutcome.NOT_SIMILAR;
+        };
+    }
+
+    private void promoteToNewCategory(Hashtag hashtag, CategoryHashtagStatus status) {
+        // findOrCreateByName 자체가 원자적이라, 동시에 같은 이름으로 승격을 시도해도 카테고리는 하나만 생성됨
+        Category newCategory = categoryCommandRepository.findOrCreateByName(hashtag.getName());
+
+        linkIfAbsent(newCategory, hashtag, status, CategoryHashtagMatchType.PROMOTED, 0.0);
     }
 
     private void linkIfAbsent(
@@ -87,14 +101,9 @@ public class CategoryHashtagLinkService implements LinkHashtagToCategoryUseCase 
             CategoryHashtagMatchType matchType,
             double similarity
     ) {
-        boolean alreadyLinked = categoryCommandRepository
-                .findCategoryHashtagByCategoryIdAndHashtagId(category.getId(), hashtag.getId())
-                .isPresent();
-        if (alreadyLinked) {
-            return;
-        }
-
-        categoryCommandRepository.linkCategoryHashtag(
+        // 존재 확인 후 삽입(check-then-act) 대신 원자적 삽입을 써서, 동시에 같은 (category, hashtag)
+        // 조합으로 링크가 시도돼도 unique 제약 위반 예외 없이 하나로 수렴함
+        categoryCommandRepository.linkCategoryHashtagIfAbsent(
                 CategoryHashtag.create(category, hashtag, matchType, status, similarity)
         );
     }

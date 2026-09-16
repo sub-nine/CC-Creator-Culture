@@ -55,7 +55,11 @@ public class CategorySimilarityPipeline {
             List<Category> remaining,
             Map<UUID, CategoryMatchResult> accumulated
     ) {
-        Map<UUID, CategoryMatchResult> stageResultsById = indexByCategoryId(stage.evaluate(hashtag, remaining));
+        // 스테이지 Evaluate
+        List<CategoryCandidateResult> evaluateResults = stage.evaluate(hashtag, remaining);
+
+        // Evaluate 결과를 Category Id로 인덱싱
+        Map<UUID, CategoryMatchResult> stageResultsById = indexByCategoryId(evaluateResults);
 
         List<Category> stillUnresolved = new ArrayList<>();
         for (Category candidate : remaining) {

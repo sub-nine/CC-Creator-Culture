@@ -77,13 +77,11 @@ class CategoryHashtagLinkServiceTest {
                 new CategoryCandidateResult(mergeCategory, new CategoryMatchResult.Merge(CategoryHashtagMatchType.ALGORITHM, 0.9)),
                 new CategoryCandidateResult(pendingCategory, new CategoryMatchResult.PendingApproval(CategoryHashtagMatchType.ALGORITHM, 0.72))
         ));
-        when(categoryCommandRepository.findCategoryHashtagByCategoryIdAndHashtagId(any(), any()))
-                .thenReturn(Optional.empty());
 
         categoryHashtagLinkService.tryLink(hashtag.getId());
 
         ArgumentCaptor<CategoryHashtag> captor = ArgumentCaptor.forClass(CategoryHashtag.class);
-        verify(categoryCommandRepository, times(2)).linkCategoryHashtag(captor.capture());
+        verify(categoryCommandRepository, times(2)).linkCategoryHashtagIfAbsent(captor.capture());
 
         CategoryHashtag mergedLink = captor.getAllValues().stream()
                 .filter(link -> link.getCategory().equals(mergeCategory)).findFirst().orElseThrow();
@@ -93,32 +91,12 @@ class CategoryHashtagLinkServiceTest {
                 .filter(link -> link.getCategory().equals(pendingCategory)).findFirst().orElseThrow();
         assertThat(pendingLink.getStatus()).isEqualTo(CategoryHashtagStatus.PENDING_APPROVAL);
 
-        verify(categoryCommandRepository, never()).save(any(Category.class));
+        verify(categoryCommandRepository, never()).findOrCreateByName(any());
     }
 
     @Test
-    @DisplayName("이미 연결된 카테고리-해시태그 조합은 Merge/PendingApproval이어도 중복 연결하지 않는다")
-    void tryLink_alreadyLinked_isSkipped() {
-        Category category = Category.create("강아지", null);
-        Hashtag hashtag = Hashtag.create("강아지용품");
-        when(hashtagCommandRepository.findById(hashtag.getId())).thenReturn(Optional.of(hashtag));
-        when(categoryCommandRepository.findAllActive()).thenReturn(List.of(category));
-        when(categorySimilarityPipeline.resolve(hashtag, List.of(category))).thenReturn(List.of(
-                new CategoryCandidateResult(category, new CategoryMatchResult.Merge(CategoryHashtagMatchType.ALGORITHM, 0.9))
-        ));
-        when(categoryCommandRepository.findCategoryHashtagByCategoryIdAndHashtagId(category.getId(), hashtag.getId()))
-                .thenReturn(Optional.of(CategoryHashtag.create(
-                        category, hashtag, CategoryHashtagMatchType.ALGORITHM, CategoryHashtagStatus.MERGED, 0.9)));
-
-        categoryHashtagLinkService.tryLink(hashtag.getId());
-
-        verify(categoryCommandRepository, never()).linkCategoryHashtag(any());
-        verify(categoryCommandRepository, never()).save(any(Category.class));
-    }
-
-    @Test
-    @DisplayName("모든 후보가 NotSimilar면(=매칭된 카테고리 없음) 해시태그 이름으로 새 카테고리를 만들어 PROMOTED/MERGED로 연결한다")
-    void tryLink_noCandidateMatched_promotesToNewCategory() {
+    @DisplayName("모든 후보가 NotSimilar면(=매칭도 실패도 없음) 해시태그 이름으로 새 카테고리를 만들어 PROMOTED/MERGED로 연결한다")
+    void tryLink_allNotSimilar_promotesToNewCategory() {
         Category category = Category.create("전자기기", null);
         Hashtag hashtag = Hashtag.create("신규카테고리");
         when(hashtagCommandRepository.findById(hashtag.getId())).thenReturn(Optional.of(hashtag));
@@ -126,19 +104,17 @@ class CategoryHashtagLinkServiceTest {
         when(categorySimilarityPipeline.resolve(hashtag, List.of(category))).thenReturn(List.of(
                 new CategoryCandidateResult(category, new CategoryMatchResult.NotSimilar())
         ));
-        when(categoryCommandRepository.save(any(Category.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        Category newCategory = Category.create(hashtag.getName(), null);
+        when(categoryCommandRepository.findOrCreateByName(hashtag.getName())).thenReturn(newCategory);
 
         categoryHashtagLinkService.tryLink(hashtag.getId());
 
-        ArgumentCaptor<Category> categoryCaptor = ArgumentCaptor.forClass(Category.class);
-        verify(categoryCommandRepository).save(categoryCaptor.capture());
-        assertThat(categoryCaptor.getValue().getName()).isEqualTo(hashtag.getName());
+        verify(categoryCommandRepository).findOrCreateByName(hashtag.getName());
 
         ArgumentCaptor<CategoryHashtag> linkCaptor = ArgumentCaptor.forClass(CategoryHashtag.class);
-        verify(categoryCommandRepository).linkCategoryHashtag(linkCaptor.capture());
+        verify(categoryCommandRepository).linkCategoryHashtagIfAbsent(linkCaptor.capture());
         CategoryHashtag linked = linkCaptor.getValue();
-        assertThat(linked.getCategory()).isEqualTo(categoryCaptor.getValue());
+        assertThat(linked.getCategory()).isEqualTo(newCategory);
         assertThat(linked.getMatchType()).isEqualTo(CategoryHashtagMatchType.PROMOTED);
         assertThat(linked.getStatus()).isEqualTo(CategoryHashtagStatus.MERGED);
     }
@@ -150,18 +126,18 @@ class CategoryHashtagLinkServiceTest {
         when(hashtagCommandRepository.findById(hashtag.getId())).thenReturn(Optional.of(hashtag));
         when(categoryCommandRepository.findAllActive()).thenReturn(List.of());
         when(categorySimilarityPipeline.resolve(hashtag, List.of())).thenReturn(List.of());
-        when(categoryCommandRepository.save(any(Category.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(categoryCommandRepository.findOrCreateByName(hashtag.getName()))
+                .thenReturn(Category.create(hashtag.getName(), null));
 
         categoryHashtagLinkService.tryLink(hashtag.getId());
 
-        verify(categoryCommandRepository).save(any(Category.class));
-        verify(categoryCommandRepository).linkCategoryHashtag(any());
+        verify(categoryCommandRepository).findOrCreateByName(hashtag.getName());
+        verify(categoryCommandRepository).linkCategoryHashtagIfAbsent(any());
     }
 
     @Test
-    @DisplayName("특정 후보에 대한 판단이 Failed면, 새 카테고리를 만들지 않고 그 기존 후보에 PENDING_APPROVAL로 연결한다")
-    void tryLink_candidateFailed_linksExistingCandidateAsPendingApproval() {
+    @DisplayName("후보가 Failed 하나뿐이면 링크도 신규 카테고리 생성도 하지 않고 보류한다")
+    void tryLink_onlyFailed_holdsBackWithoutLinkingOrPromoting() {
         Category category = Category.create("애매한카테고리", null);
         Hashtag hashtag = Hashtag.create("판단불가");
         when(hashtagCommandRepository.findById(hashtag.getId())).thenReturn(Optional.of(hashtag));
@@ -169,17 +145,50 @@ class CategoryHashtagLinkServiceTest {
         when(categorySimilarityPipeline.resolve(hashtag, List.of(category))).thenReturn(List.of(
                 new CategoryCandidateResult(category, new CategoryMatchResult.Failed("임베딩 모델 타임아웃"))
         ));
-        when(categoryCommandRepository.findCategoryHashtagByCategoryIdAndHashtagId(category.getId(), hashtag.getId()))
-                .thenReturn(Optional.empty());
+
+        categoryHashtagLinkService.tryLink(hashtag.getId());
+
+        verify(categoryCommandRepository, never()).linkCategoryHashtagIfAbsent(any());
+        verify(categoryCommandRepository, never()).findOrCreateByName(any());
+    }
+
+    @Test
+    @DisplayName("Failed와 NotSimilar가 섞여 있고 Merge/PendingApproval이 없으면, Failed 하나 때문에 신규 카테고리 생성도 보류한다")
+    void tryLink_failedMixedWithNotSimilar_stillHoldsBackPromotion() {
+        Category failedCategory = Category.create("확인못함", null);
+        Category notSimilarCategory = Category.create("전혀다름", null);
+        Hashtag hashtag = Hashtag.create("판단불가");
+        when(hashtagCommandRepository.findById(hashtag.getId())).thenReturn(Optional.of(hashtag));
+        when(categoryCommandRepository.findAllActive()).thenReturn(List.of(failedCategory, notSimilarCategory));
+        when(categorySimilarityPipeline.resolve(hashtag, List.of(failedCategory, notSimilarCategory))).thenReturn(List.of(
+                new CategoryCandidateResult(failedCategory, new CategoryMatchResult.Failed("타임아웃")),
+                new CategoryCandidateResult(notSimilarCategory, new CategoryMatchResult.NotSimilar())
+        ));
+
+        categoryHashtagLinkService.tryLink(hashtag.getId());
+
+        verify(categoryCommandRepository, never()).linkCategoryHashtagIfAbsent(any());
+        verify(categoryCommandRepository, never()).findOrCreateByName(any());
+    }
+
+    @Test
+    @DisplayName("일부 후보가 Failed여도 다른 후보가 Merge/PendingApproval이면 그 후보는 정상 연결되고, Failed 후보만 링크되지 않는다")
+    void tryLink_failedAlongsideMatch_linksMatchedCandidateOnly() {
+        Category mergeCategory = Category.create("강아지", null);
+        Category failedCategory = Category.create("확인못함", null);
+        Hashtag hashtag = Hashtag.create("강아지용품");
+        when(hashtagCommandRepository.findById(hashtag.getId())).thenReturn(Optional.of(hashtag));
+        when(categoryCommandRepository.findAllActive()).thenReturn(List.of(mergeCategory, failedCategory));
+        when(categorySimilarityPipeline.resolve(hashtag, List.of(mergeCategory, failedCategory))).thenReturn(List.of(
+                new CategoryCandidateResult(mergeCategory, new CategoryMatchResult.Merge(CategoryHashtagMatchType.ALGORITHM, 0.9)),
+                new CategoryCandidateResult(failedCategory, new CategoryMatchResult.Failed("타임아웃"))
+        ));
 
         categoryHashtagLinkService.tryLink(hashtag.getId());
 
         ArgumentCaptor<CategoryHashtag> captor = ArgumentCaptor.forClass(CategoryHashtag.class);
-        verify(categoryCommandRepository).linkCategoryHashtag(captor.capture());
-        CategoryHashtag linked = captor.getValue();
-        assertThat(linked.getCategory()).isEqualTo(category);
-        assertThat(linked.getStatus()).isEqualTo(CategoryHashtagStatus.PENDING_APPROVAL);
-
-        verify(categoryCommandRepository, never()).save(any(Category.class));
+        verify(categoryCommandRepository, times(1)).linkCategoryHashtagIfAbsent(captor.capture());
+        assertThat(captor.getValue().getCategory()).isEqualTo(mergeCategory);
+        verify(categoryCommandRepository, never()).findOrCreateByName(any());
     }
 }

@@ -32,6 +32,8 @@ import java.util.UUID;
 )
 public class Category extends BaseEntity {
 
+    public static final UUID ACTIVE_UNIQUE_VERSION = UUID.fromString("00000000-0000-0000-0000-000000000000");
+
     @Column(name = "merged_category_id")
     private UUID mergedCategoryId;
 
@@ -60,7 +62,7 @@ public class Category extends BaseEntity {
                 .name(name)
                 .description(description)
                 .status(CategoryStatus.ACTIVE)
-                .uniqueVersion(UUID.fromString("00000000-0000-0000-0000-000000000000"))
+                .uniqueVersion(ACTIVE_UNIQUE_VERSION)
                 .build();
     }
 

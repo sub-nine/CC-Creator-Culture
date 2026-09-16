@@ -20,4 +20,10 @@ public interface CategoryCommandRepository {
     void linkCategoryHashtag(CategoryHashtag categoryHashtag);
 
     Optional<CategoryHashtag> findCategoryHashtagByCategoryIdAndHashtagId(UUID categoryId, UUID hashtagId);
+
+    // 이름으로 조회하고 없으면 원자적으로 생성 - 동시에 같은 이름으로 호출돼도 하나만 생성됨
+    Category findOrCreateByName(String name);
+
+    // 이미 연결돼 있으면 원자적으로 아무것도 안 함(예외 없이) - 동시에 같은 조합으로 호출돼도 하나만 연결됨
+    void linkCategoryHashtagIfAbsent(CategoryHashtag categoryHashtag);
 }

@@ -34,6 +34,9 @@ import java.util.UUID;
         }
 )
 public class CategoryHashtag extends BaseEntity {
+
+    public static final UUID ACTIVE_UNIQUE_VERSION = UUID.fromString("00000000-0000-0000-0000-000000000000");
+
     @JoinColumn(name = "category_id", nullable = false)
     @ManyToOne
     private Category category;
@@ -76,7 +79,7 @@ public class CategoryHashtag extends BaseEntity {
                 .matchType(matchType)
                 .status(status)
                 .similarityScore(similarityScore)
-                .uniqueVersion(UUID.fromString("00000000-0000-0000-0000-000000000000"))
+                .uniqueVersion(ACTIVE_UNIQUE_VERSION)
                 .build();
     }
 
