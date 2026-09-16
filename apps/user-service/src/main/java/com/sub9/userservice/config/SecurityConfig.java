@@ -55,6 +55,8 @@ public class SecurityConfig {
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(PUBLIC_AUTH_PATHS)
                 .permitAll()
+                .requestMatchers("/internal/**")
+                .permitAll()
                 .requestMatchers("/api/v1/admin/managers")
                 .hasRole("MASTER")
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/admin/creators/*/approval")
