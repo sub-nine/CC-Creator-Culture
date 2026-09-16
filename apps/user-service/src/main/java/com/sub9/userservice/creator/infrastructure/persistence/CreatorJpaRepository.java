@@ -90,6 +90,7 @@ public interface CreatorJpaRepository extends JpaRepository<Creator, UUID> {
             @Param("userId") UUID userId,
             @Param("approvalStatus") ApprovalStatus approvalStatus);
 
+    @Query("select creator from Creator creator join creator.user user "
             + "where creator.userId in :userIds "
             + "and creator.approvalStatus = :approvalStatus "
             + "and creator.deletedAt is null "
