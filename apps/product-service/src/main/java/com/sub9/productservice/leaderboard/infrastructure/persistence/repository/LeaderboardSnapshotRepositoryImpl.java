@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
@@ -22,5 +23,15 @@ public class LeaderboardSnapshotRepositoryImpl implements LeaderboardSnapshotRep
             LocalDate endDate
     ) {
         return jpaRepository.findByTypeAndDateBetweenAndDeletedAtIsNull(type, startDate, endDate);
+    }
+
+    @Override
+    public Optional<LocalDate> findMaxDate(LeaderboardType type) {
+        return jpaRepository.findMaxDateByTypeAndDeletedAtIsNull(type);
+    }
+
+    @Override
+    public List<LeaderboardSnapshot> saveAll(List<LeaderboardSnapshot> snapshots) {
+        return jpaRepository.saveAll(snapshots);
     }
 }

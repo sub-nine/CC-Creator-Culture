@@ -5,11 +5,10 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 /** 테스트 컨테이너 상속해서 사용 */
-@Testcontainers
+// @Testcontainers
 @ActiveProfiles("test")
 public abstract class AbstractIntegrationTest {
   private static final PostgreSQLContainer<?> POSTGRES =
@@ -19,8 +18,7 @@ public abstract class AbstractIntegrationTest {
           .withPassword("test");
 
   private static final GenericContainer<?> REDIS =
-          new GenericContainer<>(DockerImageName.parse("redis:7-alpine"))
-                  .withExposedPorts(6379);
+      new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
 
   static {
     POSTGRES.start();

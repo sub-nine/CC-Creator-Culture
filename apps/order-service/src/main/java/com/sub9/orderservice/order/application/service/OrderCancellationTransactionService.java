@@ -2,6 +2,7 @@ package com.sub9.orderservice.order.application.service;
 
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.common.exception.BusinessException;
+import com.sub9.common.kafka.event.OrderCanceledEvent;
 import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort.RestoreReason;
 import com.sub9.orderservice.order.application.port.output.StockPort.StockItem;
@@ -16,6 +17,8 @@ import java.time.Instant;
 import com.sub9.common.kafka.event.OrderNotificationEvent;
 import com.sub9.common.identifier.UuidV7Generator;
 import org.springframework.context.ApplicationEventPublisher;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -50,6 +53,14 @@ public class OrderCancellationTransactionService {
                         .map(item -> new StockItem(item.getSkuId(), item.getProductSnapshot().getQuantity()))
                         .toList(),
                 RestoreReason.ORDER_CANCEL);
+        // 동일 상품의 SKU가 여러 개면 취소 수량을 상품 기준으로 합산해 리더보드에 한 번 반영한다.
+        Map<UUID, Long> quantitiesByProduct = order.getItems().stream()
+                .collect(Collectors.groupingBy(
+                        item -> item.getProductId(),
+                        Collectors.summingLong(item -> item.getProductSnapshot().getQuantity())));
+        eventPublisher.publishEvent(new OrderCanceledEvent(order.getId(), quantitiesByProduct.entrySet().stream()
+                .map(entry -> new OrderCanceledEvent.ProductQuantity(entry.getKey(), entry.getValue()))
+                .toList()));
         eventPublisher.publishEvent(new OrderNotificationEvent(
                 uuidGenerator.generate(), "ORDER_CANCELLED", "ORDER_SERVICE", "ORDER", order.getId(),
                 order.getCustomerId(), order.getOrderNumber().toString(), null, "FULL", canceledAt));

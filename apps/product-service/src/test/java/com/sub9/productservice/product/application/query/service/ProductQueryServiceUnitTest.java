@@ -3,6 +3,7 @@ package com.sub9.productservice.product.application.query.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.product.application.port.out.product.ProductMetadataQueryPort;
@@ -24,6 +25,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -33,6 +35,7 @@ import org.springframework.data.domain.PageRequest;
 class ProductQueryServiceUnitTest {
   @Mock ProductQueryRepository productQueryRepository;
   @Mock ProductMetadataQueryPort metadataQueryPort;
+  @Mock ApplicationEventPublisher eventPublisher;
   @InjectMocks private ProductQueryService productQueryService;
 
   private final UUID productId = UUID.randomUUID();
@@ -44,9 +47,11 @@ class ProductQueryServiceUnitTest {
     given(productQueryRepository.findProductDetailById(productId)).willReturn(Optional.empty());
 
     // when & then
-    assertThatThrownBy(() -> productQueryService.getProductDetail(productId, null))
+    assertThatThrownBy(() -> productQueryService.getProductDetail(productId, "guest:" + UUID.randomUUID()))
         .isInstanceOf(BusinessException.class)
         .hasMessage(ProductErrorCode.PRODUCT_NOT_FOUND.message());
+
+    verifyNoInteractions(metadataQueryPort, eventPublisher);
   }
 
   @Test
@@ -98,17 +103,27 @@ class ProductQueryServiceUnitTest {
 
   @Nested
   @DisplayName("장바구니 등록 전 상품 검증 테스트")
-  class ValidateSkuForCartTests {
+  class GetValidatedProductIdForCartTests {
     private final UUID skuId = UUID.randomUUID();
 
     @Test
+    void getValidatedProductIdForCart_returns_product_id() {
+      SkuInfo info = new SkuInfo(
+          skuId, productId, UUID.randomUUID(), "상품", "옵션", ProductStatus.ACTIVE, 10000L, 1);
+      given(productQueryRepository.getCartItemProducts(List.of(skuId))).willReturn(List.of(info));
+
+      assertThat(productQueryService.getValidatedProductIdForCart(skuId)).isEqualTo(productId);
+    }
+
+
+    @Test
     @DisplayName("조회 결과가 없으면 PRODUCT_NOT_FOUND 예외가 발생한다.")
-    void validateSkuForCart_fails_when_product_not_found() {
+    void getValidatedProductIdForCart_fails_when_product_not_found() {
       // given
       given(productQueryRepository.getCartItemProducts(List.of(skuId))).willReturn(List.of());
 
       // when & then
-      assertThatThrownBy(() -> productQueryService.validateSkuForCart(skuId))
+      assertThatThrownBy(() -> productQueryService.getValidatedProductIdForCart(skuId))
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.PRODUCT_NOT_FOUND.message());
     }
@@ -118,7 +133,7 @@ class ProductQueryServiceUnitTest {
         value = ProductStatus.class,
         names = {"INACTIVE", "SUSPENDED"})
     @DisplayName("판매 중이 아니면 PRODUCT_NOT_FOR_SALE 예외가 발생한다.")
-    void validateSkuForCart_fails_when_product_is_not_active(ProductStatus status) {
+    void getValidatedProductIdForCart_fails_when_product_is_not_active(ProductStatus status) {
       // given
       SkuInfo info =
           new SkuInfo(skuId, productId, UUID.randomUUID(), "말랑이", "핑크", status, 10000L, 1);
@@ -126,14 +141,14 @@ class ProductQueryServiceUnitTest {
       given(productQueryRepository.getCartItemProducts(List.of(skuId))).willReturn(List.of(info));
 
       // when & then
-      assertThatThrownBy(() -> productQueryService.validateSkuForCart(skuId))
+      assertThatThrownBy(() -> productQueryService.getValidatedProductIdForCart(skuId))
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.PRODUCT_NOT_FOR_SALE.message());
     }
 
     @Test
     @DisplayName("판매 중이어도 재고가 없으면 SKU_SOLD_OUT 예외가 발생한다.")
-    void validateSkuForCart_fails_when_stock_is_zero() {
+    void getValidatedProductIdForCart_fails_when_stock_is_zero() {
       // given
       SkuInfo info =
           new SkuInfo(
@@ -142,7 +157,7 @@ class ProductQueryServiceUnitTest {
       given(productQueryRepository.getCartItemProducts(List.of(skuId))).willReturn(List.of(info));
 
       // when & then
-      assertThatThrownBy(() -> productQueryService.validateSkuForCart(skuId))
+      assertThatThrownBy(() -> productQueryService.getValidatedProductIdForCart(skuId))
           .isInstanceOf(BusinessException.class)
           .hasMessage(ProductErrorCode.SKU_SOLD_OUT.message());
     }

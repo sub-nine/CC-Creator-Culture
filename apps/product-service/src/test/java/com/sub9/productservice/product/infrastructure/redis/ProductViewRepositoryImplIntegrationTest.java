@@ -21,7 +21,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 class ProductViewRepositoryImplIntegrationTest extends AbstractIntegrationTest {
   @Autowired private ProductViewRepositoryImpl productViewRepository;
 
-  // 테스트 중 자동 집계와 외부 Kafka 소비가 실행되지 않도록 격리한다.
   @MockitoBean private ProductViewCountScheduler productViewCountScheduler;
   @MockitoBean private ProductTotalViewCountScheduler productTotalViewCountScheduler;
   @MockitoBean private KafkaListenerEndpointRegistry kafkaListenerEndpointRegistry;
@@ -32,18 +31,18 @@ class ProductViewRepositoryImplIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("동일 사용자와 상품의 중복 조회를 막고 다른 사용자와 상품은 집계한다.")
+  @DisplayName("동일 사용자의 상품의 중복 조회를 막는다.")
   void recordView_success_when_duplicate_view() {
     // given
     UUID productId = UUID.randomUUID();
     UUID otherProductId = UUID.randomUUID();
-    UUID viewerId = UUID.randomUUID();
+    String viewerId = "user:" + UUID.randomUUID();
     Duration ttl = Duration.ofMinutes(30);
 
     // when & then
     assertThat(productViewRepository.recordView(productId, viewerId, ttl)).isTrue();
     assertThat(productViewRepository.recordView(productId, viewerId, ttl)).isFalse();
-    assertThat(productViewRepository.recordView(productId, UUID.randomUUID(), ttl)).isTrue();
+    assertThat(productViewRepository.recordView(productId, "guest:" + UUID.randomUUID(), ttl)).isTrue();
     assertThat(productViewRepository.recordView(otherProductId, viewerId, ttl)).isTrue();
     assertThat(productViewRepository.findAllViewCounts())
         .containsExactlyInAnyOrder(

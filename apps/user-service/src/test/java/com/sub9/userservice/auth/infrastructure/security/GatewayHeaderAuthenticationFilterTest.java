@@ -85,6 +85,21 @@ class GatewayHeaderAuthenticationFilterTest {
         assertThat(response.getStatus()).isEqualTo(200);
     }
 
+    @Test
+    @DisplayName("내부 API 경로는 Gateway 인증 헤더 검사를 생략한다")
+    void skips_internal_api_path() throws Exception {
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("POST", "/internal/v1/creators/names");
+        request.setServletPath("/internal/v1/creators/names");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain filterChain = new MockFilterChain();
+
+        filter.doFilter(request, response, filterChain);
+
+        assertThat(filterChain.getRequest()).isSameAs(request);
+        assertThat(response.getStatus()).isEqualTo(200);
+    }
+
     private MockHttpServletRequest protectedRequest() {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/logout");
         request.setServletPath("/api/v1/auth/logout");

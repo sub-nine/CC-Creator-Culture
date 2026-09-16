@@ -1,5 +1,8 @@
 package com.sub9.orderservice.payment.application.service;
 
+import static com.sub9.orderservice.support.PostgresConcurrencySupport.await;
+import static com.sub9.orderservice.support.PostgresConcurrencySupport.awaitOrderLock;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -13,6 +16,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.sub9.common.exception.BusinessException;
+import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.kafka.core.KafkaTemplate;
+import java.util.concurrent.CompletableFuture;
 import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.common.security.GatewayHeaderAuthenticationFilter;
 import com.sub9.orderservice.coupon.domain.model.Coupon;
@@ -96,7 +109,15 @@ class PaymentCancellationIntegrationTest {
     @MockitoSpyBean private PaymentRepositoryAdapter payments;
     @MockitoSpyBean private OrderCommandIdempotencyService commands;
     @MockitoBean private StockPort stock;
-    @MockitoBean private CouponUsagePort couponUsage;
+    @MockitoBean private KafkaTemplate<String, String> kafka;
+    @MockitoSpyBean private CouponUsagePort couponUsage;
+
+    @BeforeEach
+    void setKafkaResult() {
+        org.mockito.Mockito.clearInvocations(kafka);
+        org.mockito.Mockito.when(kafka.send(any(String.class), any(String.class), any(String.class)))
+                .thenReturn(CompletableFuture.completedFuture(null));
+    }
 
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
@@ -217,6 +238,132 @@ class PaymentCancellationIntegrationTest {
         assertThatThrownBy(() -> cancellationService.cancel(order.getId(), ids.generate(), PAID_AT))
                 .isInstanceOf(IllegalTransactionStateException.class);
         assertThat(countCancellations()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("같거나 다른 멱등 키의 동시 취소는 실제 취소 행과 재고 복구를 한 번만 만든다")
+    void when_cancellations_overlap_one_cancellation_is_persisted(boolean sameKey) throws Exception {
+        Order order = paidOrder(10000, PaymentStatus.SUCCESS);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        pauseCancellation(order, locked, release);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            try {
+                Future<String> first = executor.submit(() -> mvc.perform(request(order, "cancel"))
+                        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+                assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+                Future<?> second = executor.submit(() -> mvc.perform(request(order, sameKey ? "cancel" : "other"))
+                        .andExpect(status().isConflict())
+                        .andExpect(jsonPath("errorCode").value(sameKey ? "ORDER_0008" : "ORDER_0003")));
+                if (sameKey) second.get(5, TimeUnit.SECONDS);
+                else awaitOrderLock(jdbc, second);
+                release.countDown();
+                String firstBody = first.get(10, TimeUnit.SECONDS);
+                second.get(10, TimeUnit.SECONDS);
+                String replay = mvc.perform(request(order, "cancel")).andExpect(status().isOk())
+                        .andReturn().getResponse().getContentAsString();
+                assertThat(mapper.readTree(replay)).isEqualTo(mapper.readTree(firstBody));
+            } finally {
+                release.countDown();
+            }
+        }
+        assertState("CANCELED", "CANCELED", 1, "SUCCEEDED");
+        assertPaymentAndCoupon(order, true);
+        verify(stock).restore(eq(order.getId()), anyList(), eq(StockPort.RestoreReason.ORDER_CANCEL));
+        verifyNoMoreInteractions(stock);
+        verifyNoInteractions(couponUsage);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("취소와 배송 준비의 경쟁에서 선점한 상태와 실제 결제 취소 기록만 남는다")
+    void when_cancellation_races_preparing_only_winner_is_persisted(boolean cancelFirst) throws Exception {
+        Order order = paidOrder(10000, PaymentStatus.SUCCESS);
+        OrderItem item = order.getItems().getFirst();
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        if (cancelFirst) pauseCancellation(order, locked, release);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            try {
+                Future<?> first = executor.submit(() -> {
+                    if (cancelFirst) {
+                        mvc.perform(request(order, "cancel")).andExpect(status().isOk());
+                    } else {
+                        transaction().executeWithoutResult(ignored -> {
+                            itemStatusService.update(item.getCreatorId(), item.getId(), OrderItemStatus.PREPARING);
+                            locked.countDown();
+                            await(release);
+                        });
+                    }
+                    return null;
+                });
+                assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+                Future<?> second = executor.submit(() -> {
+                    if (cancelFirst) {
+                        assertThatThrownBy(() -> itemStatusService.update(
+                                item.getCreatorId(), item.getId(), OrderItemStatus.PREPARING))
+                                .isInstanceOfSatisfying(BusinessException.class, error ->
+                                        assertThat(error.getErrorCode()).isEqualTo(OrderErrorCode.INVALID_ORDER_STATUS));
+                    } else {
+                        mvc.perform(request(order, "cancel")).andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("errorCode").value("ORDER_0005"));
+                    }
+                    return null;
+                });
+                awaitOrderLock(jdbc, second);
+                release.countDown();
+                first.get(10, TimeUnit.SECONDS);
+                second.get(10, TimeUnit.SECONDS);
+            } finally {
+                release.countDown();
+            }
+        }
+        if (cancelFirst) {
+            assertState("CANCELED", "CANCELED", 1, "SUCCEEDED");
+            verify(stock).restore(eq(order.getId()), anyList(), eq(StockPort.RestoreReason.ORDER_CANCEL));
+        } else {
+            assertThat(jdbc.queryForObject("select status from p_orders", String.class)).isEqualTo("PROCESSING");
+            assertThat(jdbc.queryForObject("select canceled_at from p_orders", Object.class)).isNull();
+            assertThat(jdbc.queryForObject("select status from p_order_items where id = ?", String.class, item.getId()))
+                    .isEqualTo("PREPARING");
+            assertThat(jdbc.queryForList("select status from p_order_items where id <> ?", String.class, item.getId()))
+                    .containsOnly("ORDERED");
+            assertThat(jdbc.queryForObject("select status from p_order_command_requests", String.class)).isEqualTo("FAILED");
+        }
+        assertPaymentAndCoupon(order, cancelFirst);
+        verifyNoMoreInteractions(stock);
+        verifyNoInteractions(couponUsage);
+    }
+
+    private void pauseCancellation(Order order, CountDownLatch locked, CountDownLatch release) {
+        doAnswer(call -> {
+            Object payment = call.callRealMethod();
+            locked.countDown();
+            await(release);
+            return payment;
+        }).when(payments).findByOrderId(order.getId());
+    }
+
+    private void assertPaymentAndCoupon(Order order, boolean canceled) {
+        assertThat(countCancellations()).isEqualTo(canceled ? 1 : 0);
+        transaction().executeWithoutResult(ignored -> {
+            Payment payment = payments.findByOrderId(order.getId()).orElseThrow();
+            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+            assertThat(payment.getAmount()).isEqualTo(Money.won(10000));
+            assertThat(payment.getProcessedAt()).isEqualTo(PAID_AT);
+            if (canceled) {
+                assertThat(payment.getCancellation().getAmount()).isEqualTo(payment.getAmount());
+                assertThat(payment.getCancellation().getCanceledAt())
+                        .isEqualTo(em.find(Order.class, order.getId()).getCanceledAt());
+            } else {
+                assertThat(payment.getCancellation()).isNull();
+            }
+            UserCoupon coupon = em.find(UserCoupon.class, order.getItems().getFirst().getUserCouponId());
+            assertThat(coupon.getStatus()).isEqualTo(UserCouponStatus.USED);
+            assertThat(coupon.getUsedAt()).isEqualTo(PAID_AT);
+            assertThat(coupon.getOrderId()).isEqualTo(order.getId());
+        });
     }
 
     private Order paidOrder(long amount, PaymentStatus paymentStatus) {

@@ -21,6 +21,11 @@ export PRODUCT_DB_PASSWORD=product-password
 export ORDER_DB_PASSWORD=order-password
 export GRAFANA_ADMIN_PASSWORD=grafana-password
 export JWT_SECRET=jwt-test-secret
+export R2_ACCESS_KEY=test-access
+export R2_SECRET_KEY=test-r2-secret
+export R2_ENDPOINT=https://example.r2.cloudflarestorage.com
+export R2_BUCKET=cc-dev-product
+export R2_PUBLIC_URL=https://pub-example.r2.dev
 export CONFIG_SERVER_IMAGE=config-server
 export EUREKA_SERVER_IMAGE=eureka-server
 export GATEWAY_IMAGE=gateway
@@ -90,6 +95,11 @@ jq -e \
   and .services.gateway.environment.REDIS_HOST == "redis"
   and .services["user-service"].environment.JWT_SECRET == "jwt-test-secret"
   and .services.gateway.environment.JWT_SECRET == "jwt-test-secret"
+  and .services["product-service"].environment.R2_ACCESS_KEY == "test-access"
+  and .services["product-service"].environment.R2_SECRET_KEY == "test-r2-secret"
+  and .services["product-service"].environment.R2_ENDPOINT == "https://example.r2.cloudflarestorage.com"
+  and .services["product-service"].environment.R2_BUCKET == "cc-dev-product"
+  and .services["product-service"].environment.R2_PUBLIC_URL == "https://pub-example.r2.dev"
 ' <<<"$deploy_config" >/dev/null
 
 local_config="$(docker compose \

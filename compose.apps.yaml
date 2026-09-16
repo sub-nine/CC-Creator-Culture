@@ -5,7 +5,8 @@ x-service: &service
     context: .
     dockerfile: docker/Dockerfile.local
     target: service
-  mem_limit: 512m
+  cpus: 0.5
+  mem_limit: 1024m
   environment: &app-environment
     SPRING_PROFILES_ACTIVE: dev
     CONFIG_SERVER_IMPORT: configserver:http://config-server:8888
@@ -13,7 +14,7 @@ x-service: &service
     MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
     REDIS_HOST: redis
     SPRING_JPA_HIBERNATE_DDL_AUTO: update
-    JAVA_TOOL_OPTIONS: -Xms64m -Xmx256m -XX:+ExitOnOutOfMemoryError
+    JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError
   healthcheck:
     test: ["CMD-SHELL", "curl -fsS http://localhost:$${SERVER_PORT}/actuator/health >/dev/null"]
     interval: 10s
@@ -56,6 +57,8 @@ services:
 
   config-server:
     <<: *service
+    cpus: 0.25
+    mem_limit: 512m
     build:
       <<: *service-build
       target: config-server
@@ -65,19 +68,21 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       CONFIG_REPO_PATH: /config-repo
       SERVER_PORT: "8888"
-      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
+      JAVA_TOOL_OPTIONS: -Xms64m -Xmx256m -XX:+ExitOnOutOfMemoryError
     ports:
       - "127.0.0.1:8888:8888"
 
   eureka-server:
     <<: *service
+    cpus: 0.25
+    mem_limit: 512m
     build:
       <<: *service-build
       args:
         MODULE: infra/eureka-server
     environment:
       SERVER_PORT: "8761"
-      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
+      JAVA_TOOL_OPTIONS: -Xms64m -Xmx256m -XX:+ExitOnOutOfMemoryError
     ports:
       - "127.0.0.1:8761:8761"
 
@@ -94,7 +99,11 @@ services:
       USER_DB_USERNAME: ${USER_DB_USERNAME:?USER_DB_USERNAME is required}
       USER_DB_PASSWORD: ${USER_DB_PASSWORD:?USER_DB_PASSWORD is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-    depends_on: *app-dependencies
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+    depends_on:
+      <<: *app-dependencies
+      kafka:
+        condition: service_healthy
 
   product-service:
     <<: *service

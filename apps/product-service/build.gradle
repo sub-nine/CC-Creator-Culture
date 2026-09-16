@@ -19,6 +19,9 @@ dependencies {
     implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
     implementation 'io.github.openfeign:feign-micrometer'
 
+    // Resilience4j
+    implementation "io.github.resilience4j:resilience4j-spring-boot4:2.4.0"
+
     // Kafka
     implementation 'org.springframework.boot:spring-boot-starter-kafka'
 
@@ -71,4 +74,8 @@ dependencies {
     testImplementation 'org.testcontainers:testcontainers:1.21.4'
     testImplementation 'org.testcontainers:junit-jupiter:1.21.4'
     testImplementation 'org.testcontainers:postgresql:1.21.4'
+}
+
+tasks.withType(Test).configureEach {
+    maxParallelForks = Math.min(2, Runtime.runtime.availableProcessors())
 }

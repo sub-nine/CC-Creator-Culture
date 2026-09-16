@@ -6,7 +6,9 @@ import org.springframework.http.HttpStatus;
 public enum CreatorErrorCode implements ErrorCode {
     CREATOR_NOT_FOUND("CREATOR_0001", HttpStatus.NOT_FOUND, "창작자를 찾을 수 없습니다."),
     CREATOR_ALREADY_REVIEWED(
-            "CREATOR_0002", HttpStatus.CONFLICT, "이미 심사가 완료된 창작자입니다.");
+            "CREATOR_0002", HttpStatus.CONFLICT, "이미 심사가 완료된 창작자입니다."),
+    CREATOR_PROFILE_VALUE_ALREADY_EXISTS(
+            "CREATOR_0003", HttpStatus.CONFLICT, "이미 사용 중인 창작자 정보입니다.");
 
     private final String code;
     private final HttpStatus status;

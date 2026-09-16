@@ -1,7 +1,7 @@
 package com.sub9.productservice.product.infrastructure.redis;
 
-import com.sub9.productservice.product.application.query.dto.ProductViewCount;
 import com.sub9.productservice.product.application.port.out.product.ProductViewRepository;
+import com.sub9.productservice.product.application.query.dto.ProductViewCount;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,8 +24,9 @@ public class ProductViewRepositoryImpl implements ProductViewRepository {
   private final RedisScript<Long> viewCountScript;
 
   @Override
-  public boolean recordView(UUID productId, UUID viewerId, Duration ttl) {
+  public boolean recordView(UUID productId, String viewerId, Duration ttl) {
     String viewerKey = VIEWER_KEY_PREFIX + productId + ":" + viewerId;
+
     Long result =
         redisTemplate.execute(
             viewCountScript,

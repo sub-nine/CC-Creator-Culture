@@ -25,3 +25,9 @@ variable "github_repository" {
   type        = string
   default     = "sub-nine/CC-Creator-Culture"
 }
+
+variable "github_oidc_repository" {
+  description = "GitHub OIDC unique-id slug org@orgId/repo@repoId. Required when the org includes unique identifiers in OIDC tokens."
+  type        = string
+  default     = "sub-nine@321321281/CC-Creator-Culture@1347049090"
+}

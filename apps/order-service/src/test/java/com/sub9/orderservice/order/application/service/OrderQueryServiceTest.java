@@ -10,12 +10,14 @@ import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import com.sub9.orderservice.order.domain.model.Money;
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.model.OrderItem;
+import com.sub9.orderservice.order.domain.model.OrderItemStatus;
 import com.sub9.orderservice.order.domain.model.OrderNumber;
 import com.sub9.orderservice.order.domain.model.OrderStatus;
 import com.sub9.orderservice.order.domain.model.ProductSnapshot;
 import com.sub9.orderservice.order.domain.model.ShippingAddress;
 import com.sub9.orderservice.order.domain.repository.OrderQueryRepository;
 import com.sub9.orderservice.order.presentation.response.OrderQueryResponse.CreatorGroup;
+import com.sub9.orderservice.order.presentation.response.ProductPurchaseInfo;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -283,6 +285,60 @@ class OrderQueryServiceTest {
         });
     }
 
+    @ParameterizedTest
+    @EnumSource(OrderStatus.class)
+    @DisplayName("운영자 주문 상세는 모든 상태에서 연락처와 주소를 숨기고 원본을 보존한다")
+    void when_admin_queries_any_order_status_shipping_address_is_masked(OrderStatus status) {
+        Order order = order(120, CUSTOMER_ID, status, item(121, CREATOR_ID));
+        ShippingAddress original = order.getShippingAddress();
+        when(orderQueryRepository.findDetailByOrderNumber(order.getOrderNumber()))
+                .thenReturn(Optional.of(order));
+
+        var address = orderQueryService.getAdminOrder(order.getOrderNumber()).shippingAddress();
+
+        assertThat(address.recipientName()).isEqualTo(original.getRecipientName());
+        assertThat(address.recipientPhone()).isEqualTo("****");
+        assertThat(address.postalCode()).isEqualTo("****");
+        assertThat(address.addressLine1()).isEqualTo("****");
+        assertThat(address.addressLine2()).isEqualTo("****");
+        assertThat(order.getShippingAddress()).isSameAs(original);
+        assertThat(original.getRecipientPhone()).isEqualTo("010-1234-5678");
+    }
+
+    @Test
+    @DisplayName("운영자 조회 후에도 빈 상세 주소와 소비자 및 창작자의 배송지 원문을 보존한다")
+    void when_admin_queries_shipping_address_other_role_responses_remain_unchanged() {
+        for (String detail : new String[]{"101동 1001호", null, ""}) {
+            OrderItem item = item(131, CREATOR_ID);
+            Order order = order(130, CUSTOMER_ID, OrderStatus.PAID, item);
+            ShippingAddress original = ShippingAddress.of(
+                    "홍길동", "01012345678", "06236", "서울", detail);
+            ReflectionTestUtils.setField(order, "shippingAddress", original);
+            when(orderQueryRepository.findDetailByOrderNumber(order.getOrderNumber()))
+                    .thenReturn(Optional.of(order));
+            when(orderQueryRepository.findItemDetailById(item.getId())).thenReturn(Optional.of(item));
+
+            var admin = orderQueryService.getAdminOrder(order.getOrderNumber()).shippingAddress();
+            var customer = orderQueryService.getCustomerOrder(
+                    CUSTOMER_ID, order.getOrderNumber()).shippingAddress();
+            var creator = orderQueryService.getCreatorOrderItem(CREATOR_ID, item.getId()).shippingAddress();
+
+            assertThat(admin.recipientPhone()).isEqualTo("****");
+            assertThat(admin.addressLine2()).isEqualTo("****");
+            assertThat(customer.recipientName()).isEqualTo("홍길동");
+            assertThat(customer.recipientPhone()).isEqualTo("01012345678");
+            assertThat(customer.postalCode()).isEqualTo("06236");
+            assertThat(customer.addressLine1()).isEqualTo("서울");
+            assertThat(customer.addressLine2()).isEqualTo(detail);
+            assertThat(creator).isEqualTo(customer);
+            assertThat(order.getShippingAddress()).isSameAs(original);
+            assertThat(original.getRecipientPhone()).isEqualTo("01012345678");
+            assertThat(original.getPostalCode()).isEqualTo("06236");
+            assertThat(original.getAddressLine1()).isEqualTo("서울");
+            assertThat(original.getAddressLine2()).isEqualTo(detail);
+        }
+    }
+
     @Test
     @DisplayName("존재하지 않는 운영자 주문 상세를 조회하면 찾을 수 없음 오류를 반환한다")
     void when_admin_order_does_not_exist_not_found_is_returned() {
@@ -292,6 +348,52 @@ class OrderQueryServiceTest {
         assertError(
                 () -> orderQueryService.getAdminOrder(orderNumber),
                 OrderErrorCode.ORDER_NOT_FOUND);
+    }
+
+    @ParameterizedTest
+    @EnumSource(OrderItemStatus.class)
+    @DisplayName("본인 주문 항목은 구매 확정 상태일 때만 상품 ID와 구매 여부를 반환한다")
+    void when_owned_item_is_queried_only_completed_is_purchased(OrderItemStatus status) {
+        OrderItem item = item(131, CREATOR_ID);
+        order(130, CUSTOMER_ID, OrderStatus.PROCESSING, item);
+        ReflectionTestUtils.setField(item, "status", status);
+        when(orderQueryRepository.findItemDetailById(item.getId())).thenReturn(Optional.of(item));
+
+        assertThat(orderQueryService.getPurchaseStatus(CUSTOMER_ID, item.getId()))
+                .isEqualTo(status == OrderItemStatus.COMPLETED
+                        ? new ProductPurchaseInfo(item.getProductId(), true)
+                        : new ProductPurchaseInfo(null, false));
+    }
+
+    @Test
+    @DisplayName("타인의 구매 확정 항목을 조회하면 상품 ID 없이 미구매를 반환한다")
+    void when_another_customer_item_is_queried_not_purchased_is_returned() {
+        OrderItem item = item(141, CREATOR_ID);
+        order(140, OTHER_CUSTOMER_ID, OrderStatus.COMPLETED, item);
+        ReflectionTestUtils.setField(item, "status", OrderItemStatus.COMPLETED);
+        when(orderQueryRepository.findItemDetailById(item.getId())).thenReturn(Optional.of(item));
+
+        assertThat(orderQueryService.getPurchaseStatus(CUSTOMER_ID, item.getId()))
+                .isEqualTo(new ProductPurchaseInfo(null, false));
+    }
+
+    @Test
+    @DisplayName("주문 항목이 없으면 예외 없이 미구매를 반환한다")
+    void when_item_is_missing_not_purchased_is_returned() {
+        when(orderQueryRepository.findItemDetailById(uuid(151))).thenReturn(Optional.empty());
+
+        assertThat(orderQueryService.getPurchaseStatus(CUSTOMER_ID, uuid(151)))
+                .isEqualTo(new ProductPurchaseInfo(null, false));
+    }
+
+    @Test
+    @DisplayName("조회 장애는 미구매로 처리하지 않고 전파한다")
+    void when_purchase_query_fails_exception_is_propagated() {
+        var failure = new org.springframework.dao.DataAccessResourceFailureException("DB unavailable");
+        when(orderQueryRepository.findItemDetailById(uuid(161))).thenThrow(failure);
+
+        assertThatThrownBy(() -> orderQueryService.getPurchaseStatus(CUSTOMER_ID, uuid(161)))
+                .isSameAs(failure);
     }
 
     private static Order order(

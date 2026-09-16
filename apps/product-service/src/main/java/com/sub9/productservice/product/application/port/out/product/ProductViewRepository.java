@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface ProductViewRepository {
-  boolean recordView(UUID productId, UUID viewerId, Duration ttl);
+  boolean recordView(UUID productId, String viewerId, Duration ttl);
 
   List<ProductViewCount> findAllViewCounts();
 

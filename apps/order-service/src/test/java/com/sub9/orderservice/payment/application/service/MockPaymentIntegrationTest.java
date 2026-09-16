@@ -417,6 +417,32 @@ class MockPaymentIntegrationTest {
         verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
     }
 
+    @ParameterizedTest
+    @CsvSource({"SUCCESS,SUCCESS", "FAILED,FAILED", "SUCCESS,FAILED", "FAILED,SUCCESS"})
+    @DisplayName("실제 결제 고유 제약 충돌을 롤백한 후 저장된 결과로 응답한다")
+    void when_insert_conflicts_rollback_precedes_existing_payment_lookup(
+            PaymentStatus stored, PaymentStatus requested) {
+        Order order = saveOrder(100, false);
+        // 주문 잠금으로 정상 경로에서는 충돌하지 않으므로 저장된 행을 최초 조회에서만 숨깁니다.
+        Payment existing = payments.save(Payment.create(ids.generate(), order.getId(),
+                Money.won(100), stored, CREATED_AT));
+        doReturn(java.util.Optional.empty()).doCallRealMethod()
+                .when(payments).findByOrderId(order.getId());
+
+        if (stored == requested) {
+            assertThat(process(order, requested)).isEqualTo(MockPaymentResult.from(existing, order.getOrderNumber()));
+        } else {
+            assertBusinessError(() -> process(order, requested), OrderErrorCode.INVALID_ORDER_STATUS);
+        }
+
+        verify(payments, times(2)).findByOrderId(order.getId());
+        assertThat(paymentCount()).isEqualTo(1);
+        assertThat(orderStatus(order)).isEqualTo("PENDING_PAYMENT");
+        assertThat(queries.findDetailByOrderNumber(order.getOrderNumber()).orElseThrow().getPaidAt()).isNull();
+        assertThat(payments.findByOrderId(order.getId()).orElseThrow().getId()).isEqualTo(existing.getId());
+        verifyNoInteractions(coupons, stock, kafka);
+    }
+
     private MockHttpServletRequestBuilder paymentRequest(Order order, PaymentStatus result) {
         return post("/api/v1/orders/{orderNumber}/payments", order.getOrderNumber())
                 .contentType(MediaType.APPLICATION_JSON)

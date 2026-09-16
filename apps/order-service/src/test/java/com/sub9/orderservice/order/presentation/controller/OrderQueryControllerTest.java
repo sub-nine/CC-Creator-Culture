@@ -1,5 +1,6 @@
 package com.sub9.orderservice.order.presentation.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -18,6 +19,7 @@ import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import com.sub9.orderservice.order.domain.model.OrderItemStatus;
 import com.sub9.orderservice.order.domain.model.OrderNumber;
 import com.sub9.orderservice.order.domain.model.OrderStatus;
+import com.sub9.orderservice.order.domain.model.ShippingAddress;
 import com.sub9.orderservice.order.presentation.response.OrderQueryResponse.AdminOrderDetail;
 import com.sub9.orderservice.order.presentation.response.OrderQueryResponse.AdminOrderSummary;
 import com.sub9.orderservice.order.presentation.response.OrderQueryResponse.CreatorGroup;
@@ -213,22 +215,30 @@ class OrderQueryControllerTest {
 
     @ParameterizedTest
     @EnumSource(value = GatewayAuthenticationPrincipal.Role.class, names = {"MANAGER", "MASTER"})
-    @DisplayName("운영자 역할은 주문 상세를 배송지 없이 조회한다")
+    @DisplayName("운영자 역할은 주문 상세의 마스킹된 배송지를 조회한다")
     void when_admin_queries_order_detail_all_admin_roles_are_allowed(GatewayAuthenticationPrincipal.Role role)
             throws Exception {
         when(orderQueryService.getAdminOrder(OrderNumber.from(ORDER_NUMBER)))
                 .thenReturn(adminDetail());
 
-        mockMvc.perform(authenticatedGet("/api/v1/admin/orders/" + ORDER_NUMBER, role))
+        var result = mockMvc.perform(authenticatedGet("/api/v1/admin/orders/" + ORDER_NUMBER, role))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.customerId").value(CUSTOMER_ID.toString()))
                 .andExpect(jsonPath("$.data.creatorGroups[0].items[0].skuId").value(SKU_ID.toString()))
-                .andExpect(jsonPath("$..shippingAddress").doesNotExist())
+                .andExpect(jsonPath("$.data.shippingAddress.recipientName").value("홍길동"))
+                .andExpect(jsonPath("$.data.shippingAddress.recipientPhone").value("****"))
+                .andExpect(jsonPath("$.data.shippingAddress.postalCode").value("****"))
+                .andExpect(jsonPath("$.data.shippingAddress.addressLine1").value("****"))
+                .andExpect(jsonPath("$.data.shippingAddress.addressLine2").value("****"))
                 .andExpect(jsonPath("$..userCouponId").doesNotExist())
                 .andExpect(jsonPath("$..statusHistory").doesNotExist())
                 .andExpect(jsonPath("$..id").doesNotExist())
                 .andExpect(jsonPath("$..version").doesNotExist())
-                .andExpect(jsonPath("$..updatedAt").doesNotExist());
+                .andExpect(jsonPath("$..updatedAt").doesNotExist())
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("010-1234-5678", "06236", "서울특별시 강남구", "101동 1001호");
 
         verify(orderQueryService).getAdminOrder(OrderNumber.from(ORDER_NUMBER));
     }
@@ -499,6 +509,8 @@ class OrderQueryControllerTest {
                 34_200L,
                 CREATED_AT,
                 EXPIRES_AT,
+                ShippingAddressResponse.forAdmin(ShippingAddress.of(
+                        "홍길동", "010-1234-5678", "06236", "서울특별시 강남구", "101동 1001호")),
                 List.of(creatorGroup()));
     }
 
