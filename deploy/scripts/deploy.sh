@@ -34,6 +34,7 @@ done
 : "${ORDER_DB_PASSWORD_SECRET_OCID:?ORDER_DB_PASSWORD_SECRET_OCID is required}"
 : "${GRAFANA_ADMIN_PASSWORD_SECRET_OCID:?GRAFANA_ADMIN_PASSWORD_SECRET_OCID is required}"
 : "${JWT_SECRET_SECRET_OCID:?JWT_SECRET_SECRET_OCID is required}"
+: "${R2_SECRET_OCID:?R2_SECRET_OCID is required}"
 : "${OCIR_REGISTRY:?OCIR_REGISTRY is required}"
 
 ENABLE_MESSAGING_PROFILE="${ENABLE_MESSAGING_PROFILE:-true}"
@@ -339,17 +340,69 @@ read_secret_value() {
     echo "Failed to read OCI Vault Secret: $name" >&2
     return 1
   fi
+  assert_compose_safe "$name" "$value" || return 1
+  printf '%s' "$value"
+}
+
+assert_compose_safe() {
+  local name="$1"
+  local value="$2"
   if [[ -z "$value" || ! "$value" =~ ^[A-Za-z0-9_+./=@%-]+$ ]]; then
     echo "OCI Vault Secret must be a non-empty Compose-safe single-line value: $name" >&2
     return 1
   fi
-  printf '%s' "$value"
+}
+
+assert_https_url() {
+  local name="$1"
+  local value="$2"
+  if [[ -z "$value" || "$value" =~ [[:space:]] || "$value" != https://* ]]; then
+    echo "OCI Vault Secret must be a non-empty HTTPS URL: $name" >&2
+    return 1
+  fi
+}
+
+read_r2_secret() {
+  local raw
+
+  if ! raw="$(secret_value "$R2_SECRET_OCID")"; then
+    echo "Failed to read OCI Vault Secret: R2" >&2
+    return 1
+  fi
+
+  r2_access_key="$(printf '%s' "$raw" | jq -er '.access_key')" || {
+    echo "OCI Vault Secret R2 must contain access_key" >&2
+    return 1
+  }
+  r2_secret_key="$(printf '%s' "$raw" | jq -er '.secret_key')" || {
+    echo "OCI Vault Secret R2 must contain secret_key" >&2
+    return 1
+  }
+  r2_endpoint="$(printf '%s' "$raw" | jq -er '.endpoint')" || {
+    echo "OCI Vault Secret R2 must contain endpoint" >&2
+    return 1
+  }
+  r2_bucket="$(printf '%s' "$raw" | jq -er '.bucket')" || {
+    echo "OCI Vault Secret R2 must contain bucket" >&2
+    return 1
+  }
+  r2_public_url="$(printf '%s' "$raw" | jq -er '.public_url')" || {
+    echo "OCI Vault Secret R2 must contain public_url" >&2
+    return 1
+  }
+
+  assert_compose_safe R2_ACCESS_KEY "$r2_access_key" || return 1
+  assert_compose_safe R2_SECRET_KEY "$r2_secret_key" || return 1
+  assert_https_url R2_ENDPOINT "$r2_endpoint" || return 1
+  assert_compose_safe R2_BUCKET "$r2_bucket" || return 1
+  assert_https_url R2_PUBLIC_URL "$r2_public_url" || return 1
 }
 
 write_release_env() {
   local target="$1"
   local user_db_admin_password product_db_admin_password order_db_admin_password
   local user_db_password product_db_password order_db_password grafana_admin_password jwt_secret
+  local r2_access_key r2_secret_key r2_endpoint r2_bucket r2_public_url
   local key
 
   user_db_admin_password="$(read_secret_value USER_DB_ADMIN_PASSWORD "$USER_DB_ADMIN_PASSWORD_SECRET_OCID")" || return 1
@@ -360,6 +413,7 @@ write_release_env() {
   order_db_password="$(read_secret_value ORDER_DB_PASSWORD "$ORDER_DB_PASSWORD_SECRET_OCID")" || return 1
   grafana_admin_password="$(read_secret_value GRAFANA_ADMIN_PASSWORD "$GRAFANA_ADMIN_PASSWORD_SECRET_OCID")" || return 1
   jwt_secret="$(read_secret_value JWT_SECRET "$JWT_SECRET_SECRET_OCID")" || return 1
+  read_r2_secret || return 1
 
   {
     printf 'CANDIDATE_SHA=%s\n' "$candidate_sha"
@@ -374,6 +428,11 @@ write_release_env() {
     printf 'ORDER_DB_PASSWORD=%s\n' "$order_db_password"
     printf 'GRAFANA_ADMIN_PASSWORD=%s\n' "$grafana_admin_password"
     printf 'JWT_SECRET=%s\n' "$jwt_secret"
+    printf 'R2_ACCESS_KEY=%s\n' "$r2_access_key"
+    printf 'R2_SECRET_KEY=%s\n' "$r2_secret_key"
+    printf 'R2_ENDPOINT=%s\n' "$r2_endpoint"
+    printf 'R2_BUCKET=%s\n' "$r2_bucket"
+    printf 'R2_PUBLIC_URL=%s\n' "$r2_public_url"
     for key in "${base_image_keys[@]}"; do
       printf '%s=%s\n' "$key" "$(locked_image_value "$key")"
     done
@@ -492,6 +551,24 @@ complete_public_cutover() {
 
 DEPLOY_DEADLINE=0
 
+record_restart_baseline() {
+  local service="$1"
+  local file="$STATE_DIR/runtime/restart-baseline"
+  local container count
+  container="$(compose ps -q "$service")"
+  if [[ -z "$container" || "$container" == *$'\n'* ]]; then
+    echo "Expected exactly one running container for $service." >&2
+    return 1
+  fi
+  count="$(docker inspect --format '{{.RestartCount}}' "$container")" || return 1
+  mkdir -p "$(dirname "$file")"
+  if [[ -f "$file" ]]; then
+    grep -v "^${service}=" "$file" > "${file}.tmp" || true
+    mv "${file}.tmp" "$file"
+  fi
+  printf '%s=%s\n' "$service" "$count" >> "$file"
+}
+
 wait_healthy() {
   local service="$1"
   while (( SECONDS < DEPLOY_DEADLINE )); do
@@ -500,6 +577,7 @@ wait_healthy() {
     if [[ -n "$container" ]]; then
       health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container" 2>/dev/null || true)"
       if [[ "$health" == "healthy" || "$health" == "running" ]]; then
+        record_restart_baseline "$service" || return 1
         return 0
       fi
       if [[ "$health" == "unhealthy" || "$health" == "exited" || "$health" == "dead" ]]; then
@@ -703,7 +781,8 @@ stop_legacy_postgres() {
 
 verify_container_runtime() {
   local runtime_services=(user-postgres product-postgres order-postgres zipkin config-server eureka-server user-service product-service order-service gateway caddy)
-  local details container detail service
+  local container detail service count oom status baseline file failed
+  file="$STATE_DIR/runtime/restart-baseline"
   if [[ "$ENABLE_MESSAGING_PROFILE" == "true" ]]; then
     runtime_services+=(redis kafka kafka-ui)
   fi
@@ -711,7 +790,7 @@ verify_container_runtime() {
     runtime_services+=(prometheus grafana)
   fi
 
-  details=""
+  failed=0
   for service in "${runtime_services[@]}"; do
     container="$(compose ps -q "$service")"
     if [[ -z "$container" || "$container" == *$'\n'* ]]; then
@@ -719,9 +798,24 @@ verify_container_runtime() {
       return 1
     fi
     detail="$(docker inspect --format '{{.Name}}|{{.RestartCount}}|{{.State.OOMKilled}}|{{.State.Status}}' "$container")" || return 1
-    details+="${detail}"$'\n'
+    count="${detail#*|}"
+    oom="${count#*|}"
+    count="${count%%|*}"
+    status="${oom#*|}"
+    oom="${oom%%|*}"
+    baseline=""
+    if [[ -f "$file" ]]; then
+      baseline="$(awk -F= -v s="$service" '$1 == s {print $2}' "$file")"
+    fi
+    if [[ "$status" != "running" || "$oom" != "false" ]]; then
+      printf '%s\n' "$detail" >&2
+      failed=1
+    elif [[ -n "$baseline" && "$count" -gt "$baseline" ]]; then
+      printf '%s\n' "$detail" >&2
+      failed=1
+    fi
   done
-  if awk -F'|' 'NF == 4 && ($2 != 0 || $3 != "false" || $4 != "running") {print; failed=1} END {exit failed}' <<<"$details"; then
+  if (( failed == 0 )); then
     return 0
   fi
   echo "Container restart, OOM, or runtime state verification failed." >&2

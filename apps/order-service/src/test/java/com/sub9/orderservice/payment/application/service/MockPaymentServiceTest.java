@@ -89,6 +89,52 @@ class MockPaymentServiceTest {
         assertThat(service.process(customerId, orderNumber, PaymentStatus.FAILED)).isEqualTo(processed.result());
     }
 
+    @ParameterizedTest
+    @EnumSource(PaymentStatus.class)
+    @DisplayName("결제 고유 제약 충돌 후 기존 결과만 반환하고 재고는 복구하지 않는다")
+    void when_payment_constraint_conflicts_existing_result_is_returned(PaymentStatus status) {
+        var failure = constraintFailure("uk_payments_order_id");
+        var saved = result(status);
+        when(transactions.process(customerId, orderNumber, status)).thenThrow(failure);
+        when(transactions.findExisting(customerId, orderNumber, status))
+                .thenReturn(java.util.Optional.of(saved));
+
+        assertThat(service.process(customerId, orderNumber, status)).isEqualTo(saved);
+        verifyNoInteractions(stock);
+    }
+
+    @Test
+    @DisplayName("충돌 후 기존 결제가 없으면 최초 예외를 그대로 전달한다")
+    void when_conflicting_payment_is_missing_original_failure_is_rethrown() {
+        var failure = constraintFailure("uk_payments_order_id");
+        when(transactions.process(customerId, orderNumber, PaymentStatus.SUCCESS)).thenThrow(failure);
+        when(transactions.findExisting(customerId, orderNumber, PaymentStatus.SUCCESS))
+                .thenReturn(java.util.Optional.empty());
+
+        assertThatThrownBy(() -> service.process(customerId, orderNumber, PaymentStatus.SUCCESS))
+                .isSameAs(failure);
+        verifyNoInteractions(stock);
+    }
+
+    @Test
+    @DisplayName("다른 고유 제약 충돌은 재조회하지 않고 그대로 전달한다")
+    void when_other_constraint_conflicts_recovery_is_not_attempted() {
+        var failure = constraintFailure("other_constraint");
+        when(transactions.process(customerId, orderNumber, PaymentStatus.SUCCESS)).thenThrow(failure);
+
+        assertThatThrownBy(() -> service.process(customerId, orderNumber, PaymentStatus.SUCCESS))
+                .isSameAs(failure);
+        org.mockito.Mockito.verify(transactions, org.mockito.Mockito.never())
+                .findExisting(customerId, orderNumber, PaymentStatus.SUCCESS);
+        verifyNoInteractions(stock);
+    }
+
+    private RuntimeException constraintFailure(String constraint) {
+        return new org.springframework.dao.DataIntegrityViolationException("제약 충돌",
+                new org.hibernate.exception.ConstraintViolationException(
+                        "중복", new java.sql.SQLException("duplicate", "23505"), constraint));
+    }
+
     private MockPaymentResult result(PaymentStatus status) {
         return new MockPaymentResult(ids.generate(), orderNumber.toString(), PaymentMethod.MOCK,
                 status, 1000, status == PaymentStatus.FAILED ? "MOCK_PAYMENT_FAILED" : null,

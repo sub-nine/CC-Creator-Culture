@@ -18,4 +18,7 @@ public interface RedisRepository {
             List<LeaderboardScore> categoryScores,
             List<LeaderboardScore> hashtagScores
     );
+
+    // 현재 랭킹을 원자적으로 읽고 같은 키를 비움(스냅샷 저장 후 하루 단위로 리셋하기 위함)
+    List<RankedMember> snapshotAndClear(LeaderboardType leaderboardType);
 }

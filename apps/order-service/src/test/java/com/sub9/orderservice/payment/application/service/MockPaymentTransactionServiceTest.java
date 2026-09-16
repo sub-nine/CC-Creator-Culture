@@ -68,6 +68,18 @@ class MockPaymentTransactionServiceTest {
                         tools.jackson.databind.json.JsonMapper.builder().build()), clock, ids);
     }
 
+    @Test
+    @DisplayName("충돌 복구 조회에서도 타인 주문 접근을 거부한다")
+    void when_recovery_customer_does_not_own_order_access_is_rejected() {
+        Order order = order(100);
+        when(orders.findByOrderNumberForUpdate(order.getOrderNumber())).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> service.findExisting(ids.generate(), order.getOrderNumber(), PaymentStatus.SUCCESS))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        failure -> assertThat(failure.getErrorCode()).isEqualTo(OrderErrorCode.ORDER_ACCESS_DENIED));
+        verifyNoInteractions(payments, coupons, events, clock);
+    }
+
     @ParameterizedTest
     @CsvSource({"SUCCESS, 34200", "FAILED, 34200", "SUCCESS, 0", "FAILED, 0"})
     @DisplayName("주문 금액으로 결제를 만들고 성공 또는 실패를 주문에 반영한다")

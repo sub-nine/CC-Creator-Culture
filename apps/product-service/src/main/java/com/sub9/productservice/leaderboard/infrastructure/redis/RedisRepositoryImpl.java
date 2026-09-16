@@ -29,6 +29,7 @@ public class RedisRepositoryImpl implements RedisRepository {
 
     private final StringRedisTemplate redisTemplate;
     private final RedisScript<Long> incrementScoreIfNotProcessedScript;
+    private final RedisScript<List> snapshotAndClearScript;
 
     @Override
     public List<RankedMember> getRankedMembers(LeaderboardType leaderboardType) {
@@ -98,5 +99,33 @@ public class RedisRepositoryImpl implements RedisRepository {
             args.add(leaderboardScore.targetId().toString());
             args.add(String.valueOf(leaderboardScore.score()));
         });
+    }
+
+    @Override
+    public List<RankedMember> snapshotAndClear(LeaderboardType leaderboardType) {
+        try {
+            String key = LeaderboardRedisKey.current(leaderboardType);
+            List<String> flatResult = redisTemplate.execute(snapshotAndClearScript, List.of(key));
+            return parseFlatRankedMembers(flatResult);
+        } catch (DataAccessException exception) {
+            log.error("[REDIS] 리더보드 스냅샷 조회/초기화 실패 - type: {}", leaderboardType, exception);
+            return List.of();
+        }
+    }
+
+    // member, score가 번갈아 나열된 flat 응답(ZREVRANGE ... WITHSCORES 원형)을 순위 매긴 목록으로 변환
+    private List<RankedMember> parseFlatRankedMembers(List<String> flatMembersWithScores) {
+        if (flatMembersWithScores == null || flatMembersWithScores.isEmpty()) {
+            return List.of();
+        }
+
+        List<RankedMember> rankedMembers = new ArrayList<>(flatMembersWithScores.size() / 2);
+        long ranking = 1;
+        for (int i = 0; i < flatMembersWithScores.size(); i += 2) {
+            UUID targetId = UUID.fromString(flatMembersWithScores.get(i));
+            double score = Double.parseDouble(flatMembersWithScores.get(i + 1));
+            rankedMembers.add(new RankedMember(ranking++, targetId, score));
+        }
+        return rankedMembers;
     }
 }

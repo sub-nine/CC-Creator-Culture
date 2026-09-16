@@ -16,6 +16,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -63,6 +64,21 @@ public class MockPaymentTransactionService {
         Payment payment = paymentRepository.save(Payment.create(
                 uuidGenerator.generate(), order.getId(), order.getPaymentAmount(), result, processedAt));
         return new ProcessedPayment(MockPaymentResult.from(payment, orderNumber), stockRestore);
+    }
+
+    @Transactional
+    public Optional<MockPaymentResult> findExisting(UUID customerId, OrderNumber orderNumber, PaymentStatus result) {
+        Order order = orderRepository.findByOrderNumberForUpdate(orderNumber)
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        if (!order.getCustomerId().equals(customerId)) {
+            throw new BusinessException(OrderErrorCode.ORDER_ACCESS_DENIED);
+        }
+        return paymentRepository.findByOrderId(order.getId()).map(payment -> {
+            if (payment.getStatus() != result) {
+                throw new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS);
+            }
+            return MockPaymentResult.from(payment, orderNumber);
+        });
     }
 
     public record ProcessedPayment(MockPaymentResult result, StockRestoreCommand stockRestore) {

@@ -10,12 +10,14 @@ import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import com.sub9.orderservice.order.domain.model.Money;
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.model.OrderItem;
+import com.sub9.orderservice.order.domain.model.OrderItemStatus;
 import com.sub9.orderservice.order.domain.model.OrderNumber;
 import com.sub9.orderservice.order.domain.model.OrderStatus;
 import com.sub9.orderservice.order.domain.model.ProductSnapshot;
 import com.sub9.orderservice.order.domain.model.ShippingAddress;
 import com.sub9.orderservice.order.domain.repository.OrderQueryRepository;
 import com.sub9.orderservice.order.presentation.response.OrderQueryResponse.CreatorGroup;
+import com.sub9.orderservice.order.presentation.response.ProductPurchaseInfo;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -292,6 +294,52 @@ class OrderQueryServiceTest {
         assertError(
                 () -> orderQueryService.getAdminOrder(orderNumber),
                 OrderErrorCode.ORDER_NOT_FOUND);
+    }
+
+    @ParameterizedTest
+    @EnumSource(OrderItemStatus.class)
+    @DisplayName("본인 주문 항목은 구매 확정 상태일 때만 상품 ID와 구매 여부를 반환한다")
+    void when_owned_item_is_queried_only_completed_is_purchased(OrderItemStatus status) {
+        OrderItem item = item(131, CREATOR_ID);
+        order(130, CUSTOMER_ID, OrderStatus.PROCESSING, item);
+        ReflectionTestUtils.setField(item, "status", status);
+        when(orderQueryRepository.findItemDetailById(item.getId())).thenReturn(Optional.of(item));
+
+        assertThat(orderQueryService.getPurchaseStatus(CUSTOMER_ID, item.getId()))
+                .isEqualTo(status == OrderItemStatus.COMPLETED
+                        ? new ProductPurchaseInfo(item.getProductId(), true)
+                        : new ProductPurchaseInfo(null, false));
+    }
+
+    @Test
+    @DisplayName("타인의 구매 확정 항목을 조회하면 상품 ID 없이 미구매를 반환한다")
+    void when_another_customer_item_is_queried_not_purchased_is_returned() {
+        OrderItem item = item(141, CREATOR_ID);
+        order(140, OTHER_CUSTOMER_ID, OrderStatus.COMPLETED, item);
+        ReflectionTestUtils.setField(item, "status", OrderItemStatus.COMPLETED);
+        when(orderQueryRepository.findItemDetailById(item.getId())).thenReturn(Optional.of(item));
+
+        assertThat(orderQueryService.getPurchaseStatus(CUSTOMER_ID, item.getId()))
+                .isEqualTo(new ProductPurchaseInfo(null, false));
+    }
+
+    @Test
+    @DisplayName("주문 항목이 없으면 예외 없이 미구매를 반환한다")
+    void when_item_is_missing_not_purchased_is_returned() {
+        when(orderQueryRepository.findItemDetailById(uuid(151))).thenReturn(Optional.empty());
+
+        assertThat(orderQueryService.getPurchaseStatus(CUSTOMER_ID, uuid(151)))
+                .isEqualTo(new ProductPurchaseInfo(null, false));
+    }
+
+    @Test
+    @DisplayName("조회 장애는 미구매로 처리하지 않고 전파한다")
+    void when_purchase_query_fails_exception_is_propagated() {
+        var failure = new org.springframework.dao.DataAccessResourceFailureException("DB unavailable");
+        when(orderQueryRepository.findItemDetailById(uuid(161))).thenThrow(failure);
+
+        assertThatThrownBy(() -> orderQueryService.getPurchaseStatus(CUSTOMER_ID, uuid(161)))
+                .isSameAs(failure);
     }
 
     private static Order order(

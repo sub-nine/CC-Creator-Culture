@@ -1,5 +1,9 @@
 package com.sub9.orderservice.payment.application.service;
 
+import static com.sub9.orderservice.support.PostgresConcurrencySupport.await;
+import static com.sub9.orderservice.support.PostgresConcurrencySupport.awaitOrderLock;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -9,11 +13,21 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.sub9.orderservice.coupon.domain.model.Coupon;
+import com.sub9.orderservice.coupon.domain.model.UserCoupon;
+import com.sub9.orderservice.order.infrastructure.persistence.OrderRepositoryAdapter;
+import jakarta.persistence.EntityManager;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.cart.application.service.CartQueryService;
 import com.sub9.orderservice.order.application.port.output.CouponApplicationPort;
-import com.sub9.orderservice.order.application.port.output.CouponUsagePort;
 import com.sub9.orderservice.order.application.port.output.PaymentCancellationPort;
 import com.sub9.orderservice.order.application.port.output.StockPort;
 import com.sub9.orderservice.order.application.port.output.StockPort.RestoreReason;
@@ -91,8 +105,9 @@ class MockPaymentConcurrencyIntegrationTest {
     @Autowired
     private JdbcTemplate jdbc;
 
-    @MockitoBean
-    private CouponUsagePort coupons;
+    @Autowired private EntityManager em;
+    @Autowired private PlatformTransactionManager transactionManager;
+    @MockitoSpyBean private OrderRepositoryAdapter lockedOrders;
 
     @MockitoBean
     private StockPort stock;
@@ -112,7 +127,7 @@ class MockPaymentConcurrencyIntegrationTest {
 
     @BeforeEach
     void setClock() {
-        reset(coupons, stock, kafka);
+        reset(stock, kafka);
         when(clock.instant()).thenReturn(NOW);
         when(kafka.send(anyString(), anyString(), anyString()))
                 .thenReturn(CompletableFuture.completedFuture(null));
@@ -125,6 +140,8 @@ class MockPaymentConcurrencyIntegrationTest {
         jdbc.update("delete from p_order_cart_cleanup_tasks");
         jdbc.update("delete from p_order_items");
         jdbc.update("delete from p_orders");
+        jdbc.update("delete from p_user_coupons");
+        jdbc.update("delete from p_coupons");
     }
 
     @Test
@@ -143,16 +160,20 @@ class MockPaymentConcurrencyIntegrationTest {
         assertThat(paymentCount()).isEqualTo(1);
         assertThat(orderStatus(order)).isEqualTo("PAID");
         verify(kafka).send(eq("order.paid"), eq(order.getId().toString()), anyString());
-        verifyNoInteractions(coupons, stock);
+        verifyNoInteractions(stock);
+        assertCoupon(order, true);
+        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
+        verifyNoMoreInteractions(kafka);
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(PaymentStatus.class)
     @DisplayName("성공과 실패 결제가 경쟁하면 먼저 확정된 결과만 남긴다")
-    void when_success_and_failure_overlap_only_the_first_result_is_kept() throws Exception {
+    void when_success_and_failure_overlap_only_the_first_result_is_kept(PaymentStatus winner) throws Exception {
         Order order = saveOrder();
 
         List<Attempt<MockPaymentResult>> attempts = runConcurrent(
-                order, PaymentStatus.SUCCESS, PaymentStatus.FAILED);
+                order, winner, winner == PaymentStatus.SUCCESS ? PaymentStatus.FAILED : PaymentStatus.SUCCESS);
 
         Attempt<MockPaymentResult> committed = attempts.stream()
                 .filter(attempt -> attempt.value() != null)
@@ -164,7 +185,7 @@ class MockPaymentConcurrencyIntegrationTest {
                 .orElseThrow();
         String status = orderStatus(order);
 
-        assertThat(status).isIn("PAID", "FAILED");
+        assertThat(status).isEqualTo(winner == PaymentStatus.SUCCESS ? "PAID" : "FAILED");
         assertThat(committed.value().status().name())
                 .isEqualTo(status.equals("PAID") ? "SUCCESS" : "FAILED");
         assertThat(rejected.failure()).isInstanceOfSatisfying(BusinessException.class,
@@ -177,32 +198,40 @@ class MockPaymentConcurrencyIntegrationTest {
             verify(stock).restore(eq(order.getId()), eq(stockItems(order)), eq(RestoreReason.PAYMENT_FAILED));
             verify(kafka, never()).send(eq("order.paid"), anyString(), anyString());
         }
-        verifyNoInteractions(coupons);
+        assertCoupon(order, winner == PaymentStatus.SUCCESS);
+        assertThat(jdbc.queryForObject("select status from p_payments", String.class)).isEqualTo(winner.name());
+        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
+        verifyNoMoreInteractions(stock, kafka);
     }
 
     private List<Attempt<MockPaymentResult>> runConcurrent(
             Order order, PaymentStatus firstStatus, PaymentStatus secondStatus) throws Exception {
-        CountDownLatch ready = new CountDownLatch(2);
-        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicBoolean first = new AtomicBoolean(true);
+        doAnswer(call -> {
+            Object orderResult = call.callRealMethod();
+            if (first.getAndSet(false)) {
+                locked.countDown();
+                await(release);
+            }
+            return orderResult;
+        }).when(lockedOrders).findByOrderNumberForUpdate(order.getOrderNumber());
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
             try {
-                Future<Attempt<MockPaymentResult>> first = executor.submit(
-                        () -> attempt(order, firstStatus, ready, start));
-                Future<Attempt<MockPaymentResult>> second = executor.submit(
-                        () -> attempt(order, secondStatus, ready, start));
-                assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
-                start.countDown();
-                return List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
+                Future<Attempt<MockPaymentResult>> winner = executor.submit(() -> attempt(order, firstStatus));
+                assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+                Future<Attempt<MockPaymentResult>> contender = executor.submit(() -> attempt(order, secondStatus));
+                awaitOrderLock(jdbc, contender);
+                release.countDown();
+                return List.of(winner.get(10, TimeUnit.SECONDS), contender.get(10, TimeUnit.SECONDS));
             } finally {
-                start.countDown();
+                release.countDown();
             }
         }
     }
 
-    private Attempt<MockPaymentResult> attempt(
-            Order order, PaymentStatus status, CountDownLatch ready, CountDownLatch start) {
-        ready.countDown();
-        await(start);
+    private Attempt<MockPaymentResult> attempt(Order order, PaymentStatus status) {
         try {
             return new Attempt<>(service.process(order.getCustomerId(), order.getOrderNumber(), status), null);
         } catch (RuntimeException exception) {
@@ -210,15 +239,14 @@ class MockPaymentConcurrencyIntegrationTest {
         }
     }
 
-    private static void await(CountDownLatch latch) {
-        try {
-            if (!latch.await(5, TimeUnit.SECONDS)) {
-                throw new IllegalStateException("동시성 테스트 대기 시간이 초과되었습니다.");
-            }
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("동시성 테스트가 중단되었습니다.", exception);
-        }
+    private void assertCoupon(Order order, boolean used) {
+        var coupon = jdbc.queryForMap("select status, order_id, used_at from p_user_coupons where id = ?",
+                order.getItems().getFirst().getUserCouponId());
+        assertThat(coupon.get("status")).isEqualTo(used ? "USED" : "ISSUED");
+        assertThat(coupon.get("order_id")).isEqualTo(used ? order.getId() : null);
+        if (used) assertThat(coupon.get("used_at")).isNotNull();
+        else assertThat(coupon.get("used_at")).isNull();
+        assertThat(jdbc.queryForObject("select count(*) from p_payment_cancellations", Integer.class)).isZero();
     }
 
     private int paymentCount() {
@@ -234,12 +262,22 @@ class MockPaymentConcurrencyIntegrationTest {
     }
 
     private Order saveOrder() {
-        Order order = Order.create(ids.generate(), ids.generate(),
-                ShippingAddress.of("홍길동", "010-1234-5678", "06236", "서울 강남구", "101호"),
-                List.of(OrderItem.create(ids.generate(), null, ids.generate(), ids.generate(), ids.generate(),
-                        null, ProductSnapshot.of("키링", "기본", Money.won(20_000), 2), Money.won(0))),
-                CREATED_AT);
-        return orders.save(order);
+        return new TransactionTemplate(transactionManager).execute(ignored -> {
+            UUID orderId = ids.generate();
+            UUID customer = ids.generate();
+            Coupon coupon = Coupon.create(ids.generate(), "경쟁 쿠폰", 10, 10,
+                    CREATED_AT.minusSeconds(60), CREATED_AT.plusSeconds(3600), customer, CREATED_AT);
+            em.persist(coupon);
+            UserCoupon issued = UserCoupon.issue(ids.generate(), coupon, customer, CREATED_AT);
+            issued.use(customer, orderId, CREATED_AT);
+            em.persist(issued);
+            Order order = Order.create(orderId, customer,
+                    ShippingAddress.of("홍길동", "010-1234-5678", "06236", "서울 강남구", "101호"),
+                    List.of(OrderItem.create(ids.generate(), null, ids.generate(), ids.generate(), ids.generate(),
+                            issued.getId(), ProductSnapshot.of("키링", "기본", Money.won(20_000), 2), Money.won(4_000))),
+                    CREATED_AT);
+            return orders.save(order);
+        });
     }
 
     private record Attempt<T>(T value, RuntimeException failure) {

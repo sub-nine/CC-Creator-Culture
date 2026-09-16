@@ -61,6 +61,8 @@ public class SecurityConfig {
                 .hasRole("CREATOR")
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/creators/me")
                 .hasRole("CREATOR")
+                .requestMatchers("/internal/**")
+                .permitAll()
                 .requestMatchers("/api/v1/admin/managers")
                 .hasRole("MASTER")
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/admin/creators/*/approval")

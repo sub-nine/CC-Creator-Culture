@@ -49,3 +49,5 @@ create_secret PRODUCT_DB_PASSWORD_SECRET_OCID cc-dev-product-db-password
 create_secret ORDER_DB_PASSWORD_SECRET_OCID cc-dev-order-db-password
 create_secret GRAFANA_ADMIN_PASSWORD_SECRET_OCID cc-dev-grafana-admin-password
 create_secret JWT_SECRET_SECRET_OCID cc-dev-jwt-secret
+# cc-dev-r2 is not generated here. Store Cloudflare R2 credentials as JSON:
+# {"access_key","secret_key","endpoint","bucket","public_url"}
