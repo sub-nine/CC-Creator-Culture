@@ -43,8 +43,6 @@ public class LeaderboardSnapshot extends BaseEntity {
     @Column(name = "date", nullable = false)
     private LocalDate date;
 
-    // TODO: 아직 이 스냅샷을 실제로 저장(save)하는 로직이 없음 - 매일 자정 등 주기적으로
-    //  현재 리더보드(Redis)를 스냅샷으로 남기는 스케줄러 구현 필요
     public static LeaderboardSnapshot create(
             LeaderboardType type,
             UUID targetId,

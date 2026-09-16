@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,5 +47,31 @@ class LeaderboardSnapshotRepositoryImplIntegrationTest extends AbstractIntegrati
         assertThat(results).hasSize(1);
         assertThat(results.get(0).getTargetId()).isEqualTo(categoryId);
         assertThat(results.get(0).getScore()).isEqualTo(10.0);
+    }
+
+    @Test
+    @DisplayName("타입별로 가장 최근 스냅샷 날짜를 조회한다")
+    void findMaxDate_returnsLatestDatePerType() {
+        LocalDate today = LocalDate.now();
+        UUID categoryId = UUID.randomUUID();
+        UUID hashtagId = UUID.randomUUID();
+
+        leaderboardSnapshotJpaRepository.save(
+                LeaderboardSnapshot.create(LeaderboardType.CATEGORY, categoryId, 10.0, 1, today.minusDays(2)));
+        leaderboardSnapshotJpaRepository.save(
+                LeaderboardSnapshot.create(LeaderboardType.CATEGORY, categoryId, 20.0, 1, today.minusDays(1)));
+        leaderboardSnapshotJpaRepository.save(
+                LeaderboardSnapshot.create(LeaderboardType.HASHTAG, hashtagId, 5.0, 1, today.minusDays(5)));
+
+        assertThat(leaderboardSnapshotRepository.findMaxDate(LeaderboardType.CATEGORY))
+                .contains(today.minusDays(1));
+        assertThat(leaderboardSnapshotRepository.findMaxDate(LeaderboardType.HASHTAG))
+                .contains(today.minusDays(5));
+    }
+
+    @Test
+    @DisplayName("스냅샷 이력이 없는 타입은 빈 값을 반환한다")
+    void findMaxDate_noHistory_returnsEmpty() {
+        assertThat(leaderboardSnapshotRepository.findMaxDate(LeaderboardType.CATEGORY)).isEqualTo(Optional.empty());
     }
 }

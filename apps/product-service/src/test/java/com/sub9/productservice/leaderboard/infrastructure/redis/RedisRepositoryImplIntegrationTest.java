@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -119,5 +120,124 @@ class RedisRepositoryImplIntegrationTest extends AbstractIntegrationTest {
         assertThat(appliedCount).isEqualTo(1);
         List<RankedMember> rankedMembers = redisRepository.getRankedMembers(LeaderboardType.CATEGORY);
         assertThat(rankedMembers).containsExactly(new RankedMember(1, categoryId, 5.0));
+    }
+
+    @Test
+    @DisplayName("스냅샷을 뜨면 점수 내림차순으로 랭킹이 매겨져 반환되고, 실시간 ZSET은 비워진다")
+    void snapshotAndClear_returnsRankedMembersAndEmptiesZSet() {
+        UUID categoryA = UUID.randomUUID();
+        UUID categoryB = UUID.randomUUID();
+        redisRepository.incrementScoresIfNotProcessed(
+                LeaderboardEventType.ORDER_PAID, UUID.randomUUID(),
+                List.of(new LeaderboardScore(categoryA, 3.0)), List.of());
+        redisRepository.incrementScoresIfNotProcessed(
+                LeaderboardEventType.PRODUCT_SYNC_VIEW, UUID.randomUUID(),
+                List.of(new LeaderboardScore(categoryB, 10.0)), List.of());
+
+        List<RankedMember> snapshot = redisRepository.snapshotAndClear(LeaderboardType.CATEGORY);
+
+        assertThat(snapshot).containsExactly(
+                new RankedMember(1, categoryB, 10.0),
+                new RankedMember(2, categoryA, 3.0)
+        );
+        assertThat(redisRepository.getRankedMembers(LeaderboardType.CATEGORY)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("비어있는 ZSET을 스냅샷 떠도 예외 없이 빈 목록을 반환한다")
+    void snapshotAndClear_emptyZSet_returnsEmptyList() {
+        List<RankedMember> snapshot = redisRepository.snapshotAndClear(LeaderboardType.CATEGORY);
+
+        assertThat(snapshot).isEmpty();
+    }
+
+    @Test
+    @DisplayName("여러 스레드가 동시에 스냅샷을 시도해도 단 한 곳만 데이터를 가져가고 나머지는 빈 목록을 받는다")
+    void snapshotAndClear_concurrentCalls_onlyOneGetsData() throws Exception {
+        int threadCount = 20;
+        UUID categoryId = UUID.randomUUID();
+        redisRepository.incrementScoresIfNotProcessed(
+                LeaderboardEventType.ORDER_PAID, UUID.randomUUID(),
+                List.of(new LeaderboardScore(categoryId, 5.0)), List.of());
+
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch readyLatch = new CountDownLatch(threadCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        List<Future<List<RankedMember>>> futures = IntStream.range(0, threadCount)
+                .mapToObj(i -> executor.submit(() -> {
+                    readyLatch.countDown();
+                    startLatch.await();
+                    return redisRepository.snapshotAndClear(LeaderboardType.CATEGORY);
+                }))
+                .collect(Collectors.toList());
+
+        readyLatch.await();
+        startLatch.countDown();
+
+        List<List<RankedMember>> results = new ArrayList<>();
+        for (Future<List<RankedMember>> future : futures) {
+            results.add(future.get(20, TimeUnit.SECONDS));
+        }
+        executor.shutdown();
+
+        List<List<RankedMember>> nonEmptyResults = results.stream().filter(r -> !r.isEmpty()).toList();
+        assertThat(nonEmptyResults).hasSize(1);
+        assertThat(nonEmptyResults.get(0)).containsExactly(new RankedMember(1, categoryId, 5.0));
+        assertThat(redisRepository.getRankedMembers(LeaderboardType.CATEGORY)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("점수 증가와 스냅샷이 동시에 일어나도 증가분이 스냅샷 또는 실시간 랭킹 중 한쪽엔 반드시 반영된다")
+    void snapshotAndClear_concurrentWithIncrements_noLostUpdates() throws Exception {
+        int threadCount = 20;
+        UUID categoryId = UUID.randomUUID();
+
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount + 1);
+        CountDownLatch readyLatch = new CountDownLatch(threadCount + 1);
+        CountDownLatch startLatch = new CountDownLatch(1);
+
+        List<Future<?>> incrementFutures = IntStream.range(0, threadCount)
+                .mapToObj(i -> executor.submit(() -> {
+                    readyLatch.countDown();
+                    awaitStart(startLatch);
+                    redisRepository.incrementScoresIfNotProcessed(
+                            LeaderboardEventType.ORDER_PAID, UUID.randomUUID(),
+                            List.of(new LeaderboardScore(categoryId, 1.0)), List.of());
+                }))
+                .collect(Collectors.toList());
+        Future<List<RankedMember>> snapshotFuture = executor.submit(() -> {
+            readyLatch.countDown();
+            awaitStart(startLatch);
+            return redisRepository.snapshotAndClear(LeaderboardType.CATEGORY);
+        });
+
+        readyLatch.await();
+        startLatch.countDown();
+
+        for (Future<?> future : incrementFutures) {
+            future.get(20, TimeUnit.SECONDS);
+        }
+        List<RankedMember> snapshot = snapshotFuture.get(20, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        double snapshotScore = snapshot.stream()
+                .filter(member -> member.targetId().equals(categoryId))
+                .mapToDouble(RankedMember::score)
+                .sum();
+        double remainingScore = redisRepository.getRankedMembers(LeaderboardType.CATEGORY).stream()
+                .filter(member -> member.targetId().equals(categoryId))
+                .mapToDouble(RankedMember::score)
+                .sum();
+
+        assertThat(snapshotScore + remainingScore).isEqualTo(threadCount * 1.0);
+    }
+
+    private void awaitStart(CountDownLatch startLatch) {
+        try {
+            startLatch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        }
     }
 }
