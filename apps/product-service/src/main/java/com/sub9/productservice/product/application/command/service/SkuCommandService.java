@@ -33,49 +33,33 @@ public class SkuCommandService implements SkuCommandUseCase {
 
   @Override
   public UUID addSku(AddSkuCommand command) {
-    Product product = findByProductIdForUpdate(command.productId());
-    product.validateOwner(command.creatorId());
-
+    Product product = findByProductIdForUpdate(command.productId(), command.creatorId());
     if (command.isDefault()) {
-      Sku defaultSku =
-          skuRepository
-              .findByProductIdAndIsDefaultTrue(command.productId())
-              .orElseThrow(() -> new BusinessException(SkuErrorCode.DEFAULT_SKU_NOT_FOUND));
-
-      defaultSku.unsetDefault();
+      clearDefaultSku(product.getId());
+      skuRepository.flush();
     }
 
     Sku sku = Sku.create(command.productId(), command.name(), command.price(), command.isDefault());
-    UUID savedSkuId = skuRepository.save(sku).getId();
+    skuRepository.save(sku);
 
-    stockRepository.save(Stock.create(savedSkuId, command.quantity()));
+    stockRepository.save(Stock.create(sku.getId(), command.quantity()));
 
-    return savedSkuId;
+    return sku.getId();
   }
 
   @Override
   public void updateSku(UpdateSkuCommand command) {
-    Product product = findByProductIdForUpdate(command.productId());
-    product.validateOwner(command.creatorId());
-
+    Product product = findByProductIdForUpdate(command.productId(), command.creatorId());
     Sku sku = findBySkuIdAndProductId(command.skuId(), command.productId());
 
-    if (command.isDefault() && !sku.isDefault()) {
-      Sku defaultSku =
-          skuRepository
-              .findByProductIdAndIsDefaultTrue(command.productId())
-              .orElseThrow(() -> new BusinessException(SkuErrorCode.DEFAULT_SKU_NOT_FOUND));
+    if (command.isDefault() && !sku.isDefault()) clearDefaultSku(product.getId());
 
-      defaultSku.unsetDefault();
-    }
     sku.update(command.name(), command.price(), command.isDefault());
   }
 
   @Override
   public void deleteSku(DeleteSkuCommand command) {
-    Product product = findByProductIdForUpdate(command.productId());
-    product.validateOwner(command.creatorId());
-
+    findByProductIdForUpdate(command.productId(), command.creatorId());
     Sku sku = findBySkuIdAndProductId(command.skuId(), command.productId());
 
     long activeSkuCount = skuRepository.countByProductIdAndDeletedAtIsNull(command.productId());
@@ -87,10 +71,23 @@ public class SkuCommandService implements SkuCommandUseCase {
   }
 
   // ============================== Helper Method ====================================
-  private Product findByProductIdForUpdate(UUID productId) {
-    return productRepository
-        .findByIdForUpdate(productId)
-        .orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
+  private void clearDefaultSku(UUID productId) {
+    Sku defaultSku =
+        skuRepository
+            .findByProductIdAndIsDefaultTrue(productId)
+            .orElseThrow(() -> new BusinessException(SkuErrorCode.DEFAULT_SKU_NOT_FOUND));
+
+    defaultSku.unsetDefault();
+  }
+
+  private Product findByProductIdForUpdate(UUID productId, UUID creatorId) {
+    Product product =
+        productRepository
+            .findByIdForUpdate(productId)
+            .orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
+
+    product.validateOwner(creatorId);
+    return product;
   }
 
   private Sku findBySkuIdAndProductId(UUID skuId, UUID productId) {

@@ -12,30 +12,35 @@ import java.util.UUID;
 @Repository
 @RequiredArgsConstructor
 public class SkuRepositoryImpl implements SkuRepository {
-  private final SkuCommandJpaRepository skuCommandJpaRepository;
+  private final SkuCommandJpaRepository jpaRepository;
 
   @Override
   public Sku save(Sku sku) {
-    return skuCommandJpaRepository.save(sku);
+    return jpaRepository.save(sku);
   }
 
   @Override
   public List<Sku> findAllByProductIdAndDeletedAtIsNull(UUID productId) {
-    return skuCommandJpaRepository.findAllByProductIdAndDeletedAtIsNull(productId);
+    return jpaRepository.findAllByProductIdAndDeletedAtIsNull(productId);
   }
 
   @Override
   public Optional<Sku> findByIdAndProductIdAndDeletedAtIsNull(UUID skuId, UUID productId) {
-    return skuCommandJpaRepository.findByIdAndProductIdAndDeletedAtIsNull(skuId, productId);
+    return jpaRepository.findByIdAndProductIdAndDeletedAtIsNull(skuId, productId);
   }
 
   @Override
   public long countByProductIdAndDeletedAtIsNull(UUID productId) {
-    return skuCommandJpaRepository.countByProductIdAndDeletedAtIsNull(productId);
+    return jpaRepository.countByProductIdAndDeletedAtIsNull(productId);
   }
 
   @Override
   public Optional<Sku> findByProductIdAndIsDefaultTrue(UUID productId) {
-    return skuCommandJpaRepository.findByProductIdAndIsDefaultTrue(productId);
+    return jpaRepository.findByProductIdAndIsDefaultTrue(productId);
+  }
+
+  @Override
+  public void flush() {
+    jpaRepository.flush();
   }
 }
