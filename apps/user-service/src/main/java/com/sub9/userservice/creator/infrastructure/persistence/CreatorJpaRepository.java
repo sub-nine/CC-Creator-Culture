@@ -29,15 +29,26 @@ public interface CreatorJpaRepository extends JpaRepository<Creator, UUID> {
             value = "select creator from Creator creator join creator.user user "
                     + "where creator.approvalStatus = :approvalStatus "
                     + "and creator.deletedAt is null "
+                    + "and user.deletedAt is null",
+            countQuery = "select count(creator) from Creator creator join creator.user user "
+                    + "where creator.approvalStatus = :approvalStatus "
+                    + "and creator.deletedAt is null "
+                    + "and user.deletedAt is null")
+    Page<Creator> findApprovedActive(
+            @Param("approvalStatus") ApprovalStatus approvalStatus,
+            Pageable pageable);
+
+    @Query(
+            value = "select creator from Creator creator join creator.user user "
+                    + "where creator.approvalStatus = :approvalStatus "
+                    + "and creator.deletedAt is null "
                     + "and user.deletedAt is null "
-                    + "and (:keyword is null "
-                    + "or lower(creator.creatorName) like lower(concat('%', :keyword, '%')))",
+                    + "and lower(creator.creatorName) like lower(concat('%', :keyword, '%'))",
             countQuery = "select count(creator) from Creator creator join creator.user user "
                     + "where creator.approvalStatus = :approvalStatus "
                     + "and creator.deletedAt is null "
                     + "and user.deletedAt is null "
-                    + "and (:keyword is null "
-                    + "or lower(creator.creatorName) like lower(concat('%', :keyword, '%')))")
+                    + "and lower(creator.creatorName) like lower(concat('%', :keyword, '%'))")
     Page<Creator> findApprovedActiveByCreatorName(
             @Param("approvalStatus") ApprovalStatus approvalStatus,
             @Param("keyword") String keyword,

@@ -29,9 +29,12 @@ public class CreatorQueryService {
             int page, int size, String keyword, String sortCondition) {
         String normalizedKeyword = normalizeKeyword(keyword);
         PageRequest pageable = PageRequest.of(page, size, createSort(sortCondition));
+        if (normalizedKeyword == null) {
+            return CreatorPageResponse.from(
+                    creatorRepository.findApprovedActive(pageable));
+        }
         return CreatorPageResponse.from(
-                creatorRepository.findApprovedActiveByCreatorName(
-                        normalizedKeyword, pageable));
+                creatorRepository.findApprovedActiveByCreatorName(normalizedKeyword, pageable));
     }
 
     @Transactional(readOnly = true)

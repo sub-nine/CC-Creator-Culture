@@ -3,7 +3,6 @@ package com.sub9.userservice.creator.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -77,12 +76,12 @@ class CreatorQueryServiceTest {
     @Test
     @DisplayName("공백 검색어는 검색 조건 없이 조회한다")
     void when_keyword_is_blank_no_keyword_condition_is_used() {
-        when(creatorRepository.findApprovedActiveByCreatorName(isNull(), any()))
+        when(creatorRepository.findApprovedActive(any()))
                 .thenReturn(new PageImpl<>(List.of()));
 
         creatorQueryService.getCreators(0, 20, "   ", "creatorName,asc");
 
-        verify(creatorRepository).findApprovedActiveByCreatorName(isNull(), any());
+        verify(creatorRepository).findApprovedActive(any());
     }
 
     @Test

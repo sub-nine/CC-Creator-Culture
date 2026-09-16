@@ -165,13 +165,13 @@ class CreatorQueryIntegrationTest {
         if (deleteCreator) {
             creator.softDelete(user.getId(), CREATED_AT.plusSeconds(20));
         }
-        creatorRepository.save(creator);
+        Creator savedCreator = creatorRepository.save(creator);
         creatorRepository.flush();
         if (deleteUser) {
             user.softDelete(user.getId(), CREATED_AT.plusSeconds(30));
             userRepository.flush();
         }
-        return creator;
+        return savedCreator;
     }
 
     private Creator savePendingCreator(String creatorName, String businessNumber) {
@@ -182,9 +182,9 @@ class CreatorQueryIntegrationTest {
                 UserRole.CREATOR);
         Creator creator = Creator.createPending(
                 uuidGenerator.generate(), user.getId(), creatorName, businessNumber, CREATED_AT);
-        creatorRepository.save(creator);
+        Creator savedCreator = creatorRepository.save(creator);
         creatorRepository.flush();
-        return creator;
+        return savedCreator;
     }
 
     private Creator saveRejectedCreator(
@@ -206,8 +206,8 @@ class CreatorQueryIntegrationTest {
         User user = User.create(
                 uuidGenerator.generate(), email, "encoded-password", nickname, phone,
                 "서울시 예시구", null, role, CREATED_AT);
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
         userRepository.flush();
-        return user;
+        return savedUser;
     }
 }

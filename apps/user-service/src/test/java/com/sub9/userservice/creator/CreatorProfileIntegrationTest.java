@@ -155,18 +155,18 @@ class CreatorProfileIntegrationTest {
                 UserRole.CREATOR);
         Creator creator = Creator.createPending(
                 uuidGenerator.generate(), user.getId(), creatorName, businessNumber, CREATED_AT);
-        creatorRepository.save(creator);
+        Creator savedCreator = creatorRepository.save(creator);
         creatorRepository.flush();
-        return creator;
+        return savedCreator;
     }
 
     private User saveUser(String email, String nickname, String phone, UserRole role) {
         User user = User.create(
                 uuidGenerator.generate(), email, "encoded-password", nickname, phone,
                 "서울시 예시구", null, role, CREATED_AT);
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
         userRepository.flush();
-        return user;
+        return savedUser;
     }
 
     private void assertCreatorNotFound(UUID userId, UpdateCreatorRequest request) {

@@ -16,6 +16,8 @@ public interface CreatorRepository {
 
     Optional<Creator> findApprovedActiveById(UUID creatorId);
 
+    Page<Creator> findApprovedActive(Pageable pageable);
+
     Page<Creator> findApprovedActiveByCreatorName(String keyword, Pageable pageable);
 
     Optional<Creator> findApprovedActiveByIdForUpdate(UUID creatorId);

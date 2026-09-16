@@ -38,6 +38,11 @@ public class CreatorRepositoryImpl implements CreatorRepository {
     }
 
     @Override
+    public Page<Creator> findApprovedActive(Pageable pageable) {
+        return creatorJpaRepository.findApprovedActive(ApprovalStatus.APPROVED, pageable);
+    }
+
+    @Override
     public Page<Creator> findApprovedActiveByCreatorName(String keyword, Pageable pageable) {
         return creatorJpaRepository.findApprovedActiveByCreatorName(
                 ApprovalStatus.APPROVED, keyword, pageable);
