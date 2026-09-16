@@ -115,7 +115,7 @@ class CartCleanupIntegrationTest {
         assertThat(carts.findById(unselected.getId())).isPresent();
         assertThat(carts.findById(other.getId())).isPresent();
         assertThat(taskJpa.findById(task.getId())).isEmpty();
-        Cart added = carts.save(Cart.create(UUID.randomUUID(), selected.getUserId(), selected.getSkuId(), 3));
+        Cart added = carts.save(Cart.create(UUID.randomUUID(), selected.getUserId(), selected.getProductId(), selected.getSkuId(), 3));
         worker.process(task.getId(), NOW);
         // 동일 요청이 다시 전달되어도 원본 ID만 삭제한다.
         tasks.save(new CartCleanupTask(UUID.randomUUID(), task.getOrderId(), task.getPayload(), NOW));
@@ -286,7 +286,7 @@ class CartCleanupIntegrationTest {
         Cart removed = cart(UUID.randomUUID());
         Order second = order(removed);
         carts.deleteById(removed.getId());
-        Cart added = carts.save(Cart.create(UUID.randomUUID(), removed.getUserId(), removed.getSkuId(), 3));
+        Cart added = carts.save(Cart.create(UUID.randomUUID(), removed.getUserId(), removed.getProductId(), removed.getSkuId(), 3));
         payments.process(first.getCustomerId(), first.getOrderNumber(), PaymentStatus.SUCCESS);
         payments.process(second.getCustomerId(), second.getOrderNumber(), PaymentStatus.SUCCESS);
         scheduler(NOW).cleanup();
@@ -366,7 +366,7 @@ class CartCleanupIntegrationTest {
     }
 
     private Cart cart(UUID userId) {
-        return carts.save(Cart.create(UUID.randomUUID(), userId, UUID.randomUUID(), 2));
+        return carts.save(Cart.create(UUID.randomUUID(), userId, UUID.randomUUID(), UUID.randomUUID(), 2));
     }
 
     private CartCleanupTask enqueue(Cart cart, UUID... otherIds) {

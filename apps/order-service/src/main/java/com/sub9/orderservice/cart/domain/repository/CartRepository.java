@@ -17,4 +17,8 @@ public interface CartRepository {
   void deleteAllByUserIdAndIdIn(UUID userId, List<UUID> cartIds);
 
   Optional<Cart> findByIdAndUserId(UUID uuid, UUID uuid1);
+
+  void deleteAllByProductId(UUID productId);
+
+  void deleAllBySkuId(UUID skuId);
 }
