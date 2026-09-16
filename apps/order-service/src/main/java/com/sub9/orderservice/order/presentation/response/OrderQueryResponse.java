@@ -157,6 +157,7 @@ public final class OrderQueryResponse {
             long paymentAmount,
             Instant createdAt,
             Instant expiresAt,
+            ShippingAddressResponse shippingAddress,
             List<CreatorGroup> creatorGroups
     ) {
         public static AdminOrderDetail from(Order order) {
@@ -169,6 +170,7 @@ public final class OrderQueryResponse {
                     order.getPaymentAmount().getAmount(),
                     order.getCreatedAt(),
                     order.getExpiresAt(),
+                    ShippingAddressResponse.forAdmin(order.getShippingAddress()),
                     toCreatorGroups(order));
         }
     }
@@ -180,6 +182,11 @@ public final class OrderQueryResponse {
             String addressLine1,
             String addressLine2
     ) {
+        public static ShippingAddressResponse forAdmin(ShippingAddress address) {
+            return new ShippingAddressResponse(
+                    address.getRecipientName(), "****", "****", "****", "****");
+        }
+
         public static ShippingAddressResponse forCreator(Order order) {
             ShippingAddress address = order.getShippingAddress();
             if (order.getStatus() == OrderStatus.PAID || order.getStatus() == OrderStatus.PROCESSING) {
