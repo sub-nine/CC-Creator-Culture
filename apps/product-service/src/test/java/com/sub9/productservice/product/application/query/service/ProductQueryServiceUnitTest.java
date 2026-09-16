@@ -3,6 +3,7 @@ package com.sub9.productservice.product.application.query.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.product.application.port.out.product.ProductMetadataQueryPort;
@@ -24,6 +25,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -33,6 +35,7 @@ import org.springframework.data.domain.PageRequest;
 class ProductQueryServiceUnitTest {
   @Mock ProductQueryRepository productQueryRepository;
   @Mock ProductMetadataQueryPort metadataQueryPort;
+  @Mock ApplicationEventPublisher eventPublisher;
   @InjectMocks private ProductQueryService productQueryService;
 
   private final UUID productId = UUID.randomUUID();
@@ -44,9 +47,11 @@ class ProductQueryServiceUnitTest {
     given(productQueryRepository.findProductDetailById(productId)).willReturn(Optional.empty());
 
     // when & then
-    assertThatThrownBy(() -> productQueryService.getProductDetail(productId, null))
+    assertThatThrownBy(() -> productQueryService.getProductDetail(productId, "guest:" + UUID.randomUUID()))
         .isInstanceOf(BusinessException.class)
         .hasMessage(ProductErrorCode.PRODUCT_NOT_FOUND.message());
+
+    verifyNoInteractions(metadataQueryPort, eventPublisher);
   }
 
   @Test

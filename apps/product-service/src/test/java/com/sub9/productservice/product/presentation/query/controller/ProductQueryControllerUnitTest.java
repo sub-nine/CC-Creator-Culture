@@ -1,13 +1,19 @@
 package com.sub9.productservice.product.presentation.query.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.common.config.r2.R2Properties;
+import com.sub9.productservice.common.security.CustomAuthenticationToken;
+import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import jakarta.servlet.http.Cookie;
 import com.sub9.productservice.product.application.port.in.product.ProductQueryUseCase;
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
@@ -20,6 +26,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -132,8 +141,91 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
             jsonPath("$.data.images[0].imageUrl")
                 .value("https://images.example.com/products/detail.webp"))
         .andExpect(jsonPath("$.data.images[0].sortOrder").value(0))
-        .andExpect(jsonPath("$.data.images[0].imageKey").doesNotExist());
+        .andExpect(jsonPath("$.data.images[0].imageKey").doesNotExist())
+        .andExpect(cookie().value("visitor_cookie", org.hamcrest.Matchers.startsWith("guest:")))
+        .andExpect(cookie().httpOnly("visitor_cookie", true))
+        .andExpect(cookie().path("visitor_cookie", endPoint))
+        .andExpect(cookie().maxAge("visitor_cookie", 30 * 24 * 60 * 60))
+        .andExpect(cookie().attribute("visitor_cookie", "SameSite", "Lax"));
 
-    verify(productQueryUseCase).getProductDetail(productId, null);
+    ArgumentCaptor<String> visitorId = ArgumentCaptor.forClass(String.class);
+    verify(productQueryUseCase).getProductDetail(eq(productId), visitorId.capture());
+    assertThat(visitorId.getValue()).startsWith("guest:");
+    assertThat(UUID.fromString(visitorId.getValue().substring("guest:".length()))).isNotNull();
+  }
+
+  @Test
+  @DisplayName("비회원은 기존 방문자 쿠키로 상품을 조회하고 쿠키를 재발급하지 않는다.")
+  void getProductDetail_success_when_guest_cookie_exists() throws Exception {
+    // given
+    String visitorId = "guest:" + UUID.randomUUID();
+    given(productQueryUseCase.getProductDetail(productId, visitorId))
+        .willReturn(createProductDetailInfo());
+
+    // when & then
+    mockMvc
+        .perform(get(endPoint + "/{productId}", productId)
+            .cookie(new Cookie("visitor_cookie", visitorId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.productId").value(productId.toString()))
+        .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+    verify(productQueryUseCase).getProductDetail(productId, visitorId);
+  }
+
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {"guest:550e8400-e29b-41d4-a716-446655440000", "invalid"})
+  @DisplayName("회원은 방문자 쿠키와 관계없이 userId로 상품을 조회한다.")
+  void getProductDetail_success_when_authenticated(String visitorCookie) throws Exception {
+    // given
+    UUID userId = UUID.randomUUID();
+    given(productQueryUseCase.getProductDetail(productId, "user:" + userId))
+        .willReturn(createProductDetailInfo());
+    var request = get(endPoint + "/{productId}", productId)
+        .with(authentication(CustomAuthenticationToken.of(userId, "USER")));
+    if (visitorCookie != null) {
+      request.cookie(new Cookie("visitor_cookie", visitorCookie));
+    }
+
+    // when & then
+    mockMvc.perform(request)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.productId").value(productId.toString()))
+        .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+    verify(productQueryUseCase).getProductDetail(productId, "user:" + userId);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", " ", "invalid", "guest:", "guest:not-a-uuid",
+      "user:550e8400-e29b-41d4-a716-446655440000"})
+  @DisplayName("비회원 방문자 쿠키가 유효하지 않으면 새 쿠키를 발급하고 상품을 조회한다.")
+  void getProductDetail_success_when_guest_cookie_is_invalid(String visitorCookie)
+      throws Exception {
+    // given
+    given(productQueryUseCase.getProductDetail(eq(productId), any()))
+        .willReturn(createProductDetailInfo());
+
+    // when
+    var response = mockMvc
+        .perform(get(endPoint + "/{productId}", productId)
+            .cookie(new Cookie("visitor_cookie", visitorCookie)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.productId").value(productId.toString()))
+        .andReturn().getResponse();
+
+    // then
+    Cookie cookie = response.getCookie("visitor_cookie");
+    assertThat(cookie).isNotNull();
+    assertThat(cookie.getValue()).startsWith("guest:").isNotEqualTo(visitorCookie);
+    assertThat(UUID.fromString(cookie.getValue().substring("guest:".length()))).isNotNull();
+    verify(productQueryUseCase).getProductDetail(productId, cookie.getValue());
+  }
+
+  private ProductDetailInfo createProductDetailInfo() {
+    return new ProductDetailInfo(
+        productId, UUID.randomUUID(), "말랑이", "말랑이 설명", ProductStatus.ACTIVE,
+        0L, null, 0L, List.of(), List.of(), List.of(), List.of());
   }
 }

@@ -13,7 +13,7 @@ public class SchedulerConfig {
     @Bean
     public ThreadPoolTaskScheduler configureScheduler() {
         ThreadPoolTaskScheduler threadPoolTaskScheduler = new ThreadPoolTaskScheduler();
-        threadPoolTaskScheduler.setPoolSize(2);
+        threadPoolTaskScheduler.setPoolSize(5);
         threadPoolTaskScheduler.setThreadNamePrefix("Product-Service-Scheduler-");
 
         threadPoolTaskScheduler.setWaitForTasksToCompleteOnShutdown(true);
