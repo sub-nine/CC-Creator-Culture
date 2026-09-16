@@ -10,6 +10,7 @@ import java.util.UUID;
 public record ProductDetailResponse(
     UUID productId,
     UUID creatorId,
+    String creatorName,
     String name,
     String content,
     ProductStatus status,
@@ -36,6 +37,7 @@ public record ProductDetailResponse(
     return new ProductDetailResponse(
         productDetailInfo.productId(),
         productDetailInfo.creatorId(),
+        productDetailInfo.creatorName(),
         productDetailInfo.name(),
         productDetailInfo.content(),
         productDetailInfo.status(),
