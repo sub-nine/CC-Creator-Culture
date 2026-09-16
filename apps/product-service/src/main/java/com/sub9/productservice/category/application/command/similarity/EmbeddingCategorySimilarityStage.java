@@ -29,9 +29,8 @@ public class EmbeddingCategorySimilarityStage implements CategorySimilarityStage
 
     @Override
     public List<CategoryCandidateResult> evaluate(Hashtag hashtag, List<Category> candidates) {
-        float[] hashtagVector;
         try {
-            hashtagVector = resolveHashtagVector(hashtag);
+            ensureHashtagVectorExists(hashtag);
         } catch (Exception e) {
             // 해시태그 벡터 자체를 못 구하면 후보 전체를 판단할 수 없음 - 전부 Failed로 보류
             return candidates.stream()
@@ -40,20 +39,20 @@ public class EmbeddingCategorySimilarityStage implements CategorySimilarityStage
         }
 
         List<UUID> candidateIds = candidates.stream().map(Category::getId).toList();
-        Map<UUID, Double> similarities = categoryVectorRepository.findSimilarities(hashtagVector, candidateIds);
+        // 해시태그 벡터 값을 애플리케이션으로 끌고 오지 않고, hashtagId로 DB에서 직접 조인해 유사도 계산
+        Map<UUID, Double> similarities = categoryVectorRepository.findSimilarities(hashtag.getId(), candidateIds);
 
         return candidates.stream()
                 .map(candidate -> new CategoryCandidateResult(candidate, judge(candidate, similarities)))
                 .toList();
     }
 
-    private float[] resolveHashtagVector(Hashtag hashtag) {
-        return hashtagVectorRepository.findByHashtagId(hashtag.getId())
-                .orElseGet(() -> {
-                    float[] vector = embeddingClient.embed(hashtag.getName());
-                    hashtagVectorRepository.saveIfAbsent(hashtag.getId(), vector);
-                    return vector;
-                });
+    private void ensureHashtagVectorExists(Hashtag hashtag) {
+        if (hashtagVectorRepository.existsByHashtagId(hashtag.getId())) {
+            return;
+        }
+        float[] vector = embeddingClient.embed(hashtag.getName());
+        hashtagVectorRepository.saveIfAbsent(hashtag.getId(), vector);
     }
 
     private CategoryMatchResult judge(Category candidate, Map<UUID, Double> similarities) {
