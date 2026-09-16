@@ -99,13 +99,14 @@ services:
 
   config-server:
     <<: *java-service
+    cpus: 0.25
     image: ${CONFIG_SERVER_IMAGE:?CONFIG_SERVER_IMAGE is required}
     environment:
       SPRING_PROFILES_ACTIVE: git
       CONFIG_GIT_DEFAULT_LABEL: ${CONFIG_SERVER_CONFIG_LABEL:?CONFIG_SERVER_CONFIG_LABEL is required}
       SERVER_PORT: "8888"
-      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m -XX:+ExitOnOutOfMemoryError
-    mem_limit: 384m
+      JAVA_TOOL_OPTIONS: -Xms64m -Xmx256m -XX:+ExitOnOutOfMemoryError
+    mem_limit: 512m
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8888/actuator/health"]
       interval: 10s
@@ -115,10 +116,11 @@ services:
 
   eureka-server:
     <<: *java-service
+    cpus: 0.25
     image: ${EUREKA_SERVER_IMAGE:?EUREKA_SERVER_IMAGE is required}
     environment:
-      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m -XX:+ExitOnOutOfMemoryError
-    mem_limit: 384m
+      JAVA_TOOL_OPTIONS: -Xms64m -Xmx256m -XX:+ExitOnOutOfMemoryError
+    mem_limit: 512m
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8761/actuator/health"]
       interval: 10s
@@ -128,6 +130,7 @@ services:
 
   user-service:
     <<: *java-service
+    cpus: 0.5
     image: ${USER_SERVICE_IMAGE:?USER_SERVICE_IMAGE is required}
     environment:
       <<: *app-environment
@@ -136,8 +139,8 @@ services:
       USER_DB_USERNAME: user_app
       USER_DB_PASSWORD: ${USER_DB_PASSWORD:?USER_DB_PASSWORD is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      JAVA_TOOL_OPTIONS: -Xms192m -Xmx384m -XX:+ExitOnOutOfMemoryError
-    mem_limit: 640m
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError
+    mem_limit: 1024m
     networks:
       - internal
       - user-data
@@ -154,6 +157,7 @@ services:
 
   product-service:
     <<: *java-service
+    cpus: 0.5
     image: ${PRODUCT_SERVICE_IMAGE:?PRODUCT_SERVICE_IMAGE is required}
     environment:
       <<: *app-environment
@@ -166,8 +170,8 @@ services:
       R2_ENDPOINT: ${R2_ENDPOINT:?R2_ENDPOINT is required}
       R2_BUCKET: ${R2_BUCKET:?R2_BUCKET is required}
       R2_PUBLIC_URL: ${R2_PUBLIC_URL:?R2_PUBLIC_URL is required}
-      JAVA_TOOL_OPTIONS: -Xms192m -Xmx384m -XX:+ExitOnOutOfMemoryError
-    mem_limit: 640m
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError
+    mem_limit: 1024m
     networks:
       - internal
       - product-data
@@ -184,6 +188,7 @@ services:
 
   order-service:
     <<: *java-service
+    cpus: 0.5
     image: ${ORDER_SERVICE_IMAGE:?ORDER_SERVICE_IMAGE is required}
     environment:
       <<: *app-environment
@@ -191,8 +196,8 @@ services:
       ORDER_DATASOURCE_URL: jdbc:postgresql://order-postgres:5432/order_db
       ORDER_DB_USERNAME: order_app
       ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:?ORDER_DB_PASSWORD is required}
-      JAVA_TOOL_OPTIONS: -Xms192m -Xmx384m -XX:+ExitOnOutOfMemoryError
-    mem_limit: 640m
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError
+    mem_limit: 1024m
     networks:
       - internal
       - order-data
@@ -209,14 +214,15 @@ services:
 
   gateway:
     <<: *java-service
+    cpus: 0.5
     image: ${GATEWAY_IMAGE:?GATEWAY_IMAGE is required}
     environment:
       <<: *app-environment
       SPRING_CLOUD_CONFIG_LABEL: ${GATEWAY_CONFIG_LABEL:?GATEWAY_CONFIG_LABEL is required}
       GATEWAY_PORT: "8080"
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      JAVA_TOOL_OPTIONS: -Xms192m -Xmx384m -XX:+ExitOnOutOfMemoryError
-    mem_limit: 640m
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError
+    mem_limit: 1024m
     depends_on:
       user-service:
         condition: service_healthy
