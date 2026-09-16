@@ -1,6 +1,7 @@
 package com.sub9.productservice.category.application.command.service;
 
 import com.sub9.common.kafka.event.CategoryCreatedEvent;
+import com.sub9.productservice.category.application.command.model.CategoryUpsertResult;
 import com.sub9.productservice.category.application.command.port.out.CategoryCommandRepository;
 import com.sub9.productservice.category.application.command.port.out.OutboxRepository;
 import com.sub9.productservice.category.domain.entity.Category;
@@ -75,7 +76,8 @@ class CategoryHashtagLinkWriterTest {
         Category category = Category.create("전자기기", null);
         Hashtag hashtag = Hashtag.create("신규카테고리");
         Category newCategory = Category.create(hashtag.getName(), null);
-        when(categoryCommandRepository.findOrCreateByName(hashtag.getName())).thenReturn(newCategory);
+        when(categoryCommandRepository.findOrCreateByName(hashtag.getName()))
+                .thenReturn(new CategoryUpsertResult(newCategory, true));
 
         categoryHashtagLinkWriter.applyResults(hashtag.getId(), hashtag, List.of(
                 new CategoryCandidateResult(category, new CategoryMatchResult.NotSimilar())
@@ -97,13 +99,28 @@ class CategoryHashtagLinkWriterTest {
     void applyResults_noCandidates_promotesToNewCategory() {
         Hashtag hashtag = Hashtag.create("신규카테고리");
         Category newCategory = Category.create(hashtag.getName(), null);
-        when(categoryCommandRepository.findOrCreateByName(hashtag.getName())).thenReturn(newCategory);
+        when(categoryCommandRepository.findOrCreateByName(hashtag.getName()))
+                .thenReturn(new CategoryUpsertResult(newCategory, true));
 
         categoryHashtagLinkWriter.applyResults(hashtag.getId(), hashtag, List.of());
 
         verify(categoryCommandRepository).findOrCreateByName(hashtag.getName());
         verify(categoryCommandRepository).linkCategoryHashtagIfAbsent(any());
         verify(outboxRepository).record(new CategoryCreatedEvent(newCategory.getId()));
+    }
+
+    @Test
+    @DisplayName("findOrCreateByName이 이미 존재하는 카테고리를 반환하면(새로 생성된 게 아니면) CategoryCreatedEvent를 발행하지 않는다")
+    void applyResults_categoryAlreadyExisted_doesNotPublishEvent() {
+        Hashtag hashtag = Hashtag.create("신규카테고리");
+        Category existingCategory = Category.create(hashtag.getName(), null);
+        when(categoryCommandRepository.findOrCreateByName(hashtag.getName()))
+                .thenReturn(new CategoryUpsertResult(existingCategory, false));
+
+        categoryHashtagLinkWriter.applyResults(hashtag.getId(), hashtag, List.of());
+
+        verify(categoryCommandRepository).linkCategoryHashtagIfAbsent(any());
+        verify(outboxRepository, never()).record(any(CategoryCreatedEvent.class));
     }
 
     @Test

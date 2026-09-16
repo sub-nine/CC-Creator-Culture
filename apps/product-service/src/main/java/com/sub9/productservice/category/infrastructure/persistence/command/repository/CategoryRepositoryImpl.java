@@ -1,6 +1,7 @@
 package com.sub9.productservice.category.infrastructure.persistence.command.repository;
 
 import com.github.f4b6a3.uuid.UuidCreator;
+import com.sub9.productservice.category.application.command.model.CategoryUpsertResult;
 import com.sub9.productservice.category.application.command.port.out.CategoryCommandRepository;
 import com.sub9.productservice.category.domain.entity.Category;
 import com.sub9.productservice.category.domain.entity.CategoryHashtag;
@@ -52,12 +53,15 @@ public class CategoryRepositoryImpl implements CategoryCommandRepository {
     }
 
     @Override
-    public Category findOrCreateByName(String name) {
-        categoryJpaRepository.insertIfAbsent(
-                UuidCreator.getTimeOrderedEpoch(), name, null, CategoryStatus.ACTIVE.name(), Category.ACTIVE_UNIQUE_VERSION);
+    public CategoryUpsertResult findOrCreateByName(String name) {
+        boolean created = categoryJpaRepository.insertIfAbsent(
+                UuidCreator.getTimeOrderedEpoch(), name, null, CategoryStatus.ACTIVE.name(), Category.ACTIVE_UNIQUE_VERSION
+        ).isPresent();
 
-        return categoryJpaRepository.findByNameAndDeletedAtIsNull(name)
+        Category category = categoryJpaRepository.findByNameAndDeletedAtIsNull(name)
                 .orElseThrow(() -> new IllegalStateException("Category upsert 직후 조회 실패 - name: " + name));
+
+        return new CategoryUpsertResult(category, created);
     }
 
     @Override

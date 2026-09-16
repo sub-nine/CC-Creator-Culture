@@ -1,6 +1,7 @@
 package com.sub9.productservice.category.application.command.service;
 
 import com.sub9.common.kafka.event.CategoryCreatedEvent;
+import com.sub9.productservice.category.application.command.model.CategoryUpsertResult;
 import com.sub9.productservice.category.application.command.port.out.CategoryCommandRepository;
 import com.sub9.productservice.category.application.command.port.out.OutboxRepository;
 import com.sub9.productservice.category.domain.entity.Category;
@@ -79,10 +80,13 @@ public class CategoryHashtagLinkWriter {
 
     private void promoteToNewCategory(Hashtag hashtag, CategoryHashtagStatus status) {
         // findOrCreateByName 자체가 원자적이라, 동시에 같은 이름으로 승격을 시도해도 카테고리는 하나만 생성됨
-        Category newCategory = categoryCommandRepository.findOrCreateByName(hashtag.getName());
+        CategoryUpsertResult upsertResult = categoryCommandRepository.findOrCreateByName(hashtag.getName());
+        Category newCategory = upsertResult.category();
 
-        // TODO: findOrCreateByName이 기존 카테고리를 반환한 경우(이미 벡터 있음)에도 중복 발행됨 - created 여부 구분 필요
-        outboxRepository.record(new CategoryCreatedEvent(newCategory.getId()));
+        // 새로 생성된 경우에만 벡터 계산이 필요하므로, 기존 카테고리를 찾기만 한 경우엔 이벤트를 또 발행하지 않음
+        if (upsertResult.created()) {
+            outboxRepository.record(new CategoryCreatedEvent(newCategory.getId()));
+        }
 
         linkIfAbsent(newCategory, hashtag, status, CategoryHashtagMatchType.PROMOTED, 0.0);
     }
