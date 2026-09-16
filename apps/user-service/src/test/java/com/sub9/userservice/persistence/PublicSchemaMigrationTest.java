@@ -125,7 +125,7 @@ class PublicSchemaMigrationTest {
     void when_migration_completed_rolling_back_preserves_data_and_allows_retry() throws Exception {
         seedV1();
         executeOperationalSql("prepare-user-public-schema.sql");
-        flyway("public", null).migrate();
+        flyway("public", "3").migrate();
         List<Map<String, Object>> data = data("public");
         jdbc.execute("DROP SCHEMA private");
 
@@ -137,7 +137,7 @@ class PublicSchemaMigrationTest {
                 .containsExactly("1");
         flyway("private", "1").validate();
         executeOperationalSql("prepare-user-public-schema.sql");
-        flyway("public", null).migrate();
+        flyway("public", "3").migrate();
         assertThat(data("public")).isEqualTo(data);
     }
 
@@ -150,6 +150,63 @@ class PublicSchemaMigrationTest {
         assertThat(tables("private")).contains("flyway_schema_history", "p_users");
         assertThat(tables("public")).isEmpty();
         flyway("private", "1").validate();
+    }
+
+    @Test
+    @DisplayName("옛 필수 컬럼이 남았을 때 V4를 적용하면 현재 데이터와 FK를 보존하고 신규 저장에 성공한다")
+    void when_legacy_columns_remain_migrating_preserves_current_data_and_allows_inserts() throws Exception {
+        seedV1();
+        executeOperationalSql("prepare-user-public-schema.sql");
+        flyway("public", "3").migrate();
+        jdbc.execute("""
+                ALTER TABLE public.p_users ADD COLUMN user_id uuid;
+                UPDATE public.p_users SET user_id = gen_random_uuid();
+                ALTER TABLE public.p_users ALTER COLUMN user_id SET NOT NULL;
+                ALTER TABLE public.p_creators ADD COLUMN creator_id uuid NOT NULL;
+                INSERT INTO public.p_creators (id, user_id, creator_id, creator_name,
+                    business_registration_number, approval_status, updated_by)
+                VALUES ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001',
+                    gen_random_uuid(), 'legacy', 'legacy-registration', 'PENDING',
+                    '00000000-0000-0000-0000-000000000001');
+                """);
+        var user = jdbc.queryForObject("SELECT (to_jsonb(t) - 'user_id')::text FROM public.p_users t", String.class);
+        var creator = jdbc.queryForObject("SELECT (to_jsonb(t) - 'creator_id')::text FROM public.p_creators t", String.class);
+        var beforeConstraints = constraints();
+
+        flyway("public", null).migrate();
+
+        assertThat(jdbc.queryForObject("SELECT to_jsonb(t)::text FROM public.p_users t", String.class)).isEqualTo(user);
+        assertThat(jdbc.queryForObject("SELECT to_jsonb(t)::text FROM public.p_creators t", String.class)).isEqualTo(creator);
+        assertThat(constraints()).isEqualTo(beforeConstraints);
+        jdbc.execute("""
+                INSERT INTO public.p_users (id, email, password, nickname, phone, address, role, updated_by)
+                VALUES ('00000000-0000-0000-0000-000000000004', 'new@example.test', 'hash', 'new',
+                    '01099999999', 'address', 'CREATOR', '00000000-0000-0000-0000-000000000004');
+                INSERT INTO public.p_creators (id, user_id, creator_name, business_registration_number,
+                    approval_status, updated_by) VALUES ('00000000-0000-0000-0000-000000000005',
+                    '00000000-0000-0000-0000-000000000004', 'new', 'new-registration', 'PENDING',
+                    '00000000-0000-0000-0000-000000000004');
+                """);
+        assertThat(flyway("public", null).migrate().migrationsExecuted).isZero();
+    }
+
+    @Test
+    @DisplayName("옛 컬럼을 참조하는 뷰가 있을 때 V4를 적용하면 두 컬럼 모두 보존하고 실패한다")
+    void when_legacy_column_has_dependency_migrating_rolls_back_both_drops() {
+        flyway("public", "3").migrate();
+        jdbc.execute("ALTER TABLE public.p_users ADD COLUMN user_id uuid NOT NULL");
+        jdbc.execute("ALTER TABLE public.p_creators ADD COLUMN creator_id uuid NOT NULL");
+        jdbc.execute("CREATE VIEW public.legacy_creator_ids AS SELECT creator_id FROM public.p_creators");
+
+        assertThatThrownBy(() -> flyway("public", null).migrate()).isInstanceOf(RuntimeException.class);
+
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public'
+                  AND ((table_name = 'p_users' AND column_name = 'user_id')
+                    OR (table_name = 'p_creators' AND column_name = 'creator_id'))
+                """, Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT max(version::int) FROM public.flyway_schema_history", Integer.class))
+                .isEqualTo(3);
     }
 
     private void seedV1() {
