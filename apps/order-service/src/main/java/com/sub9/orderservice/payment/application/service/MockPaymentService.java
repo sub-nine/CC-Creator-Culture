@@ -6,6 +6,7 @@ import com.sub9.orderservice.order.domain.model.OrderNumber;
 import com.sub9.orderservice.payment.application.dto.MockPaymentResult;
 import com.sub9.orderservice.payment.domain.model.PaymentStatus;
 import java.util.UUID;
+import org.hibernate.exception.ConstraintViolationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,7 +24,17 @@ public class MockPaymentService {
     // 재고 복구 전에 결제 커밋이 끝나야 하므로 외부 트랜잭션 참여를 금지합니다.
     @Transactional(propagation = Propagation.NEVER)
     public MockPaymentResult process(UUID customerId, OrderNumber orderNumber, PaymentStatus result) {
-        var processed = transactionService.process(customerId, orderNumber, result);
+        MockPaymentTransactionService.ProcessedPayment processed;
+        try {
+            processed = transactionService.process(customerId, orderNumber, result);
+        } catch (RuntimeException failure) {
+            if (!isDuplicatePayment(failure)) {
+                throw failure;
+            }
+            // 프록시 호출이 실패한 뒤에는 롤백이 끝났으므로 새 트랜잭션에서 조회합니다.
+            return transactionService.findExisting(customerId, orderNumber, result)
+                    .orElseThrow(() -> failure);
+        }
         StockRestoreCommand command = processed.stockRestore();
         if (command != null) {
             try {
@@ -35,5 +46,15 @@ public class MockPaymentService {
             }
         }
         return processed.result();
+    }
+
+    private boolean isDuplicatePayment(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ConstraintViolationException violation
+                    && "uk_payments_order_id".equals(violation.getConstraintName())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
