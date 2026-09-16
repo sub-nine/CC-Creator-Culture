@@ -36,8 +36,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         "spring.cloud.config.enabled=false",
         "eureka.client.enabled=false",
         "spring.jpa.open-in-view=false",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.jpa.properties.hibernate.default_schema=private",
+        "spring.jpa.hibernate.ddl-auto=validate",
+        "spring.flyway.enabled=true",
+        "spring.flyway.schemas=public",
+        "spring.flyway.default-schema=public",
+        "spring.jpa.properties.hibernate.default_schema=public",
         "spring.jpa.properties.hibernate.hbm2ddl.create_namespaces=true",
         "spring.jpa.properties.hibernate.jdbc.time_zone=UTC",
         "spring.datasource.hikari.connection-init-sql=SET TIME ZONE 'UTC'"
@@ -303,7 +306,7 @@ class PersistenceIntegrationTest {
         Integer foreignKeyCount = jdbcTemplate.queryForObject("""
                 select count(*)
                   from information_schema.table_constraints
-                 where constraint_schema = 'private'
+                 where constraint_schema = 'public'
                    and table_name = 'p_follows'
                    and constraint_type = 'FOREIGN KEY'
                    and constraint_name in (
@@ -359,7 +362,7 @@ class PersistenceIntegrationTest {
         Integer foreignKeyCount = jdbcTemplate.queryForObject("""
                 select count(*)
                   from information_schema.table_constraints
-                 where constraint_schema = 'private'
+                 where constraint_schema = 'public'
                    and constraint_type = 'FOREIGN KEY'
                    and constraint_name in (
                        'fk_users_created_by',
@@ -382,7 +385,7 @@ class PersistenceIntegrationTest {
         Integer timestampWithTimeZoneCount = jdbcTemplate.queryForObject("""
                 select count(*)
                   from information_schema.columns
-                 where table_schema = 'private'
+                 where table_schema = 'public'
                    and table_name in ('p_users', 'p_creators')
                    and column_name in ('created_at', 'updated_at', 'deleted_at')
                    and data_type = 'timestamp with time zone'

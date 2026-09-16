@@ -12,7 +12,7 @@ spring:
       ddl-auto: update
     properties:
       hibernate:
-        default_schema: private
+        default_schema: public
         jdbc:
           time_zone: UTC
         hbm2ddl:

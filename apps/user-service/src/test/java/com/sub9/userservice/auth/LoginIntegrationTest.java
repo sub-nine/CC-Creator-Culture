@@ -38,7 +38,7 @@ import org.testcontainers.utility.DockerImageName;
         "eureka.client.enabled=false",
         "spring.jpa.open-in-view=false",
         "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.jpa.properties.hibernate.default_schema=private",
+        "spring.jpa.properties.hibernate.default_schema=public",
         "spring.jpa.properties.hibernate.hbm2ddl.create_namespaces=true",
         "spring.jpa.properties.hibernate.jdbc.time_zone=UTC",
         "spring.datasource.hikari.connection-init-sql=SET TIME ZONE 'UTC'"
@@ -173,7 +173,7 @@ class LoginIntegrationTest {
 
     private void updateApprovalStatus(CreatorSignupResponse signup, String status) {
         jdbcTemplate.update(
-                "UPDATE private.p_creators SET approval_status = ? WHERE user_id = ?",
+                "UPDATE public.p_creators SET approval_status = ? WHERE user_id = ?",
                 status,
                 signup.userId());
     }
