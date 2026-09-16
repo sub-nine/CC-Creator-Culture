@@ -27,13 +27,13 @@ import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-@DisplayName("CategoryHashtagLinkService - 동시성 통합 테스트")
-class CategoryHashtagLinkServiceConcurrencyTest extends AbstractIntegrationTest {
+@DisplayName("CategoryHashtagLinkFacade - 동시성 통합 테스트")
+class CategoryHashtagLinkFacadeConcurrencyTest extends AbstractIntegrationTest {
 
     private static final int THREAD_COUNT = 20;
 
     @Autowired
-    private CategoryHashtagLinkService categoryHashtagLinkService;
+    private CategoryHashtagLinkFacade categoryHashtagLinkFacade;
 
     @Autowired
     private CategoryCommandRepository categoryCommandRepository;
@@ -100,7 +100,7 @@ class CategoryHashtagLinkServiceConcurrencyTest extends AbstractIntegrationTest 
                     readyLatch.countDown();
                     startLatch.await();
                     try {
-                        categoryHashtagLinkService.tryLink(hashtagId);
+                        categoryHashtagLinkFacade.tryLink(hashtagId);
                         return null;
                     } catch (Exception e) {
                         return e;
