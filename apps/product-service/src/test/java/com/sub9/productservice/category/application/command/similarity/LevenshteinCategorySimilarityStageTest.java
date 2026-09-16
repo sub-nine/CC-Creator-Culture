@@ -1,4 +1,4 @@
-package com.sub9.productservice.category.infrastructure.similarity;
+package com.sub9.productservice.category.application.command.similarity;
 
 import com.sub9.productservice.category.domain.entity.Category;
 import com.sub9.productservice.category.domain.entity.Hashtag;

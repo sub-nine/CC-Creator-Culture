@@ -1,6 +1,5 @@
-package com.sub9.productservice.category.application.command.service;
+package com.sub9.productservice.category.application.command.similarity;
 
-import com.sub9.productservice.category.application.command.port.out.CategorySimilarityStage;
 import com.sub9.productservice.category.domain.entity.Category;
 import com.sub9.productservice.category.domain.entity.Hashtag;
 import com.sub9.productservice.category.domain.model.CategoryCandidateResult;
