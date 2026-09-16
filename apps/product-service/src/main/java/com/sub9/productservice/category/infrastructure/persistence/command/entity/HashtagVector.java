@@ -7,11 +7,14 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Array;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
 
-// TODO: embedding 컬럼을 pgvector 타입(vector(N))으로 매핑 - 지금은 뼈대만, float[] <-> vector 변환 미구현
+// TODO: 벡터 차원(768)은 jhgan/ko-sroberta-multitask 기준 - 실제 채택 모델 확정되면 재확인
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -22,7 +25,9 @@ public class HashtagVector {
     @Column(name = "hashtag_id", nullable = false, updatable = false)
     private UUID hashtagId;
 
-    @Column(name = "embedding", nullable = false)
+    @JdbcTypeCode(SqlTypes.VECTOR)
+    @Array(length = 768)
+    @Column(name = "embedding", nullable = false, columnDefinition = "vector(768)")
     private float[] embedding;
 
     @Column(name = "created_at", nullable = false, updatable = false)

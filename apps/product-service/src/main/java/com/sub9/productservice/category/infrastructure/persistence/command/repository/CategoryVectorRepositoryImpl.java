@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -23,8 +24,11 @@ public class CategoryVectorRepositoryImpl implements CategoryVectorRepository {
 
     @Override
     public Map<UUID, Double> findSimilarities(float[] hashtagVector, List<UUID> categoryIds) {
-        // TODO: pgvector <=> 연산자로 DB에서 직접 코사인 거리 계산하도록 교체
-        //  (지금은 뼈대만 - 벡터를 애플리케이션으로 끌고 와 계산하는 임시 구현이라 원래 의도한 최적화가 안 됨)
-        throw new UnsupportedOperationException("아직 미구현");
+        // cosine_distance는 [0, 2] 범위(1 - 코사인유사도) - 기존 threshold(코사인 유사도 기준)와 맞추려고 변환
+        return categoryVectorJpaRepository.findDistances(hashtagVector, categoryIds).stream()
+                .collect(Collectors.toMap(
+                        CategoryVectorJpaRepository.CategoryDistance::getCategoryId,
+                        distance -> 1.0 - distance.getDistance()
+                ));
     }
 }
