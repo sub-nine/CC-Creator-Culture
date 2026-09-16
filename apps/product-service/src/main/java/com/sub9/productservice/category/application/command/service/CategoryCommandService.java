@@ -6,7 +6,7 @@ import com.sub9.productservice.category.application.command.port.out.OutboxRepos
 import com.sub9.productservice.category.application.command.port.out.HashtagProductCommandRepository;
 import com.sub9.productservice.category.application.command.model.HashtagUpsertResult;
 import com.sub9.productservice.category.domain.entity.Hashtag;
-import com.sub9.productservice.category.domain.event.HashtagCreatedEvent;
+import com.sub9.common.kafka.event.HashtagCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

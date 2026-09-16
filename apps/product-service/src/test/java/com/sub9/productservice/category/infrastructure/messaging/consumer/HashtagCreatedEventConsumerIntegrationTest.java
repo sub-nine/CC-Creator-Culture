@@ -3,7 +3,7 @@ package com.sub9.productservice.category.infrastructure.messaging.consumer;
 import com.sub9.common.kafka.topic.KafkaTopics;
 import com.sub9.productservice.category.domain.entity.Category;
 import com.sub9.productservice.category.domain.entity.Hashtag;
-import com.sub9.productservice.category.domain.event.HashtagCreatedEvent;
+import com.sub9.common.kafka.event.HashtagCreatedEvent;
 import com.sub9.productservice.category.domain.model.CategoryStatus;
 import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.CategoryJpaRepository;
 import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.HashtagJpaRepository;

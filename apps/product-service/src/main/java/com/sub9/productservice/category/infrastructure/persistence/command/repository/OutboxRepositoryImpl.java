@@ -3,7 +3,7 @@ package com.sub9.productservice.category.infrastructure.persistence.command.repo
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.productservice.category.application.command.port.out.OutboxRepository;
-import com.sub9.productservice.category.domain.event.HashtagCreatedEvent;
+import com.sub9.common.kafka.event.HashtagCreatedEvent;
 import com.sub9.productservice.category.infrastructure.persistence.command.entity.OutboxEvent;
 import com.sub9.productservice.category.infrastructure.persistence.command.entity.OutboxEventType;
 import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.OutboxEventJpaRepository;
