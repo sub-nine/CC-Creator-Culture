@@ -45,6 +45,11 @@ public class FollowRepositoryImpl implements FollowRepository {
     }
 
     @Override
+    public long countActiveByCreatorId(UUID creatorId) {
+        return followJpaRepository.countByCreatorIdAndDeletedAtIsNull(creatorId);
+    }
+
+    @Override
     public int softDeleteActiveByUserId(UUID userId, UUID actorId, Instant deletedAt) {
         return followJpaRepository.softDeleteActiveByUserId(userId, actorId, deletedAt);
     }

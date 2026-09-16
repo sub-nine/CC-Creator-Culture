@@ -30,6 +30,8 @@ public interface FollowJpaRepository extends JpaRepository<Follow, UUID> {
     Page<Follow> findAllByUserIdAndDeletedAtIsNullAndCreator_ApprovalStatusAndCreator_DeletedAtIsNull(
             UUID userId, ApprovalStatus approvalStatus, Pageable pageable);
 
+    long countByCreatorIdAndDeletedAtIsNull(UUID creatorId);
+
     @Modifying(flushAutomatically = true)
     @Query("update Follow follow set "
             + "follow.deletedAt = :deletedAt, follow.deletedBy = :actorId, "

@@ -98,6 +98,50 @@ class CreatorTest {
         assertThat(creator.getUpdatedBy()).isEqualTo(firstActorId);
     }
 
+    @Test
+    @DisplayName("창작자 정보를 수정하면 승인 기록을 유지하고 수정 감사만 갱신한다")
+    void when_creator_profile_is_updated_approval_is_preserved_and_update_audit_changes() {
+        Creator creator = pendingCreator();
+        UUID adminId = uuidGenerator.generate();
+        UUID creatorUserId = creator.getUserId();
+        Instant approvedAt = Instant.parse("2026-09-10T02:00:00Z");
+        Instant updatedAt = Instant.parse("2026-09-15T02:00:00Z");
+        creator.approve(adminId, approvedAt);
+
+        boolean changed = creator.updateProfile(
+                "변경상점", "9876543210", creatorUserId, updatedAt);
+
+        assertThat(changed).isTrue();
+        assertThat(creator.getCreatorName()).isEqualTo("변경상점");
+        assertThat(creator.getBusinessRegistrationNumber()).isEqualTo("9876543210");
+        assertThat(creator.getApprovalStatus()).isEqualTo(ApprovalStatus.APPROVED);
+        assertThat(creator.getApprovedBy()).isEqualTo(adminId);
+        assertThat(creator.getApprovedAt())
+                .isEqualTo(LocalDateTime.parse("2026-09-10T02:00:00"));
+        assertThat(creator.getCreatedBy()).isEqualTo(adminId);
+        assertThat(creator.getUpdatedBy()).isEqualTo(creatorUserId);
+        assertThat(creator.getUpdatedAt()).isEqualTo(updatedAt);
+    }
+
+    @Test
+    @DisplayName("동일한 창작자 정보로 수정하면 감사 정보를 변경하지 않는다")
+    void when_creator_profile_values_are_same_update_is_ignored() {
+        Creator creator = pendingCreator();
+        UUID adminId = uuidGenerator.generate();
+        Instant approvedAt = Instant.parse("2026-09-10T02:00:00Z");
+        creator.approve(adminId, approvedAt);
+
+        boolean changed = creator.updateProfile(
+                creator.getCreatorName(),
+                creator.getBusinessRegistrationNumber(),
+                creator.getUserId(),
+                Instant.parse("2026-09-15T02:00:00Z"));
+
+        assertThat(changed).isFalse();
+        assertThat(creator.getUpdatedBy()).isEqualTo(adminId);
+        assertThat(creator.getUpdatedAt()).isEqualTo(approvedAt);
+    }
+
     private Creator pendingCreator() {
         return Creator.createPending(
                 uuidGenerator.generate(), uuidGenerator.generate(), "창작상점", "123-45-67890",
