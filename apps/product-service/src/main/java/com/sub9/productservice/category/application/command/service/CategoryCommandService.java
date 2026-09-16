@@ -2,7 +2,7 @@ package com.sub9.productservice.category.application.command.service;
 
 import com.sub9.productservice.category.application.command.port.in.AddHashtagsToProductUseCase;
 import com.sub9.productservice.category.application.command.port.out.HashtagCommandRepository;
-import com.sub9.productservice.category.application.command.port.out.HashtagCreatedEventPort;
+import com.sub9.productservice.category.application.command.port.out.OutboxRepository;
 import com.sub9.productservice.category.application.command.port.out.HashtagProductCommandRepository;
 import com.sub9.productservice.category.application.command.model.HashtagUpsertResult;
 import com.sub9.productservice.category.domain.entity.Hashtag;
@@ -22,7 +22,7 @@ public class CategoryCommandService implements AddHashtagsToProductUseCase {
 
     private final HashtagCommandRepository hashtagCommandRepository;
     private final HashtagProductCommandRepository hashtagProductCommandRepository;
-    private final HashtagCreatedEventPort hashtagCreatedEventPort;
+    private final OutboxRepository outboxRepository;
 
     @Override
     @Transactional
@@ -50,7 +50,7 @@ public class CategoryCommandService implements AddHashtagsToProductUseCase {
         upsertResults.stream()
                 .filter(HashtagUpsertResult::created)
                 .map(HashtagUpsertResult::hashtag)
-                .forEach(hashtag -> hashtagCreatedEventPort.record(new HashtagCreatedEvent(hashtag.getId())));
+                .forEach(hashtag -> outboxRepository.record(new HashtagCreatedEvent(hashtag.getId())));
     }
 
     private List<String> normalizeHashtagNames(List<String> hashtagStrings) {

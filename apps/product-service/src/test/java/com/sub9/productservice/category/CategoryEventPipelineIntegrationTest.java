@@ -3,7 +3,7 @@ package com.sub9.productservice.category;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sub9.common.kafka.event.ProductCreatedEvent;
 import com.sub9.common.kafka.topic.KafkaTopics;
-import com.sub9.productservice.category.infrastructure.messaging.scheduler.OutboxRelay;
+import com.sub9.productservice.category.infrastructure.scheduler.OutboxRelay;
 import com.sub9.productservice.support.AbstractKafkaIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

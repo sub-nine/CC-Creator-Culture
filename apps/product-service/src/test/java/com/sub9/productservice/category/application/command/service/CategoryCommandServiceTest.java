@@ -1,7 +1,7 @@
 package com.sub9.productservice.category.application.command.service;
 
 import com.sub9.productservice.category.application.command.port.out.HashtagCommandRepository;
-import com.sub9.productservice.category.application.command.port.out.HashtagCreatedEventPort;
+import com.sub9.productservice.category.application.command.port.out.OutboxRepository;
 import com.sub9.productservice.category.application.command.port.out.HashtagProductCommandRepository;
 import com.sub9.productservice.category.application.command.model.HashtagUpsertResult;
 import com.sub9.productservice.category.domain.entity.Hashtag;
@@ -35,7 +35,7 @@ class CategoryCommandServiceTest {
     @Mock
     private HashtagProductCommandRepository hashtagProductCommandRepository;
     @Mock
-    private HashtagCreatedEventPort hashtagCreatedEventPort;
+    private OutboxRepository outboxRepository;
 
     private CategoryCommandService categoryCommandService;
 
@@ -44,7 +44,7 @@ class CategoryCommandServiceTest {
         categoryCommandService = new CategoryCommandService(
                 hashtagCommandRepository,
                 hashtagProductCommandRepository,
-                hashtagCreatedEventPort
+                outboxRepository
         );
     }
 
@@ -89,7 +89,7 @@ class CategoryCommandServiceTest {
             verify(hashtagCommandRepository, never()).increaseUsageCount(existingHashtag.getId());
 
             ArgumentCaptor<HashtagCreatedEvent> eventCaptor = ArgumentCaptor.forClass(HashtagCreatedEvent.class);
-            verify(hashtagCreatedEventPort).record(eventCaptor.capture());
+            verify(outboxRepository).record(eventCaptor.capture());
             assertThat(eventCaptor.getValue().hashtagId()).isEqualTo(newHashtag.getId());
         }
     }
