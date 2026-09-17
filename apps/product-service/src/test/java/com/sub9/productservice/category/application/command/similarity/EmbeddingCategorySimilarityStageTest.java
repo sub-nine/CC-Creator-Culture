@@ -69,7 +69,7 @@ class EmbeddingCategorySimilarityStageTest {
         when(hashtagVectorRepository.existsByHashtagId(hashtag.getId())).thenReturn(false);
         when(embeddingClient.embed(hashtag.getName())).thenReturn(vector);
         when(categoryVectorRepository.findSimilarities(hashtag.getId(), List.of(categoryA.getId())))
-                .thenReturn(Map.of(categoryA.getId(), 0.5));
+                .thenReturn(Map.of(categoryA.getId(), 0.1));
 
         List<CategoryCandidateResult> results = stage.evaluate(hashtag, List.of(categoryA));
 
@@ -121,7 +121,7 @@ class EmbeddingCategorySimilarityStageTest {
     void judge_similarityBetweenThresholds_returnsPendingApproval() {
         when(hashtagVectorRepository.existsByHashtagId(hashtag.getId())).thenReturn(true);
         when(categoryVectorRepository.findSimilarities(hashtag.getId(), List.of(categoryA.getId())))
-                .thenReturn(Map.of(categoryA.getId(), 0.7));
+                .thenReturn(Map.of(categoryA.getId(), 0.45));
 
         List<CategoryCandidateResult> results = stage.evaluate(hashtag, List.of(categoryA));
 

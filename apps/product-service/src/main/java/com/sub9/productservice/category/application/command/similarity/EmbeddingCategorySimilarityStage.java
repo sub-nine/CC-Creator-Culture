@@ -8,7 +8,6 @@ import com.sub9.productservice.category.domain.entity.Hashtag;
 import com.sub9.productservice.category.domain.model.CategoryCandidateResult;
 import com.sub9.productservice.category.domain.model.CategoryHashtagMatchType;
 import com.sub9.productservice.category.domain.model.CategoryMatchResult;
-import com.sub9.productservice.category.domain.model.HashtagCategorySimilarityPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -22,6 +21,10 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 public class EmbeddingCategorySimilarityStage implements CategorySimilarityStage {
+
+    // local/embedding_test_result.md 실험 기준 잠정치 - Levenshtein과 분포가 달라 별도 관리, 운영 데이터로 재보정 필요
+    private static final double MERGE_THRESHOLD = 0.60;
+    private static final double PENDING_APPROVAL_THRESHOLD = 0.30;
 
     private final HashtagVectorRepository hashtagVectorRepository;
     private final CategoryVectorRepository categoryVectorRepository;
@@ -62,11 +65,10 @@ public class EmbeddingCategorySimilarityStage implements CategorySimilarityStage
             return new CategoryMatchResult.Failed("카테고리 벡터 없음");
         }
 
-        // TODO: 임계값 재산정 필요 - Levenshtein용 threshold를 그대로 쓰면 안 맞음 (local/embedding_test_result.md 참고)
-        if (similarity >= HashtagCategorySimilarityPolicy.MERGE_THRESHOLD) {
+        if (similarity >= MERGE_THRESHOLD) {
             return new CategoryMatchResult.Merge(CategoryHashtagMatchType.AI, similarity);
         }
-        if (similarity >= HashtagCategorySimilarityPolicy.PENDING_APPROVAL_THRESHOLD) {
+        if (similarity >= PENDING_APPROVAL_THRESHOLD) {
             return new CategoryMatchResult.PendingApproval(CategoryHashtagMatchType.AI, similarity);
         }
         return new CategoryMatchResult.NotSimilar();
