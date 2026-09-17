@@ -66,10 +66,10 @@ public class EmbeddingCategorySimilarityStage implements CategorySimilarityStage
         }
 
         if (similarity >= MERGE_THRESHOLD) {
-            return new CategoryMatchResult.Merge(CategoryHashtagMatchType.AI, similarity);
+            return new CategoryMatchResult.Merge(CategoryHashtagMatchType.EMBEDDING, similarity);
         }
         if (similarity >= PENDING_APPROVAL_THRESHOLD) {
-            return new CategoryMatchResult.PendingApproval(CategoryHashtagMatchType.AI, similarity);
+            return new CategoryMatchResult.PendingApproval(CategoryHashtagMatchType.EMBEDDING, similarity);
         }
         return new CategoryMatchResult.NotSimilar();
     }

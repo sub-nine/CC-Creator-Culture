@@ -15,7 +15,7 @@ class CategoryMatchResultTest {
 
         assertThat(merge.combineWith(new CategoryMatchResult.NotSimilar())).isEqualTo(merge);
         assertThat(merge.combineWith(new CategoryMatchResult.Failed("실패"))).isEqualTo(merge);
-        assertThat(merge.combineWith(new CategoryMatchResult.PendingApproval(CategoryHashtagMatchType.AI, 0.7)))
+        assertThat(merge.combineWith(new CategoryMatchResult.PendingApproval(CategoryHashtagMatchType.EMBEDDING, 0.7)))
                 .isEqualTo(merge);
     }
 
@@ -26,7 +26,7 @@ class CategoryMatchResultTest {
 
         assertThat(new CategoryMatchResult.NotSimilar().combineWith(merge)).isEqualTo(merge);
         assertThat(new CategoryMatchResult.Failed("실패").combineWith(merge)).isEqualTo(merge);
-        assertThat(new CategoryMatchResult.PendingApproval(CategoryHashtagMatchType.AI, 0.7).combineWith(merge))
+        assertThat(new CategoryMatchResult.PendingApproval(CategoryHashtagMatchType.EMBEDDING, 0.7).combineWith(merge))
                 .isEqualTo(merge);
     }
 
@@ -36,7 +36,7 @@ class CategoryMatchResultTest {
         CategoryMatchResult.PendingApproval pendingApproval =
                 new CategoryMatchResult.PendingApproval(CategoryHashtagMatchType.ALGORITHM, 0.72);
         CategoryMatchResult.PendingApproval otherPendingApproval =
-                new CategoryMatchResult.PendingApproval(CategoryHashtagMatchType.AI, 0.71);
+                new CategoryMatchResult.PendingApproval(CategoryHashtagMatchType.EMBEDDING, 0.71);
 
         assertThat(pendingApproval.combineWith(new CategoryMatchResult.NotSimilar())).isEqualTo(pendingApproval);
         assertThat(pendingApproval.combineWith(new CategoryMatchResult.Failed("실패"))).isEqualTo(pendingApproval);

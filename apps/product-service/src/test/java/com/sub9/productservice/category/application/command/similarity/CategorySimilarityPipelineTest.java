@@ -43,7 +43,7 @@ class CategorySimilarityPipelineTest {
                 new CategoryCandidateResult(categoryB, new CategoryMatchResult.NotSimilar())
         ));
         when(secondStage.evaluate(eq(hashtag), anyList())).thenReturn(List.of(
-                new CategoryCandidateResult(categoryB, new CategoryMatchResult.PendingApproval(CategoryHashtagMatchType.AI, 0.72))
+                new CategoryCandidateResult(categoryB, new CategoryMatchResult.PendingApproval(CategoryHashtagMatchType.EMBEDDING, 0.72))
         ));
 
         CategorySimilarityPipeline pipeline = new CategorySimilarityPipeline(List.of(firstStage, secondStage));
