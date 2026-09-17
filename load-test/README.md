@@ -61,3 +61,9 @@ sh load-test/scripts/teardown.sh
 볼륨을 밀고 재기동한 뒤 MASTER 계정 시드까지 이 스크립트 하나로 끝납니다.
 
 dev처럼 공유 DB를 밀 수 없는 환경에서는 이 방식을 쓸 수 없으니 별도 정리 방법이 필요합니다 (TODO).
+
+## 클라우드 실행
+
+OCI는 배포된 이미지로 `scripts/run-dev.sh`, AWS는 일회성 Fargate 태스크로 `scripts/run-aws.sh`를 사용합니다. 두 실행기 모두 시나리오를 지정해야 하며 배포만으로 실행되지 않습니다.
+
+연결 확인은 `scenarios/smoke.js`(읽기 1회)와 `scenarios/embedding-smoke.js`(추론 1회)를 사용합니다. 전체 실행기는 이 두 파일을 제외합니다. 주소, 환경 파일, 중지 방법과 지표 확인은 [클라우드 운영 절차](../deploy/cloud-load-test.md)를 참고하세요.
