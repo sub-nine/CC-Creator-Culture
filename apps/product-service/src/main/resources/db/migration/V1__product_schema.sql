@@ -1,5 +1,3 @@
-CREATE EXTENSION IF NOT EXISTS vector;
-
 CREATE TABLE p_categories (
     id uuid PRIMARY KEY,
     merged_category_id uuid,
@@ -151,18 +149,6 @@ CREATE TABLE p_category_outbox_events (
     error_message varchar(255),
     claimed_at timestamp with time zone,
     published_at timestamp with time zone,
-    created_at timestamp with time zone NOT NULL
-);
-
-CREATE TABLE p_categories_vector (
-    category_id uuid PRIMARY KEY REFERENCES p_categories (id),
-    embedding vector(768) NOT NULL,
-    created_at timestamp with time zone NOT NULL
-);
-
-CREATE TABLE p_hashtags_vector (
-    hashtag_id uuid PRIMARY KEY REFERENCES p_hashtags (id),
-    embedding vector(768) NOT NULL,
     created_at timestamp with time zone NOT NULL
 );
 
