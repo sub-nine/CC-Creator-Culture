@@ -100,9 +100,9 @@ class FollowConcurrencyIntegrationTest {
 
     @AfterEach
     void cleanDatabase() {
-        jdbcTemplate.update("delete from private.p_follows");
-        jdbcTemplate.update("delete from private.p_creators");
-        jdbcTemplate.update("delete from private.p_users");
+        jdbcTemplate.update("delete from public.p_follows");
+        jdbcTemplate.update("delete from public.p_creators");
+        jdbcTemplate.update("delete from public.p_users");
     }
 
     @Test
@@ -129,10 +129,10 @@ class FollowConcurrencyIntegrationTest {
 
         // then: 경쟁이 끝난 뒤에도 사용자와 창작자 사이에는 하나의 활성 관계만 존재한다.
         assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from private.p_follows", Integer.class)).isEqualTo(1);
+                "select count(*) from public.p_follows", Integer.class)).isEqualTo(1);
         Map<String, Object> savedFollow = jdbcTemplate.queryForMap("""
                 select user_id, creator_id, created_by, updated_by, deleted_at, deleted_by
-                  from private.p_follows
+                  from public.p_follows
                 """);
         assertThat(savedFollow.get("user_id")).isEqualTo(data.customerId());
         assertThat(savedFollow.get("creator_id")).isEqualTo(data.creatorId());
