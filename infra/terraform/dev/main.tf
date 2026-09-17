@@ -6,6 +6,8 @@ locals {
     "user-service",
     "product-service",
     "order-service",
+    "embedding-service",
+    "k6",
   ])
 
   common_tags = {
