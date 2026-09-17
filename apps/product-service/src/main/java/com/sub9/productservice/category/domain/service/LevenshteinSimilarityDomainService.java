@@ -6,7 +6,7 @@ import java.text.Normalizer;
 import java.util.Locale;
 
 @Service
-public class HashtagCategorySimilarityDomainService {
+public class LevenshteinSimilarityDomainService {
 
     // Levenshtein Distance 기반 문자열 유사도(대소문자 무시)를 0.0 ~ 1.0 사이로 계산
     public double calculateSimilarity(String a, String b) {

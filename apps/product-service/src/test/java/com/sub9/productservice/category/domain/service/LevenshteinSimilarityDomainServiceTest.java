@@ -8,10 +8,10 @@ import java.text.Normalizer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.data.Offset.offset;
 
-@DisplayName("HashtagCategorySimilarityDomainService 단위 테스트")
-class HashtagCategorySimilarityDomainServiceTest {
+@DisplayName("LevenshteinSimilarityDomainService 단위 테스트")
+class LevenshteinSimilarityDomainServiceTest {
 
-    private final HashtagCategorySimilarityDomainService similarityDomainService = new HashtagCategorySimilarityDomainService();
+    private final LevenshteinSimilarityDomainService similarityDomainService = new LevenshteinSimilarityDomainService();
 
     @Test
     @DisplayName("완전히 동일한 문자열이면 유사도는 1.0이다")

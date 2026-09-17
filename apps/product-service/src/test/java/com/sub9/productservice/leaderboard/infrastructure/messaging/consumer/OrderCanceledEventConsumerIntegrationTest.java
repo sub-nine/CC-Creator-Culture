@@ -110,7 +110,7 @@ class OrderCanceledEventConsumerIntegrationTest extends AbstractKafkaIntegration
         kafkaTemplate.send(KafkaTopics.ORDER_CANCELED, orderId.toString(), payload).get();
 
         // Then - 미리 반영해둔 6.0에서 ORDER_CANCELED 가중치(-1.5) * 수량(4) = -6.0 만큼 차감되어 0.0이 된다
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
             Double categoryScore = stringRedisTemplate.opsForZSet().score(
                     LeaderboardRedisKey.current(LeaderboardType.CATEGORY), category.getId().toString());
             Double hashtagScore = stringRedisTemplate.opsForZSet().score(

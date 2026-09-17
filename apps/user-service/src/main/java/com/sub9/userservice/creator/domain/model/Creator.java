@@ -25,7 +25,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(
         name = "p_creators",
-        schema = "private",
+        schema = "public",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_creators_user", columnNames = "user_id"),
                 @UniqueConstraint(name = "uk_creators_business_number",
@@ -134,6 +134,26 @@ public class Creator extends BaseAuditEntity {
     public void softDelete(UUID actorId, Instant now) {
         // 행을 남겨 계정과의 연결 및 변경 이력을 유지한다.
         markDeleted(actorId, now);
+    }
+
+    public boolean updateProfile(
+            String creatorName,
+            String businessRegistrationNumber,
+            UUID actorId,
+            Instant now) {
+        String updatedCreatorName = Objects.requireNonNull(
+                creatorName, "creatorName must not be null");
+        String updatedBusinessNumber = Objects.requireNonNull(
+                businessRegistrationNumber, "businessRegistrationNumber must not be null");
+        if (this.creatorName.equals(updatedCreatorName)
+                && this.businessRegistrationNumber.equals(updatedBusinessNumber)) {
+            return false;
+        }
+
+        this.creatorName = updatedCreatorName;
+        this.businessRegistrationNumber = updatedBusinessNumber;
+        recordUpdate(actorId, now);
+        return true;
     }
 
     private void ensurePending() {

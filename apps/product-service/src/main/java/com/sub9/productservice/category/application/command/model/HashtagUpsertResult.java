@@ -1,4 +1,4 @@
-package com.sub9.productservice.category.application.command.port.out;
+package com.sub9.productservice.category.application.command.model;
 
 import com.sub9.productservice.category.domain.entity.Hashtag;
 

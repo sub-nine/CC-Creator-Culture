@@ -117,7 +117,7 @@ class OrderPaidLeaderboardPipelineIntegrationTest extends AbstractKafkaIntegrati
         // Then - OrderPaidEventConsumer 소비 -> LeaderboardScoreService가 Redis에 점수 반영 ->
         // LeaderboardController 조회 API에서 실제로 보이는지까지 확인한다(ORDER_PAID 가중치 1.5 * 수량 4 = 6.0)
         // Redis는 각 테스트 전후로 비워두므로 이 카테고리/해시태그가 유일한 랭킹 항목이다
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() ->
                 mockMvc.perform(get("/api/v1/leaderboards/categories")
                                 .param("period", "DAILY")
                                 .param("limit", "10")

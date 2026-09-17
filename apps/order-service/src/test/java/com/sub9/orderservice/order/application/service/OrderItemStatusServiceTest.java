@@ -79,6 +79,28 @@ class OrderItemStatusServiceTest {
     }
 
     @Test
+    @DisplayName("마지막 상품을 완료하면 변경 응답의 연락처와 상세 주소를 숨기고 원본을 보존한다")
+    void when_last_item_is_completed_response_shipping_address_is_masked() {
+        OrderItem item = item(41, CREATOR_ID);
+        Order order = order(42, OrderStatus.PAID, item);
+        order.changeItemStatus(CREATOR_ID, item.getId(), OrderItemStatus.PREPARING);
+        order.changeItemStatus(CREATOR_ID, item.getId(), OrderItemStatus.SHIPPED);
+        order.changeItemStatus(CREATOR_ID, item.getId(), OrderItemStatus.DELIVERED);
+        when(orderRepository.findByOrderItemIdForUpdate(item.getId())).thenReturn(Optional.of(order));
+
+        var result = orderItemStatusService.update(CREATOR_ID, item.getId(), OrderItemStatus.COMPLETED);
+
+        assertThat(result.orderStatus()).isEqualTo(OrderStatus.COMPLETED);
+        assertThat(result.shippingAddress().recipientName()).isEqualTo("홍길동");
+        assertThat(result.shippingAddress().recipientPhone()).isEqualTo("****");
+        assertThat(result.shippingAddress().postalCode()).isEqualTo("06236");
+        assertThat(result.shippingAddress().addressLine1()).isEqualTo("서울특별시 강남구");
+        assertThat(result.shippingAddress().addressLine2()).isEqualTo("****");
+        assertThat(order.getShippingAddress().getRecipientPhone()).isEqualTo("010-1234-5678");
+        assertThat(order.getShippingAddress().getAddressLine2()).isEqualTo("101호");
+    }
+
+    @Test
     @DisplayName("주문 상품을 찾을 수 없으면 찾을 수 없음 오류를 반환한다")
     void when_order_item_does_not_exist_not_found_is_returned() {
         UUID orderItemId = uuid(50);

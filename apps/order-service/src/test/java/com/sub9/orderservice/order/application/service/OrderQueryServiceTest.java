@@ -285,6 +285,60 @@ class OrderQueryServiceTest {
         });
     }
 
+    @ParameterizedTest
+    @EnumSource(OrderStatus.class)
+    @DisplayName("운영자 주문 상세는 모든 상태에서 연락처와 주소를 숨기고 원본을 보존한다")
+    void when_admin_queries_any_order_status_shipping_address_is_masked(OrderStatus status) {
+        Order order = order(120, CUSTOMER_ID, status, item(121, CREATOR_ID));
+        ShippingAddress original = order.getShippingAddress();
+        when(orderQueryRepository.findDetailByOrderNumber(order.getOrderNumber()))
+                .thenReturn(Optional.of(order));
+
+        var address = orderQueryService.getAdminOrder(order.getOrderNumber()).shippingAddress();
+
+        assertThat(address.recipientName()).isEqualTo(original.getRecipientName());
+        assertThat(address.recipientPhone()).isEqualTo("****");
+        assertThat(address.postalCode()).isEqualTo("****");
+        assertThat(address.addressLine1()).isEqualTo("****");
+        assertThat(address.addressLine2()).isEqualTo("****");
+        assertThat(order.getShippingAddress()).isSameAs(original);
+        assertThat(original.getRecipientPhone()).isEqualTo("010-1234-5678");
+    }
+
+    @Test
+    @DisplayName("운영자 조회 후에도 빈 상세 주소와 소비자 및 창작자의 배송지 원문을 보존한다")
+    void when_admin_queries_shipping_address_other_role_responses_remain_unchanged() {
+        for (String detail : new String[]{"101동 1001호", null, ""}) {
+            OrderItem item = item(131, CREATOR_ID);
+            Order order = order(130, CUSTOMER_ID, OrderStatus.PAID, item);
+            ShippingAddress original = ShippingAddress.of(
+                    "홍길동", "01012345678", "06236", "서울", detail);
+            ReflectionTestUtils.setField(order, "shippingAddress", original);
+            when(orderQueryRepository.findDetailByOrderNumber(order.getOrderNumber()))
+                    .thenReturn(Optional.of(order));
+            when(orderQueryRepository.findItemDetailById(item.getId())).thenReturn(Optional.of(item));
+
+            var admin = orderQueryService.getAdminOrder(order.getOrderNumber()).shippingAddress();
+            var customer = orderQueryService.getCustomerOrder(
+                    CUSTOMER_ID, order.getOrderNumber()).shippingAddress();
+            var creator = orderQueryService.getCreatorOrderItem(CREATOR_ID, item.getId()).shippingAddress();
+
+            assertThat(admin.recipientPhone()).isEqualTo("****");
+            assertThat(admin.addressLine2()).isEqualTo("****");
+            assertThat(customer.recipientName()).isEqualTo("홍길동");
+            assertThat(customer.recipientPhone()).isEqualTo("01012345678");
+            assertThat(customer.postalCode()).isEqualTo("06236");
+            assertThat(customer.addressLine1()).isEqualTo("서울");
+            assertThat(customer.addressLine2()).isEqualTo(detail);
+            assertThat(creator).isEqualTo(customer);
+            assertThat(order.getShippingAddress()).isSameAs(original);
+            assertThat(original.getRecipientPhone()).isEqualTo("01012345678");
+            assertThat(original.getPostalCode()).isEqualTo("06236");
+            assertThat(original.getAddressLine1()).isEqualTo("서울");
+            assertThat(original.getAddressLine2()).isEqualTo(detail);
+        }
+    }
+
     @Test
     @DisplayName("존재하지 않는 운영자 주문 상세를 조회하면 찾을 수 없음 오류를 반환한다")
     void when_admin_order_does_not_exist_not_found_is_returned() {

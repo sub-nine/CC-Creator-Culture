@@ -37,6 +37,7 @@ SELECT format('GRANT CONNECT ON DATABASE %I TO %I', :'service_db_name', :'servic
 SELECT format('ALTER SCHEMA public OWNER TO %I', :'service_db_username') \gexec
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 SELECT format('GRANT USAGE, CREATE ON SCHEMA public TO %I', :'service_db_username') \gexec
+CREATE EXTENSION IF NOT EXISTS vector;
 SQL
 
 echo "Initialized isolated PostgreSQL database: $SERVICE_DB_NAME"

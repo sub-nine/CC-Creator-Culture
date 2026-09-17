@@ -2,13 +2,15 @@ package com.sub9.productservice.category.infrastructure.persistence.command.repo
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import com.sub9.productservice.category.application.command.port.out.HashtagCommandRepository;
-import com.sub9.productservice.category.application.command.port.out.HashtagUpsertResult;
+import com.sub9.productservice.category.application.command.model.HashtagUpsertResult;
 import com.sub9.productservice.category.domain.entity.Hashtag;
 import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.HashtagJpaRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -47,5 +49,10 @@ public class HashtagCommandRepositoryImpl implements HashtagCommandRepository {
         if (updated == 0) {
             throw new IllegalStateException("Hashtag 없음 - id: " + hashtagId);
         }
+    }
+
+    @Override
+    public List<UUID> findIdsWithoutCategoryLink(int limit) {
+        return jpaRepository.findIdsWithoutCategoryLink(PageRequest.of(0, limit));
     }
 }
