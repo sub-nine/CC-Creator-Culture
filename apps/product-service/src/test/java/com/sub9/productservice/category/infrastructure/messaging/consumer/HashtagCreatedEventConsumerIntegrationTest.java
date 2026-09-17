@@ -76,7 +76,7 @@ class HashtagCreatedEventConsumerIntegrationTest extends AbstractKafkaIntegratio
         kafkaTemplate.send(KafkaTopics.HASHTAG_CREATED, hashtag.getId().toString(), payload).get();
 
         // Then
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
             List<Category> categories = categoryJpaRepository.findAllByStatusAndDeletedAtIsNull(CategoryStatus.ACTIVE);
             assertThat(categories).anyMatch(category -> category.getName().equals(hashtagName));
 

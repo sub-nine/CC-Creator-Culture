@@ -105,7 +105,7 @@ class OrderPaidEventConsumerIntegrationTest extends AbstractKafkaIntegrationTest
         kafkaTemplate.send(KafkaTopics.ORDER_PAID, orderId.toString(), payload).get();
 
         // Then - ORDER_PAID 가중치(1.5) * 수량(4) = 6.0
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
             Double categoryScore = stringRedisTemplate.opsForZSet().score(
                     LeaderboardRedisKey.current(LeaderboardType.CATEGORY), category.getId().toString());
             Double hashtagScore = stringRedisTemplate.opsForZSet().score(

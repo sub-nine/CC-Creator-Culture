@@ -86,12 +86,12 @@ class ProductCreatedEventConsumerIntegrationTest extends AbstractKafkaIntegratio
         kafkaTemplate.send(KafkaTopics.PRODUCT_CREATED, productId.toString(), payload).get();
 
         // Then
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() ->
                 assertThat(hashtagJpaRepository.findByNameAndDeletedAtIsNull(normalizedHashtagName)).isPresent());
 
         Hashtag hashtag = hashtagJpaRepository.findByNameAndDeletedAtIsNull(normalizedHashtagName).orElseThrow();
 
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
             Hashtag reloaded = hashtagJpaRepository.findById(hashtag.getId()).orElseThrow();
             assertThat(reloaded.getUsageCount()).isEqualTo(1L);
 

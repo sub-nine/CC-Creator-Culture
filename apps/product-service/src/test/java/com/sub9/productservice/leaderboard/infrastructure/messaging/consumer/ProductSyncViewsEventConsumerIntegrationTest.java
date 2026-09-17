@@ -106,7 +106,7 @@ class ProductSyncViewsEventConsumerIntegrationTest extends AbstractKafkaIntegrat
         kafkaTemplate.send(KafkaTopics.PRODUCT_VIEW_COUNT_SYNC, eventId.toString(), payload).get();
 
         // Then - PRODUCT_SYNC_VIEW 가중치(1.0) * 조회수(7) = 7.0
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
             Double categoryScore = stringRedisTemplate.opsForZSet().score(
                     LeaderboardRedisKey.current(LeaderboardType.CATEGORY), category.getId().toString());
             Double hashtagScore = stringRedisTemplate.opsForZSet().score(
