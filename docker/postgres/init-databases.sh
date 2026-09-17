@@ -47,3 +47,9 @@ SQL
 create_service_database "$USER_DB_NAME" "$USER_DB_USERNAME" "$USER_DB_PASSWORD"
 create_service_database "$PRODUCT_DB_NAME" "$PRODUCT_DB_USERNAME" "$PRODUCT_DB_PASSWORD"
 create_service_database "$ORDER_DB_NAME" "$ORDER_DB_USERNAME" "$ORDER_DB_PASSWORD"
+
+psql \
+  --set=ON_ERROR_STOP=1 \
+  --username "$POSTGRES_USER" \
+  --dbname "$PRODUCT_DB_NAME" \
+  -c "CREATE EXTENSION IF NOT EXISTS vector;"

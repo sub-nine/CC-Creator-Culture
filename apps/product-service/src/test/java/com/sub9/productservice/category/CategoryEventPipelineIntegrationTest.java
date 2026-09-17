@@ -3,7 +3,7 @@ package com.sub9.productservice.category;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sub9.common.kafka.event.ProductCreatedEvent;
 import com.sub9.common.kafka.topic.KafkaTopics;
-import com.sub9.productservice.category.infrastructure.messaging.scheduler.OutboxRelay;
+import com.sub9.productservice.category.infrastructure.scheduler.OutboxRelay;
 import com.sub9.productservice.support.AbstractKafkaIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -84,7 +84,7 @@ class CategoryEventPipelineIntegrationTest extends AbstractKafkaIntegrationTest 
         // -> OutboxRelay 발행 -> HashtagCreatedEventConsumer 소비 -> tryLink() -> 카테고리 승격
         // test 프로파일에서는 @EnableScheduling이 꺼져있어(SchedulerConfig의 @Profile("!test")) OutboxRelay가
         // 자동으로 돌지 않으므로, 실제로 아웃박스 행이 생길 때까지 폴링하며 매번 직접 호출해준다
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
             outboxRelay.publishPending();
 
             mockMvc.perform(get("/api/v1/hashtags")
@@ -98,7 +98,7 @@ class CategoryEventPipelineIntegrationTest extends AbstractKafkaIntegrationTest 
         });
 
         // 해시태그와 동일한 이름으로 승격된 신규 카테고리도 검색 API에서 조회돼야 한다
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
             outboxRelay.publishPending();
 
             String categorySearchResponse = mockMvc.perform(get("/api/v1/categories")

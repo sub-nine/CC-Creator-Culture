@@ -155,6 +155,21 @@ services:
       retries: 12
       start_period: 75s
 
+  embedding-service:
+    restart: unless-stopped
+    image: ${EMBEDDING_SERVICE_IMAGE:?EMBEDDING_SERVICE_IMAGE is required}
+    cpus: 0.5
+    mem_limit: 1536m
+    logging: *rotating-logs
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
   product-service:
     <<: *java-service
     cpus: 0.5
@@ -170,6 +185,7 @@ services:
       R2_ENDPOINT: ${R2_ENDPOINT:?R2_ENDPOINT is required}
       R2_BUCKET: ${R2_BUCKET:?R2_BUCKET is required}
       R2_PUBLIC_URL: ${R2_PUBLIC_URL:?R2_PUBLIC_URL is required}
+      EMBEDDING_SERVICE_URL: http://embedding-service:8000
       JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError
     mem_limit: 1024m
     networks:
@@ -178,6 +194,8 @@ services:
     depends_on:
       <<: *platform-depends-on
       product-postgres:
+        condition: service_healthy
+      embedding-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8082/actuator/health"]

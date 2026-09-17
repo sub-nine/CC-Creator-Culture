@@ -1,4 +1,4 @@
-package com.sub9.productservice.category.infrastructure.messaging.scheduler;
+package com.sub9.productservice.category.infrastructure.scheduler;
 
 import com.sub9.productservice.category.infrastructure.messaging.publisher.OutboxEventPublisher;
 import com.sub9.productservice.category.infrastructure.persistence.command.entity.OutboxEvent;

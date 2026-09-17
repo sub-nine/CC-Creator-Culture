@@ -2,7 +2,7 @@ package com.sub9.productservice.category.infrastructure.messaging.consumer;
 
 import com.sub9.common.kafka.topic.KafkaTopics;
 import com.sub9.productservice.category.application.command.port.in.LinkHashtagToCategoryUseCase;
-import com.sub9.productservice.category.domain.event.HashtagCreatedEvent;
+import com.sub9.common.kafka.event.HashtagCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;

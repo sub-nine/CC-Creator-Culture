@@ -34,6 +34,9 @@ import java.util.UUID;
         }
 )
 public class CategoryHashtag extends BaseEntity {
+
+    public static final UUID ACTIVE_UNIQUE_VERSION = UUID.fromString("00000000-0000-0000-0000-000000000000");
+
     @JoinColumn(name = "category_id", nullable = false)
     @ManyToOne
     private Category category;
@@ -76,7 +79,7 @@ public class CategoryHashtag extends BaseEntity {
                 .matchType(matchType)
                 .status(status)
                 .similarityScore(similarityScore)
-                .uniqueVersion(UUID.fromString("00000000-0000-0000-0000-000000000000"))
+                .uniqueVersion(ACTIVE_UNIQUE_VERSION)
                 .build();
     }
 
@@ -115,7 +118,7 @@ public class CategoryHashtag extends BaseEntity {
 id	식별자	uuid		PK	NOT NULL	앱 생성(UUID)	식별자		주요 엔티티 ID
 hashtag_id	해시태그 ID	uuid	-		NOT NULL		해시태그 식별자	p_hashtags
 category_id	카테고리 ID	uuid			NOT NULL		연결된 카테고리 식별자	p_categories
-match_type	매핑 종류	varchar			NOT NULL		맵핑된 방식에 대한 정의	-	AI, ALGORITHM, MANUAL, PROMOTED(카테고리 신규 생성)
+match_type	매핑 종류	varchar			NOT NULL		맵핑된 방식에 대한 정의	-	LLM, EMBEDDING, ALGORITHM, MANUAL, PROMOTED(카테고리 신규 생성)
 status	병합 상태	varchar			NOT NULL		카테고리로의 병합 상태	-	PENDING, ANALYIZNG, PENDING_APPROVAL, MERGED, REJECTED
 similarity_score	유사도	numeric(5, 4)			NOT NULL		카테고리, 해시태그 유사도	-	0~1 사이의 실수
  */

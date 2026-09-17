@@ -11,11 +11,15 @@ import org.testcontainers.utility.DockerImageName;
 // @Testcontainers
 @ActiveProfiles("test")
 public abstract class AbstractIntegrationTest {
+  // pgvector 확장을 미리 설치한 이미지 - 순정 postgres 이미지는 CREATE EXTENSION vector 자체가 실패함
+  // ddl-auto(create-drop)는 CREATE EXTENSION을 대신 실행해주지 않아서 초기화 스크립트로 직접 활성화함
   private static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:17")
+      new PostgreSQLContainer<>(
+              DockerImageName.parse("pgvector/pgvector:pg17").asCompatibleSubstituteFor("postgres"))
           .withDatabaseName("testdb")
           .withUsername("test")
-          .withPassword("test");
+          .withPassword("test")
+          .withInitScript("init-pgvector.sql");
 
   private static final GenericContainer<?> REDIS =
       new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);

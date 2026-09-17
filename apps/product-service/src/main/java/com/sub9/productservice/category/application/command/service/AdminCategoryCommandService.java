@@ -1,8 +1,10 @@
 package com.sub9.productservice.category.application.command.service;
 
 import com.sub9.common.exception.BusinessException;
+import com.sub9.common.kafka.event.CategoryCreatedEvent;
 import com.sub9.productservice.category.application.command.port.out.CategoryCommandRepository;
 import com.sub9.productservice.category.application.command.port.out.HashtagCommandRepository;
+import com.sub9.productservice.category.application.command.port.out.OutboxRepository;
 import com.sub9.productservice.category.domain.entity.Category;
 import com.sub9.productservice.category.domain.entity.CategoryHashtag;
 import com.sub9.productservice.category.domain.entity.Hashtag;
@@ -20,6 +22,7 @@ public class AdminCategoryCommandService {
 
     private final CategoryCommandRepository categoryCommandRepository;
     private final HashtagCommandRepository hashtagCommandRepository;
+    private final OutboxRepository outboxRepository;
 
     /**
      * 카테고리 추가
@@ -28,6 +31,8 @@ public class AdminCategoryCommandService {
     public UUID createCategory(CreateCategoryRequest request) {
         Category category = Category.create(request.name(), request.description());
         Category savedCategory = categoryCommandRepository.save(category);
+
+        outboxRepository.record(new CategoryCreatedEvent(savedCategory.getId()));
         return savedCategory.getId();
     }
 

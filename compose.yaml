@@ -2,7 +2,7 @@ name: cc-service-local
 
 services:
   postgres:
-    image: postgres:17.11-alpine
+    image: pgvector/pgvector:pg17
     ports:
       - "127.0.0.1:5432:5432"
     environment:
@@ -130,6 +130,18 @@ services:
       - "127.0.0.1:9411:9411"
     environment:
       STORAGE_TYPE: mem
+
+  embedding-service:
+    build:
+      context: apps/embedding-service
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
 
 volumes:
   postgres-data:

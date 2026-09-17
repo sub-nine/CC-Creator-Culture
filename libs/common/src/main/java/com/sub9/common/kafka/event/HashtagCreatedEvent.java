@@ -1,4 +1,4 @@
-package com.sub9.productservice.category.domain.event;
+package com.sub9.common.kafka.event;
 
 import java.util.UUID;
 
