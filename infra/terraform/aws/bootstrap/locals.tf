@@ -13,10 +13,12 @@ locals {
     "user-service",
     "product-service",
     "order-service",
+    "embedding-service",
   ])
 
   artifact_names = toset([
     "db-seed",
+    "k6",
   ])
 
   github_oidc_url = "https://token.actions.githubusercontent.com"

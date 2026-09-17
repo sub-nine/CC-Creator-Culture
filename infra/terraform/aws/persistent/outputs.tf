@@ -20,17 +20,19 @@ output "persistent_config" {
     db_names        = local.db_names
 
     security_groups = {
-      config-server   = aws_security_group.app["config-server"].id
-      eureka-server   = aws_security_group.app["eureka-server"].id
-      gateway         = aws_security_group.app["gateway"].id
-      user-service    = aws_security_group.app["user-service"].id
-      product-service = aws_security_group.app["product-service"].id
-      order-service   = aws_security_group.app["order-service"].id
-      alb             = aws_security_group.alb.id
-      observation     = aws_security_group.observation.id
-      kafka           = aws_security_group.kafka.id
-      redis           = aws_security_group.redis.id
-      migration       = aws_security_group.migration.id
+      config-server     = aws_security_group.app["config-server"].id
+      eureka-server     = aws_security_group.app["eureka-server"].id
+      gateway           = aws_security_group.app["gateway"].id
+      user-service      = aws_security_group.app["user-service"].id
+      product-service   = aws_security_group.app["product-service"].id
+      order-service     = aws_security_group.app["order-service"].id
+      embedding-service = aws_security_group.app["embedding-service"].id
+      k6                = aws_security_group.app["k6"].id
+      alb               = aws_security_group.alb.id
+      observation       = aws_security_group.observation.id
+      kafka             = aws_security_group.kafka.id
+      redis             = aws_security_group.redis.id
+      migration         = aws_security_group.migration.id
       rds = {
         user-service    = aws_security_group.rds["user-service"].id
         product-service = aws_security_group.rds["product-service"].id
@@ -65,9 +67,10 @@ output "persistent_config" {
         for name, svc in aws_service_discovery_service.core : name => svc.id
       }
       dns_names = {
-        config-server = "config-server.${aws_service_discovery_private_dns_namespace.this.name}"
-        eureka-server = "eureka-server.${aws_service_discovery_private_dns_namespace.this.name}"
-        kafka         = "kafka.${aws_service_discovery_private_dns_namespace.this.name}"
+        config-server     = "config-server.${aws_service_discovery_private_dns_namespace.this.name}"
+        eureka-server     = "eureka-server.${aws_service_discovery_private_dns_namespace.this.name}"
+        kafka             = "kafka.${aws_service_discovery_private_dns_namespace.this.name}"
+        embedding-service = "embedding-service.${aws_service_discovery_private_dns_namespace.this.name}"
       }
     }
 

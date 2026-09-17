@@ -54,7 +54,7 @@ data "aws_iam_policy_document" "ecs_execution" {
       "logs:CreateLogStream",
       "logs:PutLogEvents",
     ]
-    resources = [for name in local.app_keys : "${aws_cloudwatch_log_group.app[name].arn}:*"]
+    resources = [for name in local.workload_keys : "${aws_cloudwatch_log_group.app[name].arn}:*"]
   }
 
   # RDS managed master secrets (rds!db-...) are the app DB credentials. They use the AWS managed

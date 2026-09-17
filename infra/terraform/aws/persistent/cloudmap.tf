@@ -28,7 +28,7 @@ resource "aws_service_discovery_instance" "kafka" {
 }
 
 resource "aws_service_discovery_service" "core" {
-  for_each = toset(["config-server", "eureka-server"])
+  for_each = toset(["config-server", "eureka-server", "embedding-service"])
   name     = each.key
 
   dns_config {
