@@ -106,8 +106,8 @@ class CreatorApprovalConcurrencyIntegrationTest {
 
     @AfterEach
     void cleanDatabase() {
-        jdbcTemplate.update("delete from private.p_creators");
-        jdbcTemplate.update("delete from private.p_users");
+        jdbcTemplate.update("delete from public.p_creators");
+        jdbcTemplate.update("delete from public.p_users");
     }
 
     @ParameterizedTest(name = "{0}가 잠금을 선점하면 해당 관리자만 승인에 성공한다")
