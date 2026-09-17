@@ -4,22 +4,15 @@ import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.common.entity.BaseEntity;
 import com.sub9.productservice.review.domain.exception.ReviewErrorCode;
 import jakarta.persistence.*;
-
-import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.apache.commons.lang3.ObjectUtils;
 
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(
-    // TODO: 리뷰 삭제 후 재작성을 허용하기 위해 Partial Index 적용
-    // CREATE UNIQUE INDEX uk_reviews_order_item_active
-    // ON p_reviews (order_item_id)
-    // WHERE deleted_at IS NULL;
     name = "p_reviews",
     indexes = {
       @Index(name = "idx_reviews_product_id_created_at", columnList = "product_id, created_at")
