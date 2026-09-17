@@ -23,8 +23,8 @@ import java.util.UUID;
 public class EmbeddingCategorySimilarityStage implements CategorySimilarityStage {
 
     // local/embedding_test_result.md 실험 기준 잠정치 - Levenshtein과 분포가 달라 별도 관리, 운영 데이터로 재보정 필요
-    private static final double MERGE_THRESHOLD = 0.60;
-    private static final double PENDING_APPROVAL_THRESHOLD = 0.30;
+    private static final double MERGE_THRESHOLD = 0.50;
+    private static final double PENDING_APPROVAL_THRESHOLD = 0.40;
 
     private final HashtagVectorRepository hashtagVectorRepository;
     private final CategoryVectorRepository categoryVectorRepository;
