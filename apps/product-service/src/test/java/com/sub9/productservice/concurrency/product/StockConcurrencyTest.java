@@ -1,4 +1,4 @@
-package com.sub9.productservice.product.application.command.service;
+package com.sub9.productservice.concurrency.product;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -6,6 +6,7 @@ import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.ErrorCode;
 import com.sub9.productservice.product.application.command.dto.stock.DeductStockCommand;
 import com.sub9.productservice.product.application.command.dto.stock.RestoreStockCommand;
+import com.sub9.productservice.product.application.port.in.stock.OrderStockUseCase;
 import com.sub9.productservice.product.domain.exception.StockErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.Sku;
@@ -28,11 +29,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 @DisplayName("StockCommandService - 동시성 테스트")
 @SpringBootTest(properties = "spring.kafka.listener.auto-startup=false")
 class StockConcurrencyTest extends AbstractIntegrationTest {
-  @Autowired StockCommandService stockCommandService;
-  @Autowired ProductCommandJpaRepository productRepository;
-  @Autowired SkuCommandJpaRepository skuRepository;
-  @Autowired StockCommandJpaRepository stockRepository;
   @Autowired StockHistoryCommandJpaRepository stockHistoryRepository;
+  @Autowired ProductCommandJpaRepository productRepository;
+  @Autowired StockCommandJpaRepository stockRepository;
+  @Autowired SkuCommandJpaRepository skuRepository;
+  @Autowired OrderStockUseCase orderStockUseCase;
 
   private Stock stock;
 
@@ -61,7 +62,7 @@ class StockConcurrencyTest extends AbstractIntegrationTest {
     ConcurrencyTestingUtil.run(
         threadCount,
         () ->
-            stockCommandService.deduct(
+            orderStockUseCase.deduct(
                 new DeductStockCommand(
                     UUID.randomUUID(), List.of(new DeductStockCommand.Item(stock.getSkuId(), 3)))));
 
@@ -81,7 +82,7 @@ class StockConcurrencyTest extends AbstractIntegrationTest {
         threadCount,
         () -> {
           try {
-            stockCommandService.deduct(
+            orderStockUseCase.deduct(
                 new DeductStockCommand(
                     UUID.randomUUID(), List.of(new DeductStockCommand.Item(stock.getSkuId(), 3))));
           } catch (BusinessException e) {
@@ -105,7 +106,7 @@ class StockConcurrencyTest extends AbstractIntegrationTest {
     ConcurrencyTestingUtil.run(
         threadCount,
         () ->
-            stockCommandService.deduct(
+            orderStockUseCase.deduct(
                 new DeductStockCommand(
                     orderId, List.of(new DeductStockCommand.Item(stock.getSkuId(), 3)))));
 
@@ -121,14 +122,14 @@ class StockConcurrencyTest extends AbstractIntegrationTest {
     UUID orderId = UUID.randomUUID();
     int threadCount = 5;
 
-    stockCommandService.deduct(
+    orderStockUseCase.deduct(
         new DeductStockCommand(orderId, List.of(new DeductStockCommand.Item(stock.getSkuId(), 3))));
 
     // when
     ConcurrencyTestingUtil.run(
         threadCount,
         () ->
-            stockCommandService.restore(
+            orderStockUseCase.restore(
                 new RestoreStockCommand(
                     orderId,
                     List.of(new RestoreStockCommand.Item(stock.getSkuId(), 3)),
