@@ -356,10 +356,12 @@ services:
     profiles: ["observability"]
     image: ${PROMETHEUS_IMAGE:?PROMETHEUS_IMAGE is required}
     restart: unless-stopped
+    # k6 pushes run metrics through the remote-write receiver.
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=3d
+      - --web.enable-remote-write-receiver
     volumes:
       - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -385,6 +387,7 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./deploy/grafana/provisioning/datasources/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml:ro
+      - ./deploy/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
     networks:
       - internal
     mem_limit: 768m

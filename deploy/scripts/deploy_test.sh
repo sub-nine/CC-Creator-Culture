@@ -44,8 +44,10 @@ create_manifest() {
       },
       images: {
         "config-server": ("registry.example/config-server@" + $digest),
+        "embedding-service": ("registry.example/embedding-service@" + $digest),
         "eureka-server": ("registry.example/eureka-server@" + $digest),
         "gateway": ("registry.example/gateway@" + $digest),
+        "k6": ("registry.example/k6@" + $digest),
         "user-service": ("registry.example/user-service@" + $digest),
         "product-service": ("registry.example/product-service@" + $digest),
         "order-service": ("registry.example/order-service@" + $digest)
@@ -500,7 +502,14 @@ assert_file_line "R2_PUBLIC_URL=https://pub-example.r2.dev" "$success_state/runt
 assert_file_line "CONFIG_SERVER_CONFIG_LABEL=$NEW_SHA" "$success_state/runtime/current.env"
 user_up_line="$(grep -nF "candidate=$NEW_SHA command=up args=-d user-service" "$DOCKER_LOG" | head -n 1 | cut -d: -f1)"
 redis_up_line="$(grep -nF "candidate=$NEW_SHA command=up args=-d redis kafka" "$DOCKER_LOG" | head -n 1 | cut -d: -f1)"
+embedding_up_line="$(grep -nF "candidate=$NEW_SHA command=up args=-d embedding-service" "$DOCKER_LOG" | head -n 1 | cut -d: -f1)"
+product_up_line="$(grep -nF "candidate=$NEW_SHA command=up args=-d product-service" "$DOCKER_LOG" | head -n 1 | cut -d: -f1)"
 [[ -n "$user_up_line" && -n "$redis_up_line" ]]
+[[ -n "$embedding_up_line" && -n "$product_up_line" ]]
+(( embedding_up_line < product_up_line )) || {
+  echo "embedding-service must start and become healthy before product-service." >&2
+  exit 1
+}
 (( redis_up_line < user_up_line )) || {
   echo "Redis and Kafka must start before user-service when messaging is enabled." >&2
   exit 1
@@ -512,10 +521,16 @@ assert_file_mode 600 "$success_state/releases/$NEW_SHA/source/deploy/compose.dev
 assert_file_mode 644 "$success_state/releases/$NEW_SHA/source/deploy/Caddyfile"
 assert_file_mode 644 "$success_state/releases/$NEW_SHA/source/deploy/prometheus/prometheus.yml"
 assert_file_mode 644 "$success_state/releases/$NEW_SHA/source/deploy/grafana/provisioning/datasources/prometheus.yml"
+assert_file_mode 644 "$success_state/releases/$NEW_SHA/source/deploy/grafana/provisioning/dashboards/dashboards.yml"
+assert_file_mode 644 "$success_state/releases/$NEW_SHA/source/deploy/grafana/provisioning/dashboards/k6-prometheus.json"
 assert_file_mode 755 "$success_state/releases/$NEW_SHA/source/deploy/postgres/init-service-database.sh"
 assert_file_mode 600 "$success_state/releases/$NEW_SHA/source/deploy/postgres/reconcile-credentials.sql"
 [[ ! -d "$success_state/releases/3333333333333333333333333333333333333333" ]]
-jq -e '.services | length == 6 and all(.[]; length == 2)' "$success_state/retained-images.json" >/dev/null
+jq -e '
+  .services | length == 8
+  and all(.["config-server"], .["eureka-server"], .["gateway"], .["user-service"], .["product-service"], .["order-service"]; length == 2)
+  and all(.["embedding-service"], .["k6"]; length == 1)
+' "$success_state/retained-images.json" >/dev/null
 grep -Fq -- '--resolve dev.example.com:443:127.0.0.1' "$CURL_LOG"
 grep -Fq 'stop --time 30 legacy-postgres-container' "$DOCKER_LOG"
 
@@ -523,7 +538,11 @@ grep -Fq 'stop --time 30 legacy-postgres-container' "$DOCKER_LOG"
 rm -f "$success_state/retained-images.json"
 run_deploy "$manifest" "$success_state" > "$TEST_ROOT/no-op.out" 2>&1
 grep -Fq "No-op: candidate $NEW_SHA is already deployed." "$TEST_ROOT/no-op.out"
-jq -e '.services | length == 6 and all(.[]; length == 2)' "$success_state/retained-images.json" >/dev/null
+jq -e '
+  .services | length == 8
+  and all(.["config-server"], .["eureka-server"], .["gateway"], .["user-service"], .["product-service"], .["order-service"]; length == 2)
+  and all(.["embedding-service"], .["k6"]; length == 1)
+' "$success_state/retained-images.json" >/dev/null
 [[ ! -s "$DOCKER_LOG" ]] || {
   echo "No-op deployment unexpectedly invoked Docker." >&2
   exit 1
@@ -722,5 +741,12 @@ unset LEGACY_POSTGRES_RUNNING FAIL_LEGACY_STOP
 grep -Fq 'stop --time 30 legacy-postgres-container' "$DOCKER_LOG"
 grep -Fq "candidate=$OLD_SHA topology=legacy command=up" "$DOCKER_LOG"
 grep -Fq "Rollback completed successfully." "$TEST_ROOT/legacy-stop-failure.out"
+
+[[ -f "$same_project_caddy_state/releases/$NEW_SHA/source/load-test/scripts/run-dev.sh" ]]
+[[ -f "$same_project_caddy_state/releases/$NEW_SHA/source/deploy/grafana/provisioning/dashboards/k6-prometheus.json" ]]
+if grep -Eq 'command=up args=.* k6( |$)' "$DOCKER_LOG"; then
+  echo "Deployment must not start k6" >&2
+  exit 1
+fi
 
 echo "deploy.sh regression tests passed."

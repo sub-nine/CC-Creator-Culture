@@ -80,6 +80,8 @@ candidate_sha="$(jq -er '.commit_sha' "$MANIFEST")"
 
 required_services=(config-server eureka-server gateway user-service product-service order-service)
 required_services_json='["config-server","eureka-server","gateway","order-service","product-service","user-service"]'
+required_images_json='["config-server","embedding-service","eureka-server","gateway","k6","order-service","product-service","user-service"]'
+retained_services=("${required_services[@]}" embedding-service k6)
 database_containers=(user-postgres product-postgres order-postgres)
 jq -e --argjson required "$required_services_json" '
   ((.config_labels | keys | sort) == $required)
@@ -88,15 +90,17 @@ jq -e --argjson required "$required_services_json" '
   echo "Manifest config_labels must contain a 40-character SHA for each service." >&2
   exit 65
 }
-for service in "${required_services[@]}"; do
+for service in "${retained_services[@]}"; do
   jq -e --arg service "$service" '
     .images[$service]
     | strings
-    | test("@sha256:[0-9a-f]{64}$")
+    | test("^[^[:space:]]+@sha256:[0-9a-f]{64}$")
   ' "$MANIFEST" >/dev/null
 done
-[[ "$(jq '.images | length' "$MANIFEST")" -eq "${#required_services[@]}" ]] || {
-  echo "Manifest must contain exactly six service images." >&2
+jq -e --argjson required "$required_images_json" '
+  ((.images | keys | sort) == $required)
+' "$MANIFEST" >/dev/null || {
+  echo "Manifest must contain exactly the six Java service images plus embedding-service and k6." >&2
   exit 65
 }
 
@@ -238,23 +242,35 @@ service_env_key() {
 image_digest_from_env() {
   local service="$1"
   local file="$2"
+  local strict="${3:-strict}"
   local image
   image="$(env_value "$(service_env_key "$service")" "$file")"
+  if [[ -z "$image" ]]; then
+    if [[ "$strict" == "tolerant" ]]; then
+      return 0
+    fi
+    echo "Release env file is missing $(service_env_key "$service")." >&2
+    return 1
+  fi
   [[ "$image" =~ @(sha256:[0-9a-f]{64})$ ]] || return 1
   printf '%s' "${BASH_REMATCH[1]}"
 }
 
 write_retained_images() {
   local target="$1"
-  local target_tmp json service current_digest previous_digest digests
+  local target_tmp json service current_digest previous_digest digests strict
   target_tmp="$(mktemp "${target}.XXXXXX")"
   json='{"services":{}}'
 
-  for service in "${required_services[@]}"; do
+  for service in "${retained_services[@]}"; do
+    strict=strict
+    case "$service" in
+      embedding-service|k6) strict=tolerant ;;
+    esac
     current_digest="$(image_digest_from_env "$service" "$current_env")" || return 1
     previous_digest=""
     if [[ -f "$previous_env" ]]; then
-      previous_digest="$(image_digest_from_env "$service" "$previous_env")" || return 1
+      previous_digest="$(image_digest_from_env "$service" "$previous_env" "$strict")" || return 1
     fi
     digests="$(jq -cn --arg current "$current_digest" --arg previous "$previous_digest" \
       '[$current, $previous] | map(select(length > 0)) | unique')"
@@ -262,7 +278,11 @@ write_retained_images() {
       '.services[$service] = $digests' <<<"$json")"
   done
 
-  jq -e '.services | length == 6 and all(.[]; length >= 1 and length <= 2)' <<<"$json" >/dev/null
+  jq -e '
+    .services | length == 8
+    and all(.[]; length >= 1 and length <= 2)
+    and all(.[][]; test("^sha256:[0-9a-f]{64}$"))
+  ' <<<"$json" >/dev/null
   printf '%s\n' "$json" > "$target_tmp"
   chmod 0600 "$target_tmp"
   mv "$target_tmp" "$target"
@@ -306,6 +326,7 @@ install -d -m 0700 \
   "$release_source/deploy" \
   "$release_source/deploy/prometheus" \
   "$release_source/deploy/grafana/provisioning/datasources" \
+  "$release_source/deploy/grafana/provisioning/dashboards" \
   "$release_source/deploy/postgres"
 install -m 0600 "$COMPOSE_FILE" "$release_source/deploy/compose.dev.yml"
 install -m 0644 "$repository_root/deploy/Caddyfile" "$release_source/deploy/Caddyfile"
@@ -313,12 +334,21 @@ install -m 0644 "$repository_root/deploy/prometheus/prometheus.yml" "$release_so
 install -m 0644 \
   "$repository_root/deploy/grafana/provisioning/datasources/prometheus.yml" \
   "$release_source/deploy/grafana/provisioning/datasources/prometheus.yml"
+install -m 0644 \
+  "$repository_root/docker/grafana/provisioning/dashboards/dashboards.yml" \
+  "$release_source/deploy/grafana/provisioning/dashboards/dashboards.yml"
+install -m 0644 \
+  "$repository_root/docker/grafana/provisioning/dashboards/k6-prometheus.json" \
+  "$release_source/deploy/grafana/provisioning/dashboards/k6-prometheus.json"
 install -m 0755 \
   "$repository_root/deploy/postgres/init-service-database.sh" \
   "$release_source/deploy/postgres/init-service-database.sh"
 install -m 0600 \
   "$repository_root/deploy/postgres/reconcile-credentials.sql" \
   "$release_source/deploy/postgres/reconcile-credentials.sql"
+# Keep runner files from the same release as the immutable k6 image. No local secrets/results.
+tar -C "$repository_root" --exclude='load-test/results' --exclude='load-test/.env*' -cf - load-test \
+  | tar -C "$release_source" -xf -
 install -m 0600 "$MANIFEST" "$release_root/manifest.json"
 
 secret_value() {
@@ -780,7 +810,7 @@ stop_legacy_postgres() {
 }
 
 verify_container_runtime() {
-  local runtime_services=(user-postgres product-postgres order-postgres zipkin config-server eureka-server user-service product-service order-service gateway caddy)
+  local runtime_services=(user-postgres product-postgres order-postgres zipkin config-server eureka-server embedding-service user-service product-service order-service gateway caddy)
   local container detail service count oom status baseline file failed
   file="$STATE_DIR/runtime/restart-baseline"
   if [[ "$ENABLE_MESSAGING_PROFILE" == "true" ]]; then
@@ -858,6 +888,9 @@ deploy_release() {
   compose up -d config-server eureka-server || return 1
   wait_healthy config-server || return 1
   wait_healthy eureka-server || return 1
+
+  compose up -d embedding-service || return 1
+  wait_healthy embedding-service || return 1
 
   if [[ "$ENABLE_MESSAGING_PROFILE" == "true" ]]; then
     compose --profile messaging up -d redis kafka || return 1
