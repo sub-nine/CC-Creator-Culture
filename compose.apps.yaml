@@ -49,6 +49,10 @@ services:
     environment:
       JAVA_OPTS: -Xms64m -Xmx256m
 
+  embedding-service:
+    cpus: 0.5
+    mem_limit: 1536m
+
   kafka-ui:
     profiles: ["observability"]
 
@@ -123,9 +127,12 @@ services:
       R2_ENDPOINT: ${R2_ENDPOINT:?R2_ENDPOINT is required}
       R2_BUCKET: ${R2_BUCKET:?R2_BUCKET is required}
       R2_PUBLIC_URL: ${R2_PUBLIC_URL:?R2_PUBLIC_URL is required}
+      EMBEDDING_SERVICE_URL: http://embedding-service:8000
     depends_on:
       <<: *app-dependencies
       kafka:
+        condition: service_healthy
+      embedding-service:
         condition: service_healthy
 
   order-service:

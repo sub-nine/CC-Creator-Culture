@@ -32,6 +32,7 @@ export GATEWAY_IMAGE=gateway
 export USER_SERVICE_IMAGE=user-service
 export PRODUCT_SERVICE_IMAGE=product-service
 export ORDER_SERVICE_IMAGE=order-service
+export EMBEDDING_SERVICE_IMAGE=embedding-service
 export POSTGRES_IMAGE=postgres
 export REDIS_IMAGE=redis
 export KAFKA_IMAGE=kafka
