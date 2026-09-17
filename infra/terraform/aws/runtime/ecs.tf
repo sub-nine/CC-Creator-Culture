@@ -105,7 +105,7 @@ resource "aws_ecs_service" "app" {
     assign_public_ip = false
   }
 
-  depends_on = [aws_ecs_service.platform]
+  depends_on = [aws_ecs_service.platform, aws_ecs_service.embedding]
 }
 
 resource "aws_ecs_service" "gateway" {

@@ -4,7 +4,7 @@ output "release_sha" {
 }
 
 output "image_tags" {
-  description = "Content-hash tags currently applied to the six services and db-seed."
+  description = "Content-hash tags currently applied to the seven services, db-seed and k6."
   value       = var.image_tags
 }
 

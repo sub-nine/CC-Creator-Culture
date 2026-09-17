@@ -15,6 +15,8 @@ image_tags = {
   product-service = "0000000000000000000000000000000000000000000000000000000000000000"
   order-service   = "0000000000000000000000000000000000000000000000000000000000000000"
   db-seed         = "0000000000000000000000000000000000000000000000000000000000000000"
+  embedding-service = "0000000000000000000000000000000000000000000000000000000000000000"
+  k6                = "0000000000000000000000000000000000000000000000000000000000000000"
 }
 # Required. Per-service config-repo labels from service-revisions.sh.
 config_labels = {
@@ -55,6 +57,8 @@ persistent_config = {
     user-service    = "/ecs/cc-test/user-service"
     product-service = "/ecs/cc-test/product-service"
     order-service   = "/ecs/cc-test/order-service"
+    embedding-service = "/ecs/cc-test/embedding-service"
+    k6 = "/ecs/cc-test/k6"
   }
   security_groups = {
     config-server   = "replace-with-sg-config-server"
@@ -63,6 +67,8 @@ persistent_config = {
     user-service    = "replace-with-sg-user-service"
     product-service = "replace-with-sg-product-service"
     order-service   = "replace-with-sg-order-service"
+    embedding-service = "replace-with-sg-embedding-service"
+    k6 = "replace-with-sg-k6"
     alb             = "replace-with-sg-alb"
     observation     = "replace-with-sg-observation"
     kafka           = "replace-with-sg-kafka"
@@ -97,11 +103,13 @@ persistent_config = {
     service_ids = {
       config-server = "replace-with-config-server-service-id"
       eureka-server = "replace-with-eureka-server-service-id"
+      embedding-service = "replace-with-embedding-service-id"
     }
     dns_names = {
       config-server = "config-server.cc-test.internal"
       eureka-server = "eureka-server.cc-test.internal"
       kafka         = "kafka.cc-test.internal"
+      embedding-service = "embedding-service.cc-test.internal"
     }
   }
   kafka_bootstrap_document = {
