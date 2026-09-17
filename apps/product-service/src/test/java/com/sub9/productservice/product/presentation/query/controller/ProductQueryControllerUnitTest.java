@@ -2,23 +2,21 @@ package com.sub9.productservice.product.presentation.query.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.common.config.r2.R2Properties;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
-import com.sub9.productservice.product.domain.exception.ProductErrorCode;
-import jakarta.servlet.http.Cookie;
 import com.sub9.productservice.product.application.port.in.product.ProductQueryUseCase;
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import com.sub9.productservice.support.AbstractControllerTest;
+import jakarta.servlet.http.Cookie;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -28,12 +26,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
-import org.springframework.http.HttpHeaders;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -55,6 +53,8 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
     ProductInfo response =
         new ProductInfo(
             productId,
+            UUID.randomUUID(),
+            "상호",
             "왁뿌볼",
             ProductStatus.ACTIVE,
             BigDecimal.valueOf(4.5),
@@ -74,6 +74,7 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
         .andExpect(jsonPath("$.message").value("요청 성공"))
         .andExpect(jsonPath("$.data.content.length()").value(1))
         .andExpect(jsonPath("$.data.content[0].productId").value(productId.toString()))
+        .andExpect(jsonPath("$.data.content[0].creatorName").value("상호"))
         .andExpect(jsonPath("$.data.content[0].name").value("왁뿌볼"))
         .andExpect(jsonPath("$.data.content[0].status").value("ACTIVE"))
         .andExpect(jsonPath("$.data.content[0].averageRating").value(4.5))
@@ -94,7 +95,17 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
   void searchProducts_success_when_image_is_missing(String imageKey) throws Exception {
     // given
     ProductInfo response =
-        new ProductInfo(productId, "말랑이", ProductStatus.ACTIVE, null, 0L, 10000L, 10, imageKey);
+        new ProductInfo(
+            productId,
+            UUID.randomUUID(),
+            null,
+            "말랑이",
+            ProductStatus.ACTIVE,
+            null,
+            0L,
+            10000L,
+            10,
+            imageKey);
 
     given(productQueryUseCase.searchProducts(eq("말랑"), any(Pageable.class)))
         .willReturn(new PageImpl<>(List.of(response)));
@@ -115,6 +126,7 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
         new ProductDetailInfo(
             productId,
             UUID.randomUUID(),
+            "상호",
             "왁뿌볼",
             "설명",
             ProductStatus.ACTIVE,
@@ -135,6 +147,7 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.message").value("요청 성공"))
         .andExpect(jsonPath("$.data.productId").value(productId.toString()))
+        .andExpect(jsonPath("$.data.creatorName").value("상호"))
         .andExpect(jsonPath("$.data.categories[0].name").value("의류"))
         .andExpect(jsonPath("$.data.hashtags[0].name").value("여름"))
         .andExpect(
@@ -155,7 +168,7 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
   }
 
   @Test
-  @DisplayName("비회원은 기존 방문자 쿠키로 상품을 조회하고 쿠키를 재발급하지 않는다.")
+  @DisplayName("비회원은 기존 방문자 쿠키가 있을 시 쿠키를 재발급하지 않는다.")
   void getProductDetail_success_when_guest_cookie_exists() throws Exception {
     // given
     String visitorId = "guest:" + UUID.randomUUID();
@@ -164,8 +177,9 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
 
     // when & then
     mockMvc
-        .perform(get(endPoint + "/{productId}", productId)
-            .cookie(new Cookie("visitor_cookie", visitorId)))
+        .perform(
+            get(endPoint + "/{productId}", productId)
+                .cookie(new Cookie("visitor_cookie", visitorId)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.productId").value(productId.toString()))
         .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
@@ -176,20 +190,22 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
   @ParameterizedTest
   @NullAndEmptySource
   @ValueSource(strings = {"guest:550e8400-e29b-41d4-a716-446655440000", "invalid"})
-  @DisplayName("회원은 방문자 쿠키와 관계없이 userId로 상품을 조회한다.")
+  @DisplayName("회원은 userId를 통해 상품 상세 조회 시 조회수를 집계한다..")
   void getProductDetail_success_when_authenticated(String visitorCookie) throws Exception {
     // given
     UUID userId = UUID.randomUUID();
     given(productQueryUseCase.getProductDetail(productId, "user:" + userId))
         .willReturn(createProductDetailInfo());
-    var request = get(endPoint + "/{productId}", productId)
-        .with(authentication(CustomAuthenticationToken.of(userId, "USER")));
+    var request =
+        get(endPoint + "/{productId}", productId)
+            .with(authentication(CustomAuthenticationToken.of(userId, "USER")));
     if (visitorCookie != null) {
       request.cookie(new Cookie("visitor_cookie", visitorCookie));
     }
 
     // when & then
-    mockMvc.perform(request)
+    mockMvc
+        .perform(request)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.productId").value(productId.toString()))
         .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
@@ -198,8 +214,15 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"", " ", "invalid", "guest:", "guest:not-a-uuid",
-      "user:550e8400-e29b-41d4-a716-446655440000"})
+  @ValueSource(
+      strings = {
+        "",
+        " ",
+        "invalid",
+        "guest:",
+        "guest:not-a-uuid",
+        "user:550e8400-e29b-41d4-a716-446655440000"
+      })
   @DisplayName("비회원 방문자 쿠키가 유효하지 않으면 새 쿠키를 발급하고 상품을 조회한다.")
   void getProductDetail_success_when_guest_cookie_is_invalid(String visitorCookie)
       throws Exception {
@@ -208,12 +231,15 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
         .willReturn(createProductDetailInfo());
 
     // when
-    var response = mockMvc
-        .perform(get(endPoint + "/{productId}", productId)
-            .cookie(new Cookie("visitor_cookie", visitorCookie)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.productId").value(productId.toString()))
-        .andReturn().getResponse();
+    var response =
+        mockMvc
+            .perform(
+                get(endPoint + "/{productId}", productId)
+                    .cookie(new Cookie("visitor_cookie", visitorCookie)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.productId").value(productId.toString()))
+            .andReturn()
+            .getResponse();
 
     // then
     Cookie cookie = response.getCookie("visitor_cookie");
@@ -225,7 +251,18 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
 
   private ProductDetailInfo createProductDetailInfo() {
     return new ProductDetailInfo(
-        productId, UUID.randomUUID(), "말랑이", "말랑이 설명", ProductStatus.ACTIVE,
-        0L, null, 0L, List.of(), List.of(), List.of(), List.of());
+        productId,
+        UUID.randomUUID(),
+        "상호",
+        "말랑이",
+        "말랑이 설명",
+        ProductStatus.ACTIVE,
+        0L,
+        null,
+        0L,
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of());
   }
 }

@@ -15,9 +15,9 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-  # 앱 기동 시 Flyway가 private 스키마를 만들고 db/migration을 적용한다.
-  # hibernate.default_schema=private(user-service.yaml)와 같은 스키마여야 validate가 테이블을 찾는다.
+  # 앱 기동 시 Flyway가 public 스키마를 만들고 db/migration을 적용한다.
+  # hibernate.default_schema=public(user-service.yaml)와 같은 스키마여야 validate가 테이블을 찾는다.
   flyway:
     enabled: true
-    schemas: [private]
-    default-schema: private
+    schemas: [public]
+    default-schema: public

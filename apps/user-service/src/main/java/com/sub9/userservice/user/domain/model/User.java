@@ -23,7 +23,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(
         name = "p_users",
-        schema = "private",
+        schema = "public",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_users_email", columnNames = "email"),
                 @UniqueConstraint(name = "uk_users_nickname", columnNames = "nickname"),

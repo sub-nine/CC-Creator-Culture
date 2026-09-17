@@ -10,6 +10,7 @@ import com.sub9.common.exception.CommonErrorCode;
 import com.sub9.orderservice.cart.application.dto.CartItemInfo;
 import com.sub9.orderservice.cart.application.dto.CartProductInfo;
 import com.sub9.orderservice.cart.application.port.out.CartProductPort;
+import com.sub9.orderservice.cart.application.port.out.CartUserPort;
 import com.sub9.orderservice.cart.domain.model.Cart;
 import com.sub9.orderservice.cart.domain.repository.CartRepository;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
@@ -29,6 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class CartQueryServiceUnitTest {
   @Mock private CartRepository cartRepository;
   @Mock private CartProductPort cartProductPort;
+  @Mock private CartUserPort cartUserPort;
   @InjectMocks private CartQueryService cartQueryService;
 
   private UUID userId;

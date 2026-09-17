@@ -1,4 +1,4 @@
-INSERT INTO private.p_users (
+INSERT INTO public.p_users (
     id, email, password, nickname, phone, address, slack_id, role,
     created_at, created_by, updated_at, updated_by
 ) VALUES
@@ -28,7 +28,7 @@ INSERT INTO private.p_users (
     )
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO private.p_creators (
+INSERT INTO public.p_creators (
     id, user_id, creator_name, business_registration_number, approval_status,
     approved_at, approved_by, created_at, created_by, updated_at, updated_by
 ) VALUES (

@@ -6,15 +6,17 @@ import java.util.UUID;
 public record CartItemResponse(
     UUID cartId,
     UUID skuId,
+    String creatorName,
     String productName,
     String skuName,
     String productStatus,
     int quantity,
     long price) {
-  public static CartItemResponse from(CartItemInfo cartItemInfo) {
+  public static CartItemResponse of(CartItemInfo cartItemInfo, String creatorName) {
     return new CartItemResponse(
         cartItemInfo.cartId(),
         cartItemInfo.skuId(),
+        creatorName,
         cartItemInfo.productName(),
         cartItemInfo.skuName(),
         cartItemInfo.productStatus(),

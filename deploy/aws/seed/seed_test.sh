@@ -55,10 +55,9 @@ done
 [[ "$ready" == "true" ]] || fail "PostgreSQL did not become ready with database seed_test within 30s"
 
 psql_admin <<'SQL'
-CREATE SCHEMA private;
-CREATE TABLE private.p_users (id uuid PRIMARY KEY, email text, password text, nickname text, phone text, address text,
+CREATE TABLE public.p_users (id uuid PRIMARY KEY, email text, password text, nickname text, phone text, address text,
   slack_id text, role text, created_at timestamptz, created_by uuid, updated_at timestamptz, updated_by uuid);
-CREATE TABLE private.p_creators (id uuid PRIMARY KEY, user_id uuid, creator_name text, business_registration_number text,
+CREATE TABLE public.p_creators (id uuid PRIMARY KEY, user_id uuid, creator_name text, business_registration_number text,
   approval_status text, approved_at timestamp, approved_by uuid, created_at timestamptz, created_by uuid, updated_at timestamptz, updated_by uuid);
 CREATE TABLE p_categories (id uuid PRIMARY KEY, merged_category_id uuid, name text, description text, status text,
   unique_version uuid, created_at timestamptz, updated_at timestamptz, created_by uuid, updated_by uuid);
@@ -86,5 +85,5 @@ done
 
 [[ "$(psql_admin --command "SELECT count(*) FROM ops.seed_runs WHERE run_id = '$RUN_ID'")" == "3" ]] \
   || fail "ops.seed_runs must record the run for user, product, and order"
-[[ "$(psql_admin --command "SELECT count(*) FROM private.p_users")" == "4" ]] || fail "expected 4 fixture users"
+[[ "$(psql_admin --command "SELECT count(*) FROM public.p_users")" == "4" ]] || fail "expected 4 fixture users"
 echo "seed PostgreSQL 17 check passed"
