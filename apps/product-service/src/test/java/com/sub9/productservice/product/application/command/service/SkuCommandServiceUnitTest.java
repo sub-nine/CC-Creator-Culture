@@ -7,14 +7,16 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.*;
 
 import com.sub9.common.exception.BusinessException;
+import com.sub9.productservice.product.application.command.dto.sku.AddSkuCommand;
 import com.sub9.productservice.product.application.command.dto.sku.DeleteSkuCommand;
 import com.sub9.productservice.product.application.command.dto.sku.UpdateSkuCommand;
-import com.sub9.productservice.product.domain.exception.SkuErrorCode;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.product.domain.exception.SkuErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.Sku;
 import com.sub9.productservice.product.domain.repository.ProductRepository;
 import com.sub9.productservice.product.domain.repository.SkuRepository;
+import com.sub9.productservice.product.domain.repository.StockRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.*;
@@ -28,6 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class SkuCommandServiceUnitTest {
   @Mock private ProductRepository productRepository;
   @Mock private SkuRepository skuRepository;
+  @Mock private StockRepository stockRepository;
   @InjectMocks private SkuCommandService skuCommandService;
 
   private final UUID creatorId = UUID.randomUUID();
@@ -37,6 +40,7 @@ class SkuCommandServiceUnitTest {
   private UpdateSkuCommand defaultUpdateSkuCommand;
   private UpdateSkuCommand updateSkuCommand;
   private DeleteSkuCommand deleteSkuCommand;
+  private AddSkuCommand addSkuCommand;
 
   @BeforeEach
   void setUp() {
@@ -44,6 +48,47 @@ class SkuCommandServiceUnitTest {
         new UpdateSkuCommand(creatorId, productId, skuId, "옵션이름", 2000L, true);
     updateSkuCommand = new UpdateSkuCommand(creatorId, productId, skuId, "옵션이름", 2000L, false);
     deleteSkuCommand = new DeleteSkuCommand(creatorId, productId, skuId);
+    addSkuCommand = new AddSkuCommand(productId, creatorId, "옵션이름", 2000L, true, 10);
+  }
+
+  @Nested
+  @DisplayName("SKU 등록 테스트")
+  class AddSkuTests {
+    @Test
+    @DisplayName("상품이 존재하지 않으면 PRODUCT_NOT_FOUND 예외가 발생해야 한다.")
+    void addSku_fails_when_product_not_found() {
+      // given
+      given(productRepository.findByIdForUpdate(addSkuCommand.productId()))
+          .willReturn(Optional.empty());
+
+      // when & then
+      assertThatThrownBy(() -> skuCommandService.addSku(addSkuCommand))
+          .isInstanceOf(BusinessException.class)
+          .hasMessage(ProductErrorCode.PRODUCT_NOT_FOUND.message());
+
+      verifyNoInteractions(skuRepository, stockRepository);
+    }
+
+    @Test
+    @DisplayName("상품 소유자가 아니면 PRODUCT_ACCESS_DENIED 예외가 발생해야 한다.")
+    void addSku_fails_when_product_access_denied() {
+      // given
+      Product product = mock(Product.class);
+
+      given(productRepository.findByIdForUpdate(addSkuCommand.productId()))
+          .willReturn(Optional.of(product));
+
+      willThrow(new BusinessException(ProductErrorCode.PRODUCT_ACCESS_DENIED))
+          .given(product)
+          .validateOwner(addSkuCommand.creatorId());
+
+      // when & then
+      assertThatThrownBy(() -> skuCommandService.addSku(addSkuCommand))
+          .isInstanceOf(BusinessException.class)
+          .hasMessage(ProductErrorCode.PRODUCT_ACCESS_DENIED.message());
+
+      verifyNoInteractions(skuRepository, stockRepository);
+    }
   }
 
   @Nested
@@ -57,6 +102,7 @@ class SkuCommandServiceUnitTest {
       Sku sku = mock(Sku.class);
       Sku currentDefaultSku = mock(Sku.class);
 
+      given(product.getId()).willReturn(defaultUpdateSkuCommand.productId());
       given(productRepository.findByIdForUpdate(defaultUpdateSkuCommand.productId()))
           .willReturn(Optional.of(product));
       given(
@@ -87,6 +133,7 @@ class SkuCommandServiceUnitTest {
       Product product = mock(Product.class);
       Sku sku = mock(Sku.class);
 
+      given(product.getId()).willReturn(defaultUpdateSkuCommand.productId());
       given(productRepository.findByIdForUpdate(defaultUpdateSkuCommand.productId()))
           .willReturn(Optional.of(product));
       given(

@@ -15,4 +15,6 @@ public interface SkuRepository {
   long countByProductIdAndDeletedAtIsNull(UUID productId);
 
   Optional<Sku> findByProductIdAndIsDefaultTrue(UUID productId);
+
+  void flush();
 }

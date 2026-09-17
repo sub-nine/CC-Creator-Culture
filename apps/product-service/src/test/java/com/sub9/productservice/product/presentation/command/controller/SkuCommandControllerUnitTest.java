@@ -1,16 +1,19 @@
 package com.sub9.productservice.product.presentation.command.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
+import com.sub9.productservice.product.application.command.dto.sku.AddSkuCommand;
 import com.sub9.productservice.product.application.command.dto.sku.DeleteSkuCommand;
 import com.sub9.productservice.product.application.command.dto.sku.UpdateSkuCommand;
 import com.sub9.productservice.product.application.port.in.sku.SkuCommandUseCase;
@@ -43,6 +46,62 @@ class SkuCommandControllerUnitTest extends AbstractControllerTest {
   }
 
   @Nested
+  @DisplayName("SKU 등록 테스트")
+  class AddSkuTests {
+    @Test
+    @DisplayName("SKU 등록에 성공하면 200을 반환한다")
+    void addSku_success() throws Exception {
+      // given
+      UUID createdSkuId = UUID.randomUUID();
+      AddSkuCommand command = new AddSkuCommand(productId, authUser.id(), "새 옵션", 20000L, true, 10);
+      given(skuCommandUseCase.addSku(command)).willReturn(createdSkuId);
+
+      // when & then
+      mockMvc
+          .perform(
+              post(endPoint + "/{productId}/skus", productId)
+                  .with(authUser())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      """
+                      {
+                        "name": "새 옵션",
+                        "price": 20000,
+                        "isDefault": true,
+                        "quantity": 10
+                      }
+                      """))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(createdSkuId.toString()));
+
+      verify(skuCommandUseCase).addSku(command);
+    }
+
+    @Test
+    @DisplayName("SKU 가격이 음수면 400을 반환한다")
+    void addSku_fails_when_price_is_negative() throws Exception {
+      // when & then
+      mockMvc
+          .perform(
+              post(endPoint + "/{productId}/skus", productId)
+                  .with(authUser())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      """
+                      {
+                        "name": "새 옵션",
+                        "price": -1,
+                        "isDefault": false,
+                        "quantity": 10
+                      }
+                      """))
+          .andExpect(status().isBadRequest());
+
+      verify(skuCommandUseCase, never()).addSku(any());
+    }
+  }
+
+  @Nested
   @DisplayName("SKU 수정 테스트")
   class UpdateSkuTests {
     @Test
@@ -68,7 +127,7 @@ class SkuCommandControllerUnitTest extends AbstractControllerTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(request))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.message").value("요청 성공"))
+          .andExpect(jsonPath("$.message").value("상품 옵션 수정에 성공했습니다."))
           .andExpect(jsonPath("$.data").doesNotExist());
 
       verify(skuCommandUseCase).updateSku(command);
@@ -115,7 +174,7 @@ class SkuCommandControllerUnitTest extends AbstractControllerTest {
       mockMvc
           .perform(delete(endPoint + "/" + productId + "/skus/" + skuId).with(authUser()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.message").value("요청 성공"))
+          .andExpect(jsonPath("$.message").value("상품 옵션 삭제에 성공했습니다."))
           .andExpect(jsonPath("$.data").doesNotExist());
 
       verify(skuCommandUseCase).deleteSku(command);

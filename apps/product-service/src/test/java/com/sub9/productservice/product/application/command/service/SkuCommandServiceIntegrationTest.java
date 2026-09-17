@@ -3,13 +3,16 @@ package com.sub9.productservice.product.application.command.service;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 import com.sub9.productservice.product.application.command.dto.product.CreateProductCommand;
+import com.sub9.productservice.product.application.command.dto.sku.AddSkuCommand;
 import com.sub9.productservice.product.application.command.dto.sku.CreateSkuCommand;
 import com.sub9.productservice.product.application.command.dto.sku.DeleteSkuCommand;
 import com.sub9.productservice.product.application.command.dto.sku.UpdateSkuCommand;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.Sku;
+import com.sub9.productservice.product.domain.model.Stock;
 import com.sub9.productservice.product.infrastructure.persistence.command.product.ProductCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.sku.SkuCommandJpaRepository;
+import com.sub9.productservice.product.infrastructure.persistence.command.stock.StockCommandJpaRepository;
 import com.sub9.productservice.support.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
 import java.util.List;
@@ -30,6 +33,7 @@ class SkuCommandServiceIntegrationTest extends AbstractIntegrationTest {
   @Autowired private SkuCommandService skuCommandService;
   @Autowired ProductCommandJpaRepository productRepository;
   @Autowired SkuCommandJpaRepository skuRepository;
+  @Autowired StockCommandJpaRepository stockRepository;
   @Autowired EntityManager entityManager;
 
   private final UUID creatorId = UUID.randomUUID();
@@ -64,6 +68,39 @@ class SkuCommandServiceIntegrationTest extends AbstractIntegrationTest {
             .collect(Collectors.toList());
 
     skuRepository.saveAll(dummySku);
+  }
+
+  @Nested
+  @DisplayName("SKU 등록 테스트")
+  class AddSku {
+    @Test
+    @DisplayName("SKU와 재고를 등록하고 기존 대표 SKU를 해제한다.")
+    void addSku_success() {
+      // given
+      AddSkuCommand command =
+          new AddSkuCommand(dummyProduct.getId(), creatorId, "그린", 13000L, true, 7);
+
+      UUID skuId = skuCommandService.addSku(command);
+      entityManager.flush();
+      entityManager.clear();
+
+      Sku addedSku = skuRepository.findById(skuId).orElseThrow();
+      Sku previousDefaultSku = skuRepository.findById(dummySku.get(0).getId()).orElseThrow();
+
+      // when
+      Stock stock =
+          stockRepository.findAll().stream()
+              .filter(candidate -> candidate.getSkuId().equals(skuId))
+              .findFirst()
+              .orElseThrow();
+
+      // then
+      assertThat(addedSku.isDefault()).isTrue();
+      assertThat(addedSku.getName()).isEqualTo(command.name());
+      assertThat(addedSku.getPrice()).isEqualTo(command.price());
+      assertThat(previousDefaultSku.isDefault()).isFalse();
+      assertThat(stock.getQuantity()).isEqualTo(command.quantity());
+    }
   }
 
   @Nested
