@@ -9,6 +9,7 @@ import java.util.UUID;
 public record ProductDetailInfo(
     UUID productId,
     UUID creatorId,
+    String creatorName,
     String name,
     String content,
     ProductStatus status,
@@ -20,7 +21,7 @@ public record ProductDetailInfo(
     List<SkuInfo> skus,
     List<ImageInfo> images) {
 
-  public ProductDetailInfo withMetadata(ProductMetadataQueryPort.ProductMetadataInfo metadata) {
+  public ProductDetailInfo withDetails(ProductMetadataQueryPort.ProductMetadataInfo metadata, String creatorName) {
     var categories =
         metadata.categories().stream()
             .map(category -> new CategoryInfo(category.categoryId(), category.name()))
@@ -34,6 +35,7 @@ public record ProductDetailInfo(
     return new ProductDetailInfo(
         productId,
         creatorId,
+        creatorName,
         name,
         content,
         status,

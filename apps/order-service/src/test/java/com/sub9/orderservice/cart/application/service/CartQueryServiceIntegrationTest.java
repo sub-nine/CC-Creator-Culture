@@ -7,6 +7,8 @@ import static org.mockito.Mockito.*;
 import com.sub9.orderservice.cart.application.dto.CartItemInfo;
 import com.sub9.orderservice.cart.application.dto.CartProductInfo;
 import com.sub9.orderservice.cart.application.port.out.CartProductPort;
+import com.sub9.orderservice.cart.application.port.out.CartUserPort;
+import com.sub9.orderservice.cart.application.dto.CreatorNameInfo;
 import com.sub9.orderservice.cart.domain.model.Cart;
 import com.sub9.orderservice.cart.infrastructure.persistence.CartJpaRepository;
 import com.sub9.orderservice.cart.presentation.response.CartItemResponse;
@@ -28,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 @DisplayName("CartQueryService - 통합 테스트")
 class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
   @MockitoBean private CartProductPort cartProductPort;
+  @MockitoBean private CartUserPort cartUserPort;
   @Autowired private CartQueryService cartQueryService;
   @Autowired private CartJpaRepository cartRepository;
   @Autowired private EntityManager entityManager;
@@ -56,6 +59,11 @@ class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
 
       given(cartProductPort.getCartItemProducts(anyList()))
           .willReturn(List.of(secondInfo, firstInfo));
+      given(cartUserPort.getCreatorNamesByIds(anyList()))
+          .willReturn(
+              List.of(
+                  new CreatorNameInfo(firstInfo.creatorId(), "첫 상호"),
+                  new CreatorNameInfo(secondInfo.creatorId(), "둘째 상호")));
 
       entityManager.flush();
       entityManager.clear();
@@ -67,9 +75,9 @@ class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
       assertThat(result)
           .containsExactlyInAnyOrder(
               new CartItemResponse(
-                  first.getId(), first.getSkuId(), "첫 상품", "옵션", "ACTIVE", 2, 1000L),
+                  first.getId(), first.getSkuId(), "첫 상호", "첫 상품", "옵션", "ACTIVE", 2, 1000L),
               new CartItemResponse(
-                  second.getId(), second.getSkuId(), "둘째 상품", "옵션", "ACTIVE", 5, 2000L));
+                  second.getId(), second.getSkuId(), "둘째 상호", "둘째 상품", "옵션", "ACTIVE", 5, 2000L));
 
       verify(cartProductPort)
           .getCartItemProducts(
@@ -80,7 +88,7 @@ class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("장바구니가 비어 있으면 빈 목록을 반환하고 상품 서비스를 호출하지 않는다.")
+    @DisplayName("장바구니가 비어 있으면 빈 목록을 반환하고 상품과 유저 서비스를 호출하지 않는다.")
     void getCart_success_when_empty() {
       // given
       saveCart(UUID.randomUUID(), 2);
@@ -93,7 +101,7 @@ class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
 
       // then
       assertThat(result).isEmpty();
-      verifyNoInteractions(cartProductPort);
+      verifyNoInteractions(cartProductPort, cartUserPort);
     }
 
     @Test
@@ -133,6 +141,7 @@ class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
 
       // then
       assertThat(result).isEmpty();
+      verifyNoInteractions(cartUserPort);
     }
   }
 
