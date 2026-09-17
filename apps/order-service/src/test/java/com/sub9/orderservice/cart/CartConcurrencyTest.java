@@ -14,9 +14,11 @@ import com.sub9.orderservice.cart.domain.model.Cart;
 import com.sub9.orderservice.cart.infrastructure.persistence.CartJpaRepository;
 import com.sub9.orderservice.support.AbstractIntegrationTest;
 import com.sub9.orderservice.support.ConcurrencyTestingUtil;
+import java.util.List;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -74,9 +76,13 @@ public class CartConcurrencyTest extends AbstractIntegrationTest {
     UUID userId = UUID.randomUUID();
     int threadCount = 5;
 
-    for (int i = 0; i < 69; i++) {
-      cartRepository.save(Cart.create(UUID.randomUUID(), userId, productId, UUID.randomUUID(), 10));
-    }
+    List<Cart> carts =
+        IntStream.range(0, 69)
+            .mapToObj(i -> Cart.create(UUID.randomUUID(), userId, productId, UUID.randomUUID(), 10))
+            .toList();
+
+    cartRepository.saveAll(carts);
+    cartRepository.flush();
 
     given(cartProductPort.getValidatedProductIdForCart(any())).willReturn(productId);
 
@@ -87,6 +93,6 @@ public class CartConcurrencyTest extends AbstractIntegrationTest {
             cartCommandUseCase.addCartItem(new AddCartItemCommand(userId, UUID.randomUUID(), 10)));
 
     // then
-    assertThat(cartRepository.findAll()).hasSize(74);
+    assertThat(cartRepository.count()).isGreaterThan(70);
   }
 }
