@@ -18,6 +18,15 @@ on:
       - ".github/scripts/validate-candidate-manifest_test.sh"
       - ".github/scripts/service-revisions.sh"
       - ".github/scripts/service-revisions_test.sh"
+      - ".github/scripts/smoke-embedding-image.sh"
+      - ".github/scripts/smoke-embedding-image_test.sh"
+      - "deploy/compose.dev.yml"
+      - "deploy/grafana/**"
+      - "deploy/prometheus/**"
+      - "docker/grafana/**"
+      - "apps/embedding-service/**"
+      - "load-test/**"
+      - "deploy/scripts/**"
   pull_request:
     branches: [main, dev]
     paths:
@@ -35,6 +44,15 @@ on:
       - ".github/scripts/validate-candidate-manifest_test.sh"
       - ".github/scripts/service-revisions.sh"
       - ".github/scripts/service-revisions_test.sh"
+      - ".github/scripts/smoke-embedding-image.sh"
+      - ".github/scripts/smoke-embedding-image_test.sh"
+      - "deploy/compose.dev.yml"
+      - "deploy/grafana/**"
+      - "deploy/prometheus/**"
+      - "docker/grafana/**"
+      - "apps/embedding-service/**"
+      - "load-test/**"
+      - "deploy/scripts/**"
   workflow_dispatch:
 
 permissions:
@@ -68,14 +86,30 @@ jobs:
           shellcheck -x \
             deploy/aws/seed/scripts/seed.sh \
             deploy/aws/seed/seed_test.sh \
-            .github/scripts/validate-candidate-manifest.sh \
-            .github/scripts/service-revisions.sh
+              .github/scripts/validate-candidate-manifest.sh \
+              .github/scripts/smoke-embedding-image.sh \
+              .github/scripts/service-revisions.sh
 
       - name: Candidate manifest validator tests
         run: bash .github/scripts/validate-candidate-manifest_test.sh
 
       - name: Service revision tests
         run: bash .github/scripts/service-revisions_test.sh
+
+      - name: Embedding smoke runner tests
+        run: bash .github/scripts/smoke-embedding-image_test.sh
+
+      - name: Embedding smoke unit tests
+        run: python3 -m unittest discover -s apps/embedding-service -p "*_test.py"
+
+      - name: Cloud runner tests
+        run: python3 -m unittest discover -s load-test/tests -p '*_test.py'
+
+      - name: Dev deploy regression tests
+        run: |
+          bash .github/scripts/cleanup-ocir-images_test.sh
+          bash deploy/scripts/deploy_test.sh
+          bash deploy/scripts/compose_topology_test.sh
 
       - name: RDS CA bundle checksum drift
         run: |
@@ -103,6 +137,22 @@ jobs:
             exit 1
           fi
           echo "RDS CA bundle checksum matches upstream: sha256:$upstream"
+
+  k6-image:
+    name: Inspect ARM64 k6 scenarios
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Build and inspect without requests
+        run: |
+          docker build --platform linux/arm64 -t cc-k6:verify load-test
+          docker run --rm --network none --entrypoint sh \
+            -e SMOKE_URL=http://example.test/docs -e EMBED_URL=http://example.test/embed \
+            cc-k6:verify -eu -c 'find scenarios -name "*.js" | while read -r script; do k6 inspect --include-system-env-vars "$script" >/dev/null; done'
 
   seed-image:
     name: Seed image against PostgreSQL 17
@@ -141,3 +191,11 @@ jobs:
 
       - name: validate
         run: terraform validate -no-color
+
+      - name: test
+        if: matrix.stack == 'runtime'
+        run: terraform test -no-color
+
+      - name: Observation document test
+        if: matrix.stack == 'persistent'
+        run: python3 observation_test.py
