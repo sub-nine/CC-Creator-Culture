@@ -15,6 +15,7 @@ import com.sub9.productservice.product.infrastructure.persistence.command.sku.Sk
 import com.sub9.productservice.product.infrastructure.persistence.command.stock.StockCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.stock.StockHistoryCommandJpaRepository;
 import com.sub9.productservice.support.AbstractIntegrationTest;
+import com.sub9.productservice.support.ConcurrencyTestingUtil;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.List;
@@ -27,6 +28,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
@@ -186,7 +188,7 @@ class StockCommandServiceIntegrationTest extends AbstractIntegrationTest {
       StockHistoryReason reason = StockHistoryReason.ORDER_CANCEL;
       stockCommandService.deduct(deductCommand(orderId));
       flushAndClear();
-      // 차감 시각과 별개로 복구 쿼리 자체의 시각 갱신을 검증한다.
+
       entityManager
           .createQuery("UPDATE Stock s SET s.updatedAt = :updatedAt WHERE s.id IN :ids")
           .setParameter("updatedAt", previousUpdatedAt)

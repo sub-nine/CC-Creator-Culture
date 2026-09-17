@@ -8,6 +8,7 @@ import com.sub9.productservice.product.application.port.in.stock.AdjustStockUseC
 import com.sub9.productservice.product.application.port.in.stock.OrderStockUseCase;
 import com.sub9.productservice.product.application.port.out.product.ProductQueryRepository;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.product.domain.exception.StockErrorCode;
 import com.sub9.productservice.product.domain.model.StockHistory;
 import com.sub9.productservice.product.domain.model.StockHistoryReason;
 import com.sub9.productservice.product.domain.repository.StockRepository;
@@ -31,11 +32,11 @@ public class StockCommandService implements AdjustStockUseCase, OrderStockUseCas
     }
 
     if (command.quantity() == 0) {
-      throw new BusinessException(ProductErrorCode.INVALID_STOCK_ADJUSTMENT);
+      throw new BusinessException(StockErrorCode.INVALID_STOCK_ADJUSTMENT);
     }
 
     if (!stockRepository.adjustStock(command.skuId(), command.quantity())) {
-      throw new BusinessException(ProductErrorCode.INSUFFICIENT_STOCK);
+      throw new BusinessException(StockErrorCode.INSUFFICIENT_STOCK);
     }
 
     stockHistoryRepository.save(
@@ -53,7 +54,7 @@ public class StockCommandService implements AdjustStockUseCase, OrderStockUseCas
       if (!stockHistoryRepository.insertIfAbsent(history)) continue;
 
       if (!stockRepository.decreaseStock(item.skuId(), item.quantity())) {
-        throw new BusinessException(ProductErrorCode.INSUFFICIENT_STOCK);
+        throw new BusinessException(StockErrorCode.INSUFFICIENT_STOCK);
       }
     }
   }
@@ -67,7 +68,7 @@ public class StockCommandService implements AdjustStockUseCase, OrderStockUseCas
       if (!stockHistoryRepository.insertIfAbsent(history)) continue;
 
       if (!stockRepository.increaseStock(item.skuId(), item.quantity())) {
-        throw new BusinessException(ProductErrorCode.SKU_NOT_FOUND);
+        throw new BusinessException(StockErrorCode.STOCK_NOT_FOUND);
       }
     }
   }

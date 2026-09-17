@@ -11,6 +11,7 @@ import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
 import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.product.domain.exception.SkuErrorCode;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
@@ -88,7 +89,7 @@ public class ProductQueryService implements ProductQueryUseCase, CartProductQuer
 
     if (skuInfo.productStatus() != ProductStatus.ACTIVE)
       throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOR_SALE);
-    if (skuInfo.quantity() <= 0) throw new BusinessException(ProductErrorCode.SKU_SOLD_OUT);
+    if (skuInfo.quantity() <= 0) throw new BusinessException(SkuErrorCode.SKU_SOLD_OUT);
 
     return skuInfo.productId();
   }

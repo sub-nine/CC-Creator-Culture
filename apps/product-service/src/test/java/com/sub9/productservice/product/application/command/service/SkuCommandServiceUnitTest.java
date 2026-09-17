@@ -9,6 +9,7 @@ import static org.mockito.Mockito.*;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.product.application.command.dto.sku.DeleteSkuCommand;
 import com.sub9.productservice.product.application.command.dto.sku.UpdateSkuCommand;
+import com.sub9.productservice.product.domain.exception.SkuErrorCode;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.Sku;
@@ -99,7 +100,7 @@ class SkuCommandServiceUnitTest {
       // when & then
       assertThatThrownBy(() -> skuCommandService.updateSku(defaultUpdateSkuCommand))
           .isInstanceOf(BusinessException.class)
-          .hasMessage(ProductErrorCode.DEFAULT_SKU_NOT_FOUND.message());
+          .hasMessage(SkuErrorCode.DEFAULT_SKU_NOT_FOUND.message());
 
       verify(sku, never()).update(anyString(), anyLong(), anyBoolean());
     }
@@ -155,7 +156,7 @@ class SkuCommandServiceUnitTest {
       // when & then
       assertThatThrownBy(() -> skuCommandService.updateSku(updateSkuCommand))
           .isInstanceOf(BusinessException.class)
-          .hasMessage(ProductErrorCode.SKU_NOT_FOUND.message());
+          .hasMessage(SkuErrorCode.SKU_NOT_FOUND.message());
 
       verify(product).validateOwner(updateSkuCommand.creatorId());
     }
@@ -178,7 +179,7 @@ class SkuCommandServiceUnitTest {
       // when & then
       assertThatThrownBy(() -> skuCommandService.updateSku(updateSkuCommand))
           .isInstanceOf(BusinessException.class)
-          .hasMessage(ProductErrorCode.DEFAULT_SKU_CANNOT_UNSET.message());
+          .hasMessage(SkuErrorCode.DEFAULT_SKU_CANNOT_UNSET.message());
 
       verify(product).validateOwner(updateSkuCommand.creatorId());
       assertThat(sku.isDefault()).isTrue();
@@ -243,7 +244,7 @@ class SkuCommandServiceUnitTest {
       // when & then
       assertThatThrownBy(() -> skuCommandService.deleteSku(deleteSkuCommand))
           .isInstanceOf(BusinessException.class)
-          .hasMessage(ProductErrorCode.SKU_NOT_FOUND.message());
+          .hasMessage(SkuErrorCode.SKU_NOT_FOUND.message());
 
       verify(skuRepository)
           .findByIdAndProductIdAndDeletedAtIsNull(
@@ -268,7 +269,7 @@ class SkuCommandServiceUnitTest {
       // when & then
       assertThatThrownBy(() -> skuCommandService.deleteSku(deleteSkuCommand))
           .isInstanceOf(BusinessException.class)
-          .hasMessage(ProductErrorCode.DEFAULT_SKU_CANNOT_DELETED.message());
+          .hasMessage(SkuErrorCode.DEFAULT_SKU_CANNOT_DELETED.message());
 
       assertThat(sku.getDeletedAt()).isNull();
     }
@@ -294,7 +295,7 @@ class SkuCommandServiceUnitTest {
       // when & then
       assertThatThrownBy(() -> skuCommandService.deleteSku(deleteSkuCommand))
           .isInstanceOf(BusinessException.class)
-          .hasMessage(ProductErrorCode.SKU_REQUIRED.message());
+          .hasMessage(SkuErrorCode.SKU_REQUIRED.message());
 
       assertThat(sku.getDeletedAt()).isNull();
     }

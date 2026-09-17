@@ -5,7 +5,8 @@ import org.springframework.http.HttpStatus;
 
 enum ProductStockErrorCode implements ErrorCode {
     INSUFFICIENT_STOCK("STOCK_0002", HttpStatus.CONFLICT, "재고가 부족합니다."),
-    SKU_NOT_FOUND("SKU_0004", HttpStatus.NOT_FOUND, "존재하지 않는 옵션입니다.");
+    SKU_NOT_FOUND("SKU_0004", HttpStatus.NOT_FOUND, "존재하지 않는 옵션입니다."),
+    STOCK_NOT_FOUND("STOCK_0004", HttpStatus.NOT_FOUND, "존재하지 않는 재고입니다.");
 
     private final String code;
     private final HttpStatus status;

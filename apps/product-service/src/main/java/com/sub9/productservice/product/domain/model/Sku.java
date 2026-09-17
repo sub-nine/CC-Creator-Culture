@@ -2,7 +2,7 @@ package com.sub9.productservice.product.domain.model;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.common.entity.BaseEntity;
-import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.product.domain.exception.SkuErrorCode;
 import jakarta.persistence.*;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -44,7 +44,7 @@ public class Sku extends BaseEntity {
 
   public void update(String name, Long price, boolean isDefault) {
     if (this.isDefault && !isDefault) {
-      throw new BusinessException(ProductErrorCode.DEFAULT_SKU_CANNOT_UNSET);
+      throw new BusinessException(SkuErrorCode.DEFAULT_SKU_CANNOT_UNSET);
     }
 
     validatePrice(price);
@@ -56,11 +56,11 @@ public class Sku extends BaseEntity {
 
   public void deleteOption(UUID creatorId, long activeSkuCount) {
     if (this.isDefault()) {
-      throw new BusinessException(ProductErrorCode.DEFAULT_SKU_CANNOT_DELETED);
+      throw new BusinessException(SkuErrorCode.DEFAULT_SKU_CANNOT_DELETED);
     }
 
     if (activeSkuCount <= 1) {
-      throw new BusinessException(ProductErrorCode.SKU_REQUIRED);
+      throw new BusinessException(SkuErrorCode.SKU_REQUIRED);
     }
 
     super.delete(creatorId);
@@ -72,7 +72,7 @@ public class Sku extends BaseEntity {
 
   private static void validatePrice(Long price) {
     if (price == null || price < 0) {
-      throw new BusinessException(ProductErrorCode.INVALID_SKU_PRICE);
+      throw new BusinessException(SkuErrorCode.INVALID_SKU_PRICE);
     }
   }
 }

@@ -2,7 +2,7 @@ package com.sub9.productservice.product.domain.model;
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import com.sub9.common.exception.BusinessException;
-import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.product.domain.exception.StockErrorCode;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
@@ -37,7 +37,7 @@ public class Stock {
 
   public static Stock create(UUID skuId, int quantity) {
     if (quantity < 0) {
-      throw new BusinessException(ProductErrorCode.INVALID_STOCK_QUANTITY);
+      throw new BusinessException(StockErrorCode.INVALID_STOCK_QUANTITY);
     }
 
     Stock stock = new Stock();

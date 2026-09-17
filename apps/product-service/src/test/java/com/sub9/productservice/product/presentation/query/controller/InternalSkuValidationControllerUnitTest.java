@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.product.application.port.in.product.CartProductQueryUseCase;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.product.domain.exception.SkuErrorCode;
 import com.sub9.productservice.support.AbstractControllerTest;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +44,7 @@ class InternalSkuValidationControllerUnitTest extends AbstractControllerTest {
   @DisplayName("품절 검증 실패 시 409와 SKU_SOLD_OUT 에러 코드를 반환한다.")
   void getValidatedProductIdForCart_fails_when_sku_is_sold_out() throws Exception {
     // given
-    willThrow(new BusinessException(ProductErrorCode.SKU_SOLD_OUT))
+    willThrow(new BusinessException(SkuErrorCode.SKU_SOLD_OUT))
         .given(cartProductQueryUseCase)
         .getValidatedProductIdForCart(skuId);
 
@@ -51,7 +52,7 @@ class InternalSkuValidationControllerUnitTest extends AbstractControllerTest {
     mockMvc
         .perform(get(endPoint, skuId))
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.errorCode").value(ProductErrorCode.SKU_SOLD_OUT.code()));
+        .andExpect(jsonPath("$.errorCode").value(SkuErrorCode.SKU_SOLD_OUT.code()));
     verify(cartProductQueryUseCase).getValidatedProductIdForCart(skuId);
   }
 }

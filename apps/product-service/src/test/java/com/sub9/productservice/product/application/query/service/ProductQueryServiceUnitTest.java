@@ -11,6 +11,7 @@ import com.sub9.productservice.product.application.port.out.product.ProductQuery
 import com.sub9.productservice.product.application.port.out.product.ProductUserPort;
 import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.product.domain.exception.SkuErrorCode;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import java.util.List;
 import java.util.Optional;
@@ -110,7 +111,7 @@ class ProductQueryServiceUnitTest {
       // when & then
       assertThatThrownBy(() -> productQueryService.getValidatedProductIdForCart(skuId))
           .isInstanceOf(BusinessException.class)
-          .hasMessage(ProductErrorCode.SKU_SOLD_OUT.message());
+          .hasMessage(SkuErrorCode.SKU_SOLD_OUT.message());
     }
   }
 }
