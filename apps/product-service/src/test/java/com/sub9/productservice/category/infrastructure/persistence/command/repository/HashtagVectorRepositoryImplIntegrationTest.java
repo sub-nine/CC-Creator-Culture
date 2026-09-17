@@ -1,6 +1,8 @@
 package com.sub9.productservice.category.infrastructure.persistence.command.repository;
 
+import com.sub9.productservice.category.application.command.port.out.HashtagCommandRepository;
 import com.sub9.productservice.category.application.command.port.out.HashtagVectorRepository;
+import com.sub9.productservice.category.domain.entity.Hashtag;
 import com.sub9.productservice.category.infrastructure.persistence.command.entity.HashtagVector;
 import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.HashtagVectorJpaRepository;
 import com.sub9.productservice.support.AbstractIntegrationTest;
@@ -25,6 +27,9 @@ class HashtagVectorRepositoryImplIntegrationTest extends AbstractIntegrationTest
     @Autowired
     private HashtagVectorJpaRepository hashtagVectorJpaRepository;
 
+    @Autowired
+    private HashtagCommandRepository hashtagCommandRepository;
+
     @Test
     @DisplayName("저장된 적 없는 해시태그는 존재하지 않는다고 판단한다")
     void existsByHashtagId_notSaved_returnsFalse() {
@@ -34,7 +39,7 @@ class HashtagVectorRepositoryImplIntegrationTest extends AbstractIntegrationTest
     @Test
     @DisplayName("벡터를 저장하면 이후 존재한다고 판단하고, pgvector 컬럼에 원래 값 그대로 저장된다")
     void saveIfAbsent_savesVector_thenExists() {
-        UUID hashtagId = UUID.randomUUID();
+        UUID hashtagId = saveHashtag().getId();
         float[] vector = zeroVector();
         vector[0] = 1.0f;
 
@@ -48,7 +53,7 @@ class HashtagVectorRepositoryImplIntegrationTest extends AbstractIntegrationTest
     @Test
     @DisplayName("이미 저장된 해시태그에 다시 saveIfAbsent를 호출해도 기존 값을 덮어쓰지 않는다")
     void saveIfAbsent_alreadyExists_doesNotOverwrite() {
-        UUID hashtagId = UUID.randomUUID();
+        UUID hashtagId = saveHashtag().getId();
         float[] firstVector = zeroVector();
         firstVector[0] = 1.0f;
         float[] secondVector = zeroVector();
@@ -63,5 +68,9 @@ class HashtagVectorRepositoryImplIntegrationTest extends AbstractIntegrationTest
 
     private float[] zeroVector() {
         return new float[DIMENSION];
+    }
+
+    private Hashtag saveHashtag() {
+        return hashtagCommandRepository.save(Hashtag.create("벡터테스트" + UUID.randomUUID()));
     }
 }

@@ -1,6 +1,10 @@
 package com.sub9.productservice.category.infrastructure.persistence.command.repository;
 
+import com.sub9.productservice.category.application.command.port.out.CategoryCommandRepository;
 import com.sub9.productservice.category.application.command.port.out.CategoryVectorRepository;
+import com.sub9.productservice.category.application.command.port.out.HashtagCommandRepository;
+import com.sub9.productservice.category.domain.entity.Category;
+import com.sub9.productservice.category.domain.entity.Hashtag;
 import com.sub9.productservice.category.infrastructure.persistence.command.entity.HashtagVector;
 import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.HashtagVectorJpaRepository;
 import com.sub9.productservice.support.AbstractIntegrationTest;
@@ -28,11 +32,17 @@ class CategoryVectorRepositoryImplIntegrationTest extends AbstractIntegrationTes
     @Autowired
     private HashtagVectorJpaRepository hashtagVectorJpaRepository;
 
+    @Autowired
+    private HashtagCommandRepository hashtagCommandRepository;
+
+    @Autowired
+    private CategoryCommandRepository categoryCommandRepository;
+
     @Test
     @DisplayName("해시태그 벡터와 방향이 같은 카테고리 벡터는 유사도 1에 가깝게 나온다")
     void findSimilarities_sameDirectionVectors_returnsSimilarityCloseToOne() {
         UUID hashtagId = saveHashtagVector(oneHot(0));
-        UUID categoryId = UUID.randomUUID();
+        UUID categoryId = saveCategory().getId();
         categoryVectorRepository.save(categoryId, oneHot(0));
 
         Map<UUID, Double> similarities = categoryVectorRepository.findSimilarities(hashtagId, List.of(categoryId));
@@ -44,7 +54,7 @@ class CategoryVectorRepositoryImplIntegrationTest extends AbstractIntegrationTes
     @DisplayName("해시태그 벡터와 직교하는 카테고리 벡터는 유사도 0에 가깝게 나온다")
     void findSimilarities_orthogonalVectors_returnsSimilarityCloseToZero() {
         UUID hashtagId = saveHashtagVector(oneHot(0));
-        UUID categoryId = UUID.randomUUID();
+        UUID categoryId = saveCategory().getId();
         categoryVectorRepository.save(categoryId, oneHot(1));
 
         Map<UUID, Double> similarities = categoryVectorRepository.findSimilarities(hashtagId, List.of(categoryId));
@@ -56,7 +66,7 @@ class CategoryVectorRepositoryImplIntegrationTest extends AbstractIntegrationTes
     @DisplayName("벡터가 없는 카테고리는 결과 맵에서 빠진다")
     void findSimilarities_categoryVectorMissing_excludedFromResult() {
         UUID hashtagId = saveHashtagVector(oneHot(0));
-        UUID categoryWithVector = UUID.randomUUID();
+        UUID categoryWithVector = saveCategory().getId();
         UUID categoryWithoutVector = UUID.randomUUID();
         categoryVectorRepository.save(categoryWithVector, oneHot(0));
 
@@ -70,7 +80,7 @@ class CategoryVectorRepositoryImplIntegrationTest extends AbstractIntegrationTes
     @DisplayName("해시태그 벡터 자체가 없으면 결과가 빈 맵이다")
     void findSimilarities_hashtagVectorMissing_returnsEmptyMap() {
         UUID hashtagId = UUID.randomUUID();
-        UUID categoryId = UUID.randomUUID();
+        UUID categoryId = saveCategory().getId();
         categoryVectorRepository.save(categoryId, oneHot(0));
 
         Map<UUID, Double> similarities = categoryVectorRepository.findSimilarities(hashtagId, List.of(categoryId));
@@ -79,9 +89,13 @@ class CategoryVectorRepositoryImplIntegrationTest extends AbstractIntegrationTes
     }
 
     private UUID saveHashtagVector(float[] vector) {
-        UUID hashtagId = UUID.randomUUID();
+        UUID hashtagId = hashtagCommandRepository.save(Hashtag.create("벡터테스트" + UUID.randomUUID())).getId();
         hashtagVectorJpaRepository.save(HashtagVector.of(hashtagId, vector));
         return hashtagId;
+    }
+
+    private Category saveCategory() {
+        return categoryCommandRepository.save(Category.create("벡터테스트" + UUID.randomUUID(), null));
     }
 
     private float[] oneHot(int index) {
