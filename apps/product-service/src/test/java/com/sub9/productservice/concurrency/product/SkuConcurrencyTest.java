@@ -34,12 +34,11 @@ public class SkuConcurrencyTest extends AbstractIntegrationTest {
 
   private final UUID creatorId = UUID.randomUUID();
   private UUID productId;
-  private Sku sku;
 
   @BeforeEach
   void setUp() {
     Product product = productRepository.save(Product.create(creatorId, "말랑이", "설명"));
-    sku = skuRepository.save(Sku.create(product.getId(), "핑크 | M", 10000L, true));
+    skuRepository.save(Sku.create(product.getId(), "핑크 | M", 10000L, true));
     productId = product.getId();
   }
 
