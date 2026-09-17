@@ -1,4 +1,4 @@
-package com.sub9.productservice.category.infrastructure.scheduler;
+package com.sub9.productservice.category.application.command.service;
 
 import com.sub9.productservice.category.application.command.port.in.CalculateCategoryVectorUseCase;
 import com.sub9.productservice.category.application.command.port.out.CategoryCommandRepository;
@@ -12,24 +12,25 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CategoryVectorRecoveryScheduler 단위 테스트")
-class CategoryVectorRecoverySchedulerTest {
+@DisplayName("CategoryVectorRecoveryService 단위 테스트")
+class CategoryVectorRecoveryServiceTest {
 
     @Mock
     private CategoryCommandRepository categoryCommandRepository;
     @Mock
     private CalculateCategoryVectorUseCase calculateCategoryVectorUseCase;
 
-    private CategoryVectorRecoveryScheduler scheduler;
+    private CategoryVectorRecoveryService service;
 
     @BeforeEach
     void setUp() {
-        scheduler = new CategoryVectorRecoveryScheduler(categoryCommandRepository, calculateCategoryVectorUseCase);
+        service = new CategoryVectorRecoveryService(categoryCommandRepository, calculateCategoryVectorUseCase);
     }
 
     @Test
@@ -39,10 +40,11 @@ class CategoryVectorRecoverySchedulerTest {
         UUID categoryId2 = UUID.randomUUID();
         when(categoryCommandRepository.findActiveIdsWithoutVector(20)).thenReturn(List.of(categoryId1, categoryId2));
 
-        scheduler.recoverMissingVectors();
+        int count = service.recoverMissingVectors();
 
         verify(calculateCategoryVectorUseCase).calculate(categoryId1);
         verify(calculateCategoryVectorUseCase).calculate(categoryId2);
+        assertThat(count).isEqualTo(2);
     }
 
     @Test
@@ -53,7 +55,7 @@ class CategoryVectorRecoverySchedulerTest {
         when(categoryCommandRepository.findActiveIdsWithoutVector(20)).thenReturn(List.of(failing, succeeding));
         doThrow(new RuntimeException("임베딩 서버 오류")).when(calculateCategoryVectorUseCase).calculate(failing);
 
-        scheduler.recoverMissingVectors();
+        service.recoverMissingVectors();
 
         verify(calculateCategoryVectorUseCase).calculate(succeeding);
     }

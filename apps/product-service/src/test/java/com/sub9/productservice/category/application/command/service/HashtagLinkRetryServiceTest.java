@@ -1,4 +1,4 @@
-package com.sub9.productservice.category.infrastructure.scheduler;
+package com.sub9.productservice.category.application.command.service;
 
 import com.sub9.productservice.category.application.command.port.in.LinkHashtagToCategoryUseCase;
 import com.sub9.productservice.category.application.command.port.out.HashtagCommandRepository;
@@ -12,24 +12,25 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("HashtagLinkRetryScheduler 단위 테스트")
-class HashtagLinkRetrySchedulerTest {
+@DisplayName("HashtagLinkRetryService 단위 테스트")
+class HashtagLinkRetryServiceTest {
 
     @Mock
     private HashtagCommandRepository hashtagCommandRepository;
     @Mock
     private LinkHashtagToCategoryUseCase linkHashtagToCategoryUseCase;
 
-    private HashtagLinkRetryScheduler scheduler;
+    private HashtagLinkRetryService service;
 
     @BeforeEach
     void setUp() {
-        scheduler = new HashtagLinkRetryScheduler(hashtagCommandRepository, linkHashtagToCategoryUseCase);
+        service = new HashtagLinkRetryService(hashtagCommandRepository, linkHashtagToCategoryUseCase);
     }
 
     @Test
@@ -39,10 +40,11 @@ class HashtagLinkRetrySchedulerTest {
         UUID hashtagId2 = UUID.randomUUID();
         when(hashtagCommandRepository.findIdsWithoutCategoryLink(20)).thenReturn(List.of(hashtagId1, hashtagId2));
 
-        scheduler.retryUnlinkedHashtags();
+        int count = service.retryUnlinkedHashtags();
 
         verify(linkHashtagToCategoryUseCase).tryLink(hashtagId1);
         verify(linkHashtagToCategoryUseCase).tryLink(hashtagId2);
+        assertThat(count).isEqualTo(2);
     }
 
     @Test
@@ -53,7 +55,7 @@ class HashtagLinkRetrySchedulerTest {
         when(hashtagCommandRepository.findIdsWithoutCategoryLink(20)).thenReturn(List.of(failing, succeeding));
         doThrow(new RuntimeException("임베딩 서버 오류")).when(linkHashtagToCategoryUseCase).tryLink(failing);
 
-        scheduler.retryUnlinkedHashtags();
+        service.retryUnlinkedHashtags();
 
         verify(linkHashtagToCategoryUseCase).tryLink(succeeding);
     }

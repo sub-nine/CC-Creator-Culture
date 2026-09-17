@@ -9,6 +9,7 @@ import com.sub9.productservice.category.domain.model.CategoryStatus;
 import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.CategoryHashtagJpaRepository;
 import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.CategoryJpaRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -75,5 +76,11 @@ public class CategoryRepositoryImpl implements CategoryCommandRepository {
                 categoryHashtag.getSimilarityScore(),
                 CategoryHashtag.ACTIVE_UNIQUE_VERSION
         );
+    }
+
+    @Override
+    public List<UUID> findActiveIdsWithoutVector(int limit) {
+        return categoryJpaRepository.findIdsByStatusAndDeletedAtIsNullAndVectorMissing(
+                CategoryStatus.ACTIVE, PageRequest.of(0, limit));
     }
 }
