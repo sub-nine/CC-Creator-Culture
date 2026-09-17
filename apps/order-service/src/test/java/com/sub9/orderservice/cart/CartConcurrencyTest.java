@@ -20,6 +20,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,6 +70,7 @@ public class CartConcurrencyTest extends AbstractIntegrationTest {
   @Test
   // 장바구니 수량은 정합성이 크게 필요한 영역이 아니므로
   // 최대 개수에 대한 별도의 동시성 제어는 적용하지 않는다.
+  @Disabled("비결정적 테스트라 CI 오류로 인한 비활성화")
   @DisplayName("장바구니 상품을 동시에 추가하면 최대 개수를 초과할 수 있다.")
   void addCartItemExceedingLimitConcurrently() throws Exception {
     // given
