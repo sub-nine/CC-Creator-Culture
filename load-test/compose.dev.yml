@@ -1,0 +1,17 @@
+services:
+  k6:
+    image: ${K6_IMAGE:?K6_IMAGE is required}
+    working_dir: /scripts
+    environment:
+      - TARGET=${TARGET:-dev}
+      - BASE_URL=${BASE_URL:-}
+      - SMOKE_URL=${SMOKE_URL:-}
+      - EMBED_URL=${EMBED_URL:-}
+      - TESTID=${TESTID:-}
+      - K6_PROMETHEUS_RW_SERVER_URL=${K6_PROMETHEUS_RW_SERVER_URL:-http://prometheus:9090/api/v1/write}
+      - K6_PROMETHEUS_RW_TREND_STATS=avg,min,med,max,p(90),p(95),p(99)
+
+networks:
+  default:
+    external: true
+    name: ${K6_NETWORK:-cc-dev_internal}

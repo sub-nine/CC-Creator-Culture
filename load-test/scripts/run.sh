@@ -4,7 +4,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
-SCENARIO="$1"
+SCENARIO="${1:-}"
 TARGET="${2:-local}"
 
 if [ -z "$SCENARIO" ]; then
@@ -12,7 +12,7 @@ if [ -z "$SCENARIO" ]; then
   exit 1
 fi
 
-TESTID="$(date +%s)"
+TESTID="${TESTID:-$(date +%s)}"
 
 docker compose -f load-test/docker-compose.yml run --rm --build -e TARGET="$TARGET" k6 \
   run --out experimental-prometheus-rw --tag testid="$TESTID" "$SCENARIO"
