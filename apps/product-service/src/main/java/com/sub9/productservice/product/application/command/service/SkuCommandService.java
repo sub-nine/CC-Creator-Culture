@@ -34,6 +34,7 @@ public class SkuCommandService implements SkuCommandUseCase {
   @Override
   public UUID addSku(AddSkuCommand command) {
     Product product = findByProductIdForUpdate(command.productId(), command.creatorId());
+
     if (command.isDefault()) {
       clearDefaultSku(product.getId());
       skuRepository.flush();
@@ -52,7 +53,10 @@ public class SkuCommandService implements SkuCommandUseCase {
     Product product = findByProductIdForUpdate(command.productId(), command.creatorId());
     Sku sku = findBySkuIdAndProductId(command.skuId(), command.productId());
 
-    if (command.isDefault() && !sku.isDefault()) clearDefaultSku(product.getId());
+    if (command.isDefault() && !sku.isDefault()) {
+      clearDefaultSku(product.getId());
+      skuRepository.flush();
+    }
 
     sku.update(command.name(), command.price(), command.isDefault());
   }
