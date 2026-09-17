@@ -1,6 +1,7 @@
 package com.sub9.orderservice.coupon;
 
 import com.sub9.common.exception.BusinessException;
+import com.sub9.common.exception.ErrorCode;
 import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.cart.application.service.CartQueryService;
 import com.sub9.orderservice.coupon.application.dto.IssueDispatchResult;
@@ -32,7 +33,14 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -136,10 +144,161 @@ class CouponIssueFlowIntegrationTest {
         assertThat(redisTemplate.hasKey(CouponRedisKey.issued(coupon.getId(), userId))).isFalse();
     }
 
+    @Test
+    @DisplayName("한정 수량보다 많은 사용자가 동시에 발급해도 성공 수가 총수량을 넘지 않는다")
+    void when_users_issue_coupon_concurrently_quantity_is_not_exceeded() throws Exception {
+        // 선착순 쿠폰 10개에 서로 다른 사용자 100명이 동시에 요청하는 상황을 재현한다.
+        int totalQuantity = 10;
+        int requestCount = 100;
+        when(clock.instant()).thenReturn(ISSUE_TIME);
+        Coupon coupon = saveCoupon(totalQuantity);
+
+        // Redis 지연 초기화가 아닌 정상적인 Redis → DB 발급 경쟁을 검증한다.
+        redisTemplate.opsForValue().set(
+                CouponRedisKey.remaining(coupon.getId()), Integer.toString(totalQuantity));
+
+        List<UUID> userIds = new ArrayList<>(requestCount);
+        for (int index = 0; index < requestCount; index++) {
+            userIds.add(generator.generate());
+        }
+
+        // 모든 요청을 준비한 뒤 같은 시작 신호를 보내 실제 동시 경쟁을 만든다.
+        CountDownLatch ready = new CountDownLatch(requestCount);
+        CountDownLatch start = new CountDownLatch(1);
+
+        List<IssueAttemptResult> attempts = new ArrayList<>(requestCount);
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var futures = userIds.stream()
+                    .map(userId -> executor.submit(() -> {
+                        ready.countDown();
+                        if (!start.await(5, TimeUnit.SECONDS)) {
+                            throw new IllegalStateException("쿠폰 동시 발급 시작 신호를 기다리는 중 시간 초과했습니다.");
+                        }
+                        try {
+                            couponIssueService.issue(coupon.getId(), userId);
+                            return IssueAttemptResult.succeeded(userId);
+                        } catch (BusinessException exception) {
+                            return IssueAttemptResult.failed(userId, exception.getErrorCode());
+                        }
+                    }))
+                    .toList();
+
+            boolean allRequestsReady = ready.await(5, TimeUnit.SECONDS);
+            start.countDown();
+            assertThat(allRequestsReady).isTrue();
+
+            for (var future : futures) {
+                attempts.add(future.get(30, TimeUnit.SECONDS));
+            }
+        }
+
+        List<IssueAttemptResult> succeeded = attempts.stream().filter(IssueAttemptResult::isSuccessful).toList();
+        List<IssueAttemptResult> failed = attempts.stream().filter(attempt -> !attempt.isSuccessful()).toList();
+        Set<UUID> succeededUserIds = succeeded.stream().map(IssueAttemptResult::userId).collect(java.util.stream.Collectors.toSet());
+        List<UUID> persistedUserIds = jdbcTemplate.queryForList(
+                "select user_id from p_user_coupons where coupon_id = ?",
+                UUID.class, coupon.getId());
+
+        assertThat(attempts).hasSize(requestCount);
+        // 성공 응답, DB 발급 사용자와 Redis 잔여 수량이 같은 결과를 나타내는지 확인한다.
+        assertThat(succeeded).hasSize(totalQuantity);
+        assertThat(failed).hasSize(requestCount - totalQuantity)
+                .allMatch(attempt -> attempt.errorCode() == CouponErrorCode.SOLD_OUT);
+        assertThat(couponRepository.findActiveById(coupon.getId()).orElseThrow().getIssuedQuantity())
+                .isEqualTo(totalQuantity);
+        assertThat(persistedUserIds).hasSize(totalQuantity);
+        assertThat(Set.copyOf(persistedUserIds)).isEqualTo(succeededUserIds);
+        assertThat(redisTemplate.opsForValue().get(CouponRedisKey.remaining(coupon.getId())))
+                .isEqualTo("0");
+    }
+
+    @Test
+    @DisplayName("동일 사용자가 동시에 발급을 요청해도 쿠폰과 수량은 한 번만 반영된다")
+    void when_same_user_issues_coupon_concurrently_only_one_succeeds() throws Exception {
+        // 동일 사용자의 중복 요청 20개가 동시에 들어오는 상황을 재현한다.
+        int totalQuantity = 10;
+        int requestCount = 20;
+        when(clock.instant()).thenReturn(ISSUE_TIME);
+        Coupon coupon = saveCoupon(totalQuantity);
+        UUID userId = generator.generate();
+
+        // 수량이 충분한 상태를 준비해 실패 원인이 품절이 아닌 중복 발급임을 검증한다.
+        redisTemplate.opsForValue().set(
+                CouponRedisKey.remaining(coupon.getId()), Integer.toString(totalQuantity));
+
+        // 동일한 사용자 요청을 모두 준비한 뒤 같은 시작 신호로 발급 경쟁을 만든다.
+        CountDownLatch ready = new CountDownLatch(requestCount);
+        CountDownLatch start = new CountDownLatch(1);
+
+        List<IssueAttemptResult> attempts = new ArrayList<>(requestCount);
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            List<Future<IssueAttemptResult>> futures = new ArrayList<>(requestCount);
+            for (int index = 0; index < requestCount; index++) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    if (!start.await(5, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("동일 사용자 동시 발급 시작 신호를 기다리는 중 시간 초과했습니다.");
+                    }
+                    try {
+                        couponIssueService.issue(coupon.getId(), userId);
+                        return IssueAttemptResult.succeeded(userId);
+                    } catch (BusinessException exception) {
+                        return IssueAttemptResult.failed(userId, exception.getErrorCode());
+                    }
+                }));
+            }
+
+            boolean allRequestsReady = ready.await(5, TimeUnit.SECONDS);
+            start.countDown();
+            assertThat(allRequestsReady).isTrue();
+
+            for (var future : futures) {
+                attempts.add(future.get(30, TimeUnit.SECONDS));
+            }
+        }
+
+        List<IssueAttemptResult> succeeded = attempts.stream().filter(IssueAttemptResult::isSuccessful).toList();
+        List<IssueAttemptResult> failed = attempts.stream().filter(attempt -> !attempt.isSuccessful()).toList();
+        String issuedKey = CouponRedisKey.issued(coupon.getId(), userId);
+
+        assertThat(attempts).hasSize(requestCount);
+        // 한 요청만 성공하고 나머지는 모두 일관된 중복 발급 오류를 받아야 한다.
+        assertThat(succeeded).hasSize(1);
+        assertThat(failed).hasSize(requestCount - 1)
+                .allMatch(attempt -> attempt.errorCode() == CouponErrorCode.ALREADY_ISSUED);
+        // 중복 요청이 DB 발급량과 Redis 잔여 수량을 추가로 변경하지 않았는지 확인한다.
+        assertThat(couponRepository.findActiveById(coupon.getId()).orElseThrow().getIssuedQuantity())
+                .isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "select count(*) from p_user_coupons where coupon_id = ? and user_id = ?",
+                Integer.class, coupon.getId(), userId)).isEqualTo(1);
+        assertThat(redisTemplate.opsForValue().get(CouponRedisKey.remaining(coupon.getId())))
+                .isEqualTo("9");
+        assertThat(redisTemplate.opsForValue().get(issuedKey)).isNotBlank();
+    }
+
     private Coupon saveCoupon(int totalQuantity) {
         return couponRepository.save(Coupon.create(
                 generator.generate(), "전체 흐름 쿠폰", 10, totalQuantity,
                 ISSUE_TIME.minusSeconds(60), ISSUE_TIME.plusSeconds(60),
                 generator.generate(), ISSUE_TIME.minusSeconds(120)));
+    }
+
+    // 각 요청의 사용자와 오류 코드를 보존해 성공 사용자와 실패 원인을 함께 검증한다.
+    private record IssueAttemptResult(UUID userId, ErrorCode errorCode) {
+
+        private static IssueAttemptResult succeeded(UUID userId) {
+            return new IssueAttemptResult(userId, null);
+        }
+
+        private static IssueAttemptResult failed(UUID userId, ErrorCode errorCode) {
+            return new IssueAttemptResult(userId, errorCode);
+        }
+
+        private boolean isSuccessful() {
+            return errorCode == null;
+        }
     }
 }
