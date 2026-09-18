@@ -6,4 +6,4 @@ cd "$SCRIPT_DIR/../.."
 
 TARGET="${1:-local}"
 
-docker compose -f load-test/docker-compose.yml run --rm --build -e TARGET="$TARGET" k6-all
+docker compose -f load-test/docker-compose.yml run --rm -e TARGET="$TARGET" k6-all
