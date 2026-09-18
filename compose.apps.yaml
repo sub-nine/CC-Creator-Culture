@@ -5,8 +5,6 @@ x-service: &service
     context: .
     dockerfile: docker/Dockerfile.local
     target: service
-  cpus: 0.5
-  mem_limit: 1024m
   environment: &app-environment
     SPRING_PROFILES_ACTIVE: dev
     CONFIG_SERVER_IMPORT: configserver:http://config-server:8888
@@ -36,22 +34,13 @@ x-app-dependencies: &app-dependencies
     condition: service_healthy
 
 services:
-  postgres:
-    mem_limit: 512m
-
   kafka:
-    mem_limit: 768m
     environment:
       KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
 
   zipkin:
-    mem_limit: 384m
     environment:
       JAVA_OPTS: -Xms64m -Xmx256m
-
-  embedding-service:
-    cpus: 0.5
-    mem_limit: 1536m
 
   kafka-ui:
     profiles: ["observability"]
@@ -61,8 +50,6 @@ services:
 
   config-server:
     <<: *service
-    cpus: 0.25
-    mem_limit: 512m
     build:
       <<: *service-build
       target: config-server
@@ -78,8 +65,6 @@ services:
 
   eureka-server:
     <<: *service
-    cpus: 0.25
-    mem_limit: 512m
     build:
       <<: *service-build
       args:
