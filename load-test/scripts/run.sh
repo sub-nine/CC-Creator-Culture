@@ -14,5 +14,5 @@ fi
 
 TESTID="$(date +%s)"
 
-docker compose -f load-test/docker-compose.yml run --rm --build -e TARGET="$TARGET" k6 \
+docker compose -f load-test/docker-compose.yml run --rm -e TARGET="$TARGET" k6 \
   run --out experimental-prometheus-rw --tag testid="$TESTID" "$SCENARIO"
