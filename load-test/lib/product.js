@@ -2,13 +2,13 @@ import http from 'k6/http';
 import { authHeaders } from './auth.js';
 
 // creator 토큰으로 상품+SKU를 만들고 첫 SKU의 skuId를 반환한다
-export function createProductWithSku(baseUrl, creatorToken, unique, productName) {
+export function createProductWithSku(baseUrl, creatorToken, unique, productName, hashTags = ['k6test']) {
   const productRes = http.post(
     `${baseUrl}/api/v1/products`,
     {
       request: http.file(
         JSON.stringify({
-          hashTags: ['k6test'],
+          hashTags,
           name: `${productName} ${unique}`,
           content: 'k6 부하 테스트용으로 생성된 상품입니다.',
           skus: [{ name: '기본', price: 10000, isDefault: true, quantity: 1000000 }],
