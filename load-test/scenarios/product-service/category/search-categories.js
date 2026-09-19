@@ -1,12 +1,15 @@
 import http from 'k6/http';
 import { sleep } from 'k6';
-import config from '../../../config';
+import config from '../../../config/index.js';
 import { login, authHeaders } from '../../../lib/auth.js';
+import { loginAsMaster } from '../../../lib/creator.js';
 import { checkStatus } from '../../../lib/checks.js';
 
 /**
- * 시나리오 설명: 카테고리 탐색 화면에서 키워드로 카테고리를 검색하는 흐름
- * 엔드포인트: GET /api/v1/categories (게이트웨이 정책상 로그인 필요)
+ * 시나리오 설명: 카테고리 탐색 화면에서 키워드로 카테고리를 검색하는 흐름. setup()에서
+ *   검색어와 동일한 이름의 카테고리를 미리 만들어둬(시드 데이터), 외부 데이터 상태와
+ *   무관하게 검색 결과가 항상 1건 이상 나오도록 한다.
+ * 엔드포인트: GET /api/v1/categories?keyword= (게이트웨이 정책상 로그인 필요)
  * 테스트 유형: 부하 테스트 (load)
  * 최대 VUser: 30
  * 목표 TPS: 20 req/s
@@ -48,11 +51,26 @@ export function setup() {
   }
 
   const token = login(config.baseUrl, email, password);
-  return { token };
+
+  const masterToken = loginAsMaster(config.baseUrl);
+  const keyword = `k6search${unique.slice(-6)}`;
+  const categoryRes = http.post(
+    `${config.baseUrl}/api/v1/admin/categories`,
+    JSON.stringify({ name: keyword, description: 'k6 카테고리 검색 부하 테스트용 시드 카테고리' }),
+    { headers: { Authorization: `Bearer ${masterToken}`, 'Content-Type': 'application/json' } },
+  );
+  if (categoryRes.status !== 201) {
+    throw new Error(`setup 실패 - 시드 카테고리 생성 status=${categoryRes.status} body=${categoryRes.body}`);
+  }
+
+  return { token, keyword };
 }
 
 export default function (data) {
-  const res = http.get(`${config.baseUrl}/api/v1/categories`, authHeaders(data.token));
+  const res = http.get(
+    `${config.baseUrl}/api/v1/categories?keyword=${encodeURIComponent(data.keyword)}`,
+    authHeaders(data.token),
+  );
   checkStatus(res, 200);
   sleep(1);
 }
