@@ -1,8 +1,7 @@
 import http from 'k6/http';
 import { authHeaders } from './auth.js';
 
-// creator 토큰으로 상품+SKU를 만들고 첫 SKU의 skuId를 반환한다
-export function createProductWithSku(baseUrl, creatorToken, unique, productName, hashTags = ['k6test']) {
+function postProduct(baseUrl, creatorToken, unique, productName, hashTags) {
   const productRes = http.post(
     `${baseUrl}/api/v1/products`,
     {
@@ -22,11 +21,21 @@ export function createProductWithSku(baseUrl, creatorToken, unique, productName,
   if (productRes.status !== 201) {
     throw new Error(`setup 실패 - 상품 등록 status=${productRes.status} body=${productRes.body}`);
   }
-  const productId = productRes.json().data.productId;
+  return productRes.json().data.productId;
+}
+
+// creator 토큰으로 상품+SKU를 만들고 첫 SKU의 skuId를 반환한다
+export function createProductWithSku(baseUrl, creatorToken, unique, productName, hashTags = ['k6test']) {
+  const productId = postProduct(baseUrl, creatorToken, unique, productName, hashTags);
 
   const detailRes = http.get(`${baseUrl}/api/v1/products/${productId}`, authHeaders(creatorToken));
   if (detailRes.status !== 200) {
     throw new Error(`setup 실패 - 상품 조회 status=${detailRes.status} body=${detailRes.body}`);
   }
   return detailRes.json().data.skus[0].skuId;
+}
+
+// creator 토큰으로 상품만 등록하고 productId를 반환한다 (SKU 조회가 필요 없는 경우)
+export function registerProduct(baseUrl, creatorToken, unique, productName, hashTags = ['k6test']) {
+  return postProduct(baseUrl, creatorToken, unique, productName, hashTags);
 }
