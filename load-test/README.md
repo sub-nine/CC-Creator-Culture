@@ -2,6 +2,8 @@
 
 product-service, order-service, user-service 등 이 프로젝트의 API 엔드포인트에 대한 k6 부하 테스트 스크립트 모음입니다. Docker만 있으면 실행할 수 있으며, k6를 로컬에 별도로 설치할 필요는 없습니다.
 
+<!-- TODO: 전체 시나리오가 sleep()+VU 기반 closed model이라 목표 TPS가 근사치임 - 정확한 처리량 통제가 필요하면 arrival-rate executor 전환 검토 -->
+
 ## 사전 조건
 
 ### local
