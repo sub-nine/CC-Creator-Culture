@@ -1,35 +1,35 @@
 import http from 'k6/http';
 import { sleep } from 'k6';
-import config from '../../config/index.js';
-import { login, authHeaders } from '../../lib/auth.js';
-import { checkStatus } from '../../lib/checks.js';
+import config from '../../../config';
+import { login, authHeaders } from '../../../lib/auth.js';
+import { checkStatus } from '../../../lib/checks.js';
 
 /**
- * 시나리오 설명: 카테고리 검색 결과에서 하나를 선택해 상세 정보를 확인하는 흐름
- * 엔드포인트: GET /api/v1/categories/{categoryId} (게이트웨이 정책상 로그인 필요)
+ * 시나리오 설명: 카테고리 상세 화면에서 소속 해시태그 목록을 훑어보는 흐름
+ * 엔드포인트: GET /api/v1/categories/{categoryId}/hashtags (게이트웨이 정책상 로그인 필요)
  * 테스트 유형: 부하 테스트 (load)
- * 최대 VUser: 30
- * 목표 TPS: 20 req/s
- * 목표 P95: 250ms
+ * 최대 VUser: 25
+ * 목표 TPS: 16 req/s
+ * 목표 P95: 300ms
  * 허용 에러율: 1% 미만
- * 프로파일 선정 이유: 반복마다 sleep(1)이 있어 VU당 최대 처리량이 초당 1건이라, 최대 VU 30 기준 램프업/다운 구간까지 포함한 전체 평균 기준 실측 상한(~24 req/s)보다 여유 있게 목표를 잡음
+ * 프로파일 선정 이유: 반복마다 sleep(1)이 있어 VU당 최대 처리량이 초당 1건이라, 최대 VU 25 기준 램프업/다운 구간까지 포함한 전체 평균 기준 실측 상한(~20 req/s)보다 여유 있게 목표를 잡음
  */
 export const options = {
   stages: [
-    { duration: '30s', target: 30 },
-    { duration: '1m', target: 30 },
+    { duration: '30s', target: 25 },
+    { duration: '1m', target: 25 },
     { duration: '10s', target: 0 },
   ],
   thresholds: {
-    http_req_duration: ['p(95)<250'],
+    http_req_duration: ['p(95)<300'],
     http_req_failed: ['rate<0.01'],
-    http_reqs: ['rate>=20'],
+    http_reqs: ['rate>=16'],
   },
 };
 
 export function setup() {
   const unique = `${Date.now()}`;
-  const email = `k6-test-categorydetail-${unique}@example.com`;
+  const email = `k6-test-cathashtags-${unique}@example.com`;
   const password = 'Passw0rd!';
 
   const signupRes = http.post(
@@ -37,7 +37,7 @@ export function setup() {
     JSON.stringify({
       email,
       password,
-      nickname: `k6catdetail${unique}`,
+      nickname: `k6cathash${unique}`,
       phone: `010-${unique.slice(-8, -4)}-${unique.slice(-4)}`,
       address: '서울시 강남구',
     }),
@@ -59,7 +59,10 @@ export function setup() {
 }
 
 export default function (data) {
-  const res = http.get(`${config.baseUrl}/api/v1/categories/${data.categoryId}`, authHeaders(data.token));
+  const res = http.get(
+    `${config.baseUrl}/api/v1/categories/${data.categoryId}/hashtags`,
+    authHeaders(data.token),
+  );
   checkStatus(res, 200);
   sleep(1);
 }

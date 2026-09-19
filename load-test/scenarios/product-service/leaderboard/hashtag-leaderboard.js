@@ -1,8 +1,8 @@
 import http from 'k6/http';
 import { sleep } from 'k6';
-import config from '../../config/index.js';
-import { login, authHeaders } from '../../lib/auth.js';
-import { checkStatus } from '../../lib/checks.js';
+import config from '../../../config/index.js';
+import { login, authHeaders } from '../../../lib/auth.js';
+import { checkStatus } from '../../../lib/checks.js';
 
 /**
  * 시나리오 설명: 메인 화면의 인기 해시태그 리더보드를 조회하는 흐름

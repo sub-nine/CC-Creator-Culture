@@ -1,8 +1,8 @@
 import http from 'k6/http';
 import { sleep } from 'k6';
-import config from '../../config/index.js';
-import { login, authHeaders } from '../../lib/auth.js';
-import { checkStatus } from '../../lib/checks.js';
+import config from '../../../config';
+import { login, authHeaders } from '../../../lib/auth.js';
+import { checkStatus } from '../../../lib/checks.js';
 
 /**
  * 시나리오 설명: 상품 등록/검색 화면에서 해시태그를 키워드로 찾아보는 흐름
