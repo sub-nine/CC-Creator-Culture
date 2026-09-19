@@ -1,11 +1,14 @@
 import http from 'k6/http';
 import { sleep } from 'k6';
-import config from '../../../config';
+import config from '../../../config/index.js';
 import { login, authHeaders } from '../../../lib/auth.js';
+import { loginAsMaster } from '../../../lib/creator.js';
 import { checkStatus } from '../../../lib/checks.js';
 
 /**
- * 시나리오 설명: 카테고리 검색 결과에서 하나를 선택해 상세 정보를 확인하는 흐름
+ * 시나리오 설명: 카테고리 검색 결과에서 하나를 선택해 상세 정보를 확인하는 흐름. setup()에서
+ *   조회 대상 카테고리를 직접 만들어둬(시드 데이터), DB에 카테고리가 미리 있어야 한다는
+ *   외부 의존성 없이 항상 실행 가능하게 한다.
  * 엔드포인트: GET /api/v1/categories/{categoryId} (게이트웨이 정책상 로그인 필요)
  * 테스트 유형: 부하 테스트 (load)
  * 최대 VUser: 30
@@ -49,13 +52,18 @@ export function setup() {
 
   const token = login(config.baseUrl, email, password);
 
-  const listRes = http.get(`${config.baseUrl}/api/v1/categories`, authHeaders(token));
-  const categories = listRes.json().data.content;
-  if (!categories || categories.length === 0) {
-    throw new Error('setup 실패 - 조회할 카테고리 데이터가 없음 (최소 1개 카테고리 필요)');
+  const masterToken = loginAsMaster(config.baseUrl);
+  const categoryName = `k6catdetail${unique.slice(-6)}`;
+  const categoryRes = http.post(
+    `${config.baseUrl}/api/v1/admin/categories`,
+    JSON.stringify({ name: categoryName, description: 'k6 카테고리 상세 조회 부하 테스트용 시드 카테고리' }),
+    { headers: { Authorization: `Bearer ${masterToken}`, 'Content-Type': 'application/json' } },
+  );
+  if (categoryRes.status !== 201) {
+    throw new Error(`setup 실패 - 시드 카테고리 생성 status=${categoryRes.status} body=${categoryRes.body}`);
   }
 
-  return { token, categoryId: categories[0].id };
+  return { token, categoryId: categoryRes.json().data };
 }
 
 export default function (data) {
