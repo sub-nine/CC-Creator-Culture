@@ -523,6 +523,13 @@ assert_file_mode 644 "$success_state/releases/$NEW_SHA/source/deploy/prometheus/
 assert_file_mode 644 "$success_state/releases/$NEW_SHA/source/deploy/grafana/provisioning/datasources/prometheus.yml"
 assert_file_mode 644 "$success_state/releases/$NEW_SHA/source/deploy/grafana/provisioning/dashboards/dashboards.yml"
 assert_file_mode 644 "$success_state/releases/$NEW_SHA/source/deploy/grafana/provisioning/dashboards/k6-prometheus.json"
+[[ -f "$success_state/releases/$NEW_SHA/source/load-test/Dockerfile.cloud" ]]
+cmp "$REPOSITORY_ROOT/docker/grafana/provisioning/dashboards/k6-prometheus.json" \
+  "$success_state/releases/$NEW_SHA/source/deploy/grafana/provisioning/dashboards/k6-prometheus.json"
+if grep -Eq 'command=up args=.* k6( |$)' "$DOCKER_LOG"; then
+  echo "Deployment must not start k6" >&2
+  exit 1
+fi
 assert_file_mode 755 "$success_state/releases/$NEW_SHA/source/deploy/postgres/init-service-database.sh"
 assert_file_mode 600 "$success_state/releases/$NEW_SHA/source/deploy/postgres/reconcile-credentials.sql"
 [[ ! -d "$success_state/releases/3333333333333333333333333333333333333333" ]]
@@ -744,9 +751,5 @@ grep -Fq "Rollback completed successfully." "$TEST_ROOT/legacy-stop-failure.out"
 
 [[ -f "$same_project_caddy_state/releases/$NEW_SHA/source/load-test/scripts/run-dev.sh" ]]
 [[ -f "$same_project_caddy_state/releases/$NEW_SHA/source/deploy/grafana/provisioning/dashboards/k6-prometheus.json" ]]
-if grep -Eq 'command=up args=.* k6( |$)' "$DOCKER_LOG"; then
-  echo "Deployment must not start k6" >&2
-  exit 1
-fi
 
 echo "deploy.sh regression tests passed."
