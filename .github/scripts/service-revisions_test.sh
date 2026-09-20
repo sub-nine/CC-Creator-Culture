@@ -46,7 +46,7 @@ write_tree() {
   printf 'app\n' > "$REPO/apps/embedding-service/app.py"
   printf 'smoke\n' > "$REPO/apps/embedding-service/smoke.py"
   printf 'requirements\n' > "$REPO/apps/embedding-service/requirements.txt"
-  printf 'k6\n' > "$REPO/load-test/Dockerfile"
+  printf 'k6\n' > "$REPO/load-test/Dockerfile.cloud"
   printf 'scenario\n' > "$REPO/load-test/scenario.js"
   printf 'app: {}\n' > "$REPO/config-repo/application.yaml"
   printf 'app-dev: {}\n' > "$REPO/config-repo/application-dev.yaml"

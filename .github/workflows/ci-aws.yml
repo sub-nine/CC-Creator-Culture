@@ -149,7 +149,7 @@ jobs:
           platforms: arm64
       - name: Build and inspect without requests
         run: |
-          docker build --platform linux/arm64 -t cc-k6:verify load-test
+          docker build --platform linux/arm64 -f load-test/Dockerfile.cloud -t cc-k6:verify load-test
           docker run --rm --network none --entrypoint sh \
             -e SMOKE_URL=http://example.test/docs -e EMBED_URL=http://example.test/embed \
             cc-k6:verify -eu -c 'find scenarios -name "*.js" | while read -r script; do k6 inspect --include-system-env-vars "$script" >/dev/null; done'

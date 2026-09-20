@@ -190,7 +190,7 @@ jobs:
             module-dir: ""
             target: ""
             context: load-test
-            file: load-test/Dockerfile
+            file: load-test/Dockerfile.cloud
           # AWS demo seed artifact: ECR only, no Java build, not part of the OCI candidate manifest.
           # Every step is skipped for this entry when AWS_ECR_REGISTRY is empty.
           - service: db-seed
