@@ -61,6 +61,10 @@ with tempfile.TemporaryDirectory() as directory:
             '__meta_eureka_app_instance_ip_addr': '127.0.0.2',
         }})
         (directory / 'targets.json').write_text(json.dumps(targets))
+        # Linux에서도 컨테이너의 nobody 사용자가 검증용 파일을 읽을 수 있게 한다.
+        directory.chmod(0o755)
+        for filename in ('prometheus.yml', 'targets.json'):
+            (directory / filename).chmod(0o644)
         command = ['docker', 'run', '--rm', '--network', 'none', '--entrypoint', 'promtool',
                    '-v', f'{directory}:/check:ro', 'prom/prometheus:v3.13.1', 'check']
         subprocess.run(command + ['config', '/check/prometheus.yml'], check=True)
