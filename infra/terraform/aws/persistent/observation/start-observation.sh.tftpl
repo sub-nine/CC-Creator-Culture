@@ -43,6 +43,9 @@ scrape_configs:
       - source_labels: [__meta_eureka_app_name]
         regex: '(?i)(config-server|eureka-server)'
         action: drop
+      - source_labels: [__meta_eureka_app_name]
+        target_label: job
+        action: lowercase
       - source_labels: [__meta_eureka_app_instance_ip_addr]
         regex: (.+)
         replacement: $1:9090

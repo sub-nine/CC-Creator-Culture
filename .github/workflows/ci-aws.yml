@@ -198,4 +198,4 @@ jobs:
 
       - name: Observation document test
         if: matrix.stack == 'persistent'
-        run: python3 observation_test.py
+        run: python3 observation_test.py --promtool
