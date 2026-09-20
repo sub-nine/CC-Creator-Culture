@@ -1,6 +1,7 @@
 services:
   k6:
-    build: .
+    image: grafana/k6:latest
+    working_dir: /scripts
     networks:
       - cc-service-apps_default
     environment:
@@ -12,10 +13,11 @@ services:
       - K6_PROMETHEUS_RW_SERVER_URL=${K6_PROMETHEUS_RW_SERVER_URL:-http://prometheus:9090/api/v1/write}
       - K6_PROMETHEUS_RW_TREND_STATS=avg,min,med,max,p(90),p(95),p(99)
     volumes:
-      - ./results:/scripts/results
+      - .:/scripts
 
   k6-all:
-    build: .
+    image: grafana/k6:latest
+    working_dir: /scripts
     networks:
       - cc-service-apps_default
     environment:
@@ -28,7 +30,7 @@ services:
       - K6_PROMETHEUS_RW_TREND_STATS=avg,min,med,max,p(90),p(95),p(99)
     entrypoint: ["sh", "entrypoint.sh"]
     volumes:
-      - ./results:/scripts/results
+      - .:/scripts
 
 networks:
   cc-service-apps_default:

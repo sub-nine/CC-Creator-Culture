@@ -49,6 +49,7 @@ sh load-test/scripts/run-all.sh dev
 
 - Grafana: http://localhost:3000 (k6 폴더의 "k6 Prometheus" 대시보드)
 - 같은 실행에서 나온 시나리오들은 `testid` 변수로 묶여서 필터링됩니다.
+- 같은 대시보드 하단 "Infra Monitoring" row에서 CPU/JVM Heap(Eden/Old)/GC 최대 지연/HikariCP 커넥션/Postgres max_connections도 k6 지표와 같은 타임라인으로 함께 볼 수 있습니다. 부하가 걸릴 때 인프라 쪽이 병목인지 확인할 때 참고하세요.
 
 ## 테스트 데이터 정리
 
