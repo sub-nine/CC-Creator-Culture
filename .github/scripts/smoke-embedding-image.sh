@@ -40,4 +40,3 @@ done
 timeout --foreground "${SMOKE_TIMEOUT_SECONDS}s" docker exec "$container" python smoke.py
 
 echo "Embedding image smoke validation passed."
-
