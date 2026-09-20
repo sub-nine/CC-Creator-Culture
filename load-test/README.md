@@ -18,9 +18,11 @@ sh load-test/scripts/up.sh
 
 ### dev / prod
 
-이미 배포되어 있는 서버를 대상으로 하므로 로컬에서 별도로 띄울 것은 없습니다. 다만 `config/environments/dev.js`, `prod.js`에 대상 서버의 baseUrl을 설정해야 합니다 (현재 TODO 상태).
+이미 배포되어 있는 서버를 대상으로 하므로 로컬에서 별도로 띄울 것은 없습니다. 일반 시나리오의 대상 주소는 `BASE_URL` 환경변수로 전달합니다. dev/prod에서 주소가 없으면 요청 전에 실패합니다.
 
 ## 실행
+
+로컬은 고정 버전의 공식 k6 이미지에 이 디렉터리를 마운트합니다. 스크립트 변경 시 이미지를 다시 빌드하지 않습니다. 클라우드 배포 이미지만 `Dockerfile.cloud`로 빌드합니다.
 
 ### 스크립트 하나만 실행
 
@@ -39,8 +41,8 @@ sh load-test/scripts/run-all.sh
 기본값은 `local`이며, 두 스크립트 모두 마지막 인자로 대상 환경을 받습니다.
 
 ```bash
-sh load-test/scripts/run.sh scenarios/product-service/search-products.js dev
-sh load-test/scripts/run-all.sh dev
+BASE_URL=https://dev.example.com sh load-test/scripts/run.sh scenarios/product-service/search-products.js dev
+BASE_URL=https://dev.example.com sh load-test/scripts/run-all.sh dev
 ```
 
 ## 결과 확인
@@ -53,7 +55,7 @@ sh load-test/scripts/run-all.sh dev
 
 ## 테스트 데이터 정리
 
-시나리오가 만드는 데이터는 `k6-test-`로 시작하는 프리픽스를 Unique 값으로 씁니다. local은 DB가 로컬 볼륨이라 정리 대신 통째로 밀고 다시 띄우는 게 더 간단합니다:
+시나리오가 만드는 데이터는 `k6-test-`로 시작하는 프리픽스를 Unique 값으로 씁니다. local은 DB가 로컬 볼륨이라 정리 대신 통째로 밀고 다시 띄우는 게 더 간단합니다.
 
 ```bash
 sh load-test/scripts/teardown.sh

@@ -42,6 +42,6 @@ bootstrap 의 runtime-deploy 역할은 이 스택의 plan, apply, destroy 에 �
 
 `embedding` 서비스는 0.5 vCPU / 2GiB, ARM64 태스크 1개로 실행하며 Product는 내부 DNS의 8000번 포트를 사용한다. `app_running=false`에서 임베딩도 정지한다. Java 환경변수와 9090번 관리 포트는 임베딩에 적용하지 않는다.
 
-`k6`는 1 vCPU / 2GiB의 일회성 태스크 정의다. 상시 ECS 서비스가 없고 기본 명령은 `version`이므로 배포만으로 부하가 발생하지 않는다. `k6_runner` 출력은 수동 실행 스크립트의 네트워크와 대상 주소 입력이다. 실행 전 관측 EC2의 Prometheus 준비를 확인한다. [운영 절차](../../../../deploy/cloud-load-test.md)를 따른다.
+`k6`는 1 vCPU / 2GiB의 일회성 태스크 정의다. 상시 ECS 서비스가 없고 기본 명령은 `version`이므로 배포만으로 부하가 발생하지 않는다. `k6_runner` 출력은 수동 실행 스크립트의 네트워크와 대상 주소 입력이다. 실행 전 모니터링 EC2의 Prometheus 준비를 확인한다. [운영 절차](../../../../deploy/cloud-load-test.md)를 따른다.
 
 로컬 mock 검증: `terraform test -no-color`. 실제 클라우드 plan과 최소 연결 확인은 별도이며, 테스트는 AWS 자원을 만들지 않는다.
