@@ -2065,7 +2065,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "JVM Heap Eden/Old(Tenured) 영역 사용률 (used/max)",
+      "description": "JVM Heap Eden(used/committed, G1GC는 Eden max가 -1로 정의 안 됨)/Old(Tenured, used/max) 영역 사용률",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -2110,7 +2110,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "editorMode": "code",
-          "expr": "jvm_memory_used_bytes{area=\"heap\", id=~\".*Eden.*\"} / jvm_memory_max_bytes{area=\"heap\", id=~\".*Eden.*\"}",
+          "expr": "jvm_memory_used_bytes{area=\"heap\", id=~\".*Eden.*\"} / jvm_memory_committed_bytes{area=\"heap\", id=~\".*Eden.*\"}",
           "instant": false,
           "legendFormat": "{{job}} Eden",
           "range": true,
