@@ -13,17 +13,27 @@ import { checkStatus } from '../../../lib/checks.js';
  * 엔드포인트: GET /api/v1/categories?keyword= (게이트웨이 정책상 로그인 필요)
  * 테스트 유형: 부하 테스트 (load)
  * 최대 VUser: 30
- * 목표 TPS: 20 req/s
- * 목표 P95: 250ms
- * 목표 P99: 500ms (P95의 2배 수준, 드문 꼬리 지연 허용 범위 확인용)
+ * 목표 TPS: 10 req/s 이상 (병목 판정용 아님 - sanity check, 아래 참고)
+ * 목표 P95: 100ms 미만 (실측 기준 재산정, 아래 참고)
+ * 목표 P99: 250ms 미만 (실측 기준 재산정, 아래 참고)
  * 허용 에러율: 1% 미만
  * 프로파일 선정 이유:
  *   - VUser 30명: DAU 5,000명 가정 시 Little's Law 기반 피크 동시접속자 추정치(~208명)
  *       - 카테고리 탐색 비중 15%로 산출
- *   - 목표 TPS 20: sleep(1)이라 VU당 최대 처리량이 초당 1건
- *       - 램프업/다운 구간까지 포함한 전체 평균 기준 실측 상한(~24 req/s)보다 여유 있게 설정
+ *   - 목표 TPS 10: closed model(sleep(1)+VU) 특성상 TPS는 VU 수에서 역산된 값이지 실제
+ *     트래픽 추정치가 아님 - 응답이 1초보다 훨씬 빠른 한(지금 수십ms 수준) TPS는 서버 성능과
+ *     무관하게 거의 항상 VU 수 근처로 나와서, 이 값으로는 병목을 못 찾음
+ *       - 테스트가 완전히 실패해 로드 자체가 안 걸렸는지만 거르는 느슨한 sanity check로 낮춤
+ *       - 병목 판정은 실제 처리 비용을 그대로 반영하는 P95/P99가 전담
+ *   - 목표 P95 100ms / P99 250ms: 프로덕션 SLA(캐싱 여부 무관하게 유지할 사용자 체감 기준)와
+ *     회귀 탐지(실측 베이스라인 대비 몇 배 느려지면 잡아내는 기준)를 절충. 매칭20+노이즈30 시드
+ *     기준 실측치(p95=32.87ms, p99=251.31ms, endpoint:search 태그 스코프) 대비 P95는 3배 여유,
+ *     P99는 거의 근접 - 기존 250ms/500ms는 실측 대비 10배 가까이 헐렁해서 병목이 나도 못 잡았음
+ *     (지난 TPS Fail 당시 P95=36.53ms로 250ms 대비 여전히 여유)
  *   - Ramp-up/down 30초/10초
  *       - 실제 시간축 아님, 반복 테스트를 위한 완만한 증감 패턴만 압축 재현
+ * TODO: TPS를 진짜 병목 탐지 게이트로 쓰려면 arrival-rate(open model) executor로 전환 필요 -
+ *   서버가 느려져도 부하량이 줄지 않아 closed model의 self-throttling 문제를 근본적으로 해결함
  */
 export const options = {
   stages: [
@@ -34,9 +44,9 @@ export const options = {
   // setup()의 시드 생성 요청도 http_req_duration 등에 합산되므로, endpoint:search 태그로
   // 부하 구간의 검색 요청만 걸러서 threshold를 검증한다
   thresholds: {
-    'http_req_duration{endpoint:search}': ['p(95)<250', 'p(99)<500'],
+    'http_req_duration{endpoint:search}': ['p(95)<100', 'p(99)<250'],
     'http_req_failed{endpoint:search}': ['rate<0.01'],
-    'http_reqs{endpoint:search}': ['rate>=20'],
+    'http_reqs{endpoint:search}': ['rate>=10'],
   },
 };
 

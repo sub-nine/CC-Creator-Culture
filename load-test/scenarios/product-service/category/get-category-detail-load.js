@@ -11,22 +11,38 @@ import { checkStatus } from '../../../lib/checks.js';
  *   외부 의존성 없이 항상 실행 가능하게 한다.
  * 엔드포인트: GET /api/v1/categories/{categoryId} (게이트웨이 정책상 로그인 필요)
  * 테스트 유형: 부하 테스트 (load)
- * 최대 VUser: 30
- * 목표 TPS: 20 req/s
- * 목표 P95: 250ms
+ * 최대 VUser: 20
+ * 목표 TPS: 7 req/s 이상 (병목 판정용 아님 - sanity check, 아래 참고)
+ * 목표 P95: 100ms 미만 (실측 기준 재산정, 아래 참고)
+ * 목표 P99: 250ms 미만 (실측 기준 재산정, 아래 참고)
  * 허용 에러율: 1% 미만
- * 프로파일 선정 이유: 반복마다 sleep(1)이 있어 VU당 최대 처리량이 초당 1건이라, 최대 VU 30 기준 램프업/다운 구간까지 포함한 전체 평균 기준 실측 상한(~24 req/s)보다 여유 있게 목표를 잡음
+ * 프로파일 선정 이유:
+ *   - VUser 20명
+ *       - 공통 가정: DAU 5,000명 · 활성 4시간 · 평균 세션 5분 기준 Little's Law로 평균 동시접속자 104명, 피크 2배 208명
+ *       - 카테고리 상세는 탐색(15%) 도달자 중 실제 클릭 비율 65%까지 곱해 산출 (208 * 15% * 65% ~ 20)
+ *   - 목표 TPS 7: closed model(sleep(1)+VU) 특성상 응답이 1초보다 훨씬 빠른 한 TPS는 서버 성능과
+ *     무관하게 거의 항상 VU 수 근처로 나와 병목을 못 잡음 -
+ *     로드 자체가 안 걸렸는지만 거르는 느슨한 sanity check로 낮춤
+ *   - 목표 P95 100ms / P99 250ms: 프로덕션 SLA(캐싱 여부 무관 사용자 체감 기준)와 회귀 탐지(베이스라인
+ *     대비 몇 배 느려지면 잡아내는 기준)를 절충
+ *     실측치(p95=7.46ms, p99=9.97ms, endpoint:detail 태그 스코프) 대비 여유는 크지만, 기존
+ *     250ms/500ms보다는 타이트하게 통일
+ *   - Ramp-up/down 30초/10초
+ *       - 실제 시간축 아님, 반복 테스트를 위한 완만한 증감 패턴만 압축 재현
+ * TODO: TPS를 진짜 병목 탐지 게이트로 쓰려면 arrival-rate(open model) executor로 전환 필요
  */
 export const options = {
   stages: [
-    { duration: '30s', target: 30 },
-    { duration: '1m', target: 30 },
+    { duration: '30s', target: 20 },
+    { duration: '1m', target: 20 },
     { duration: '10s', target: 0 },
   ],
+  // setup()의 시드 생성 요청도 http_req_duration 등에 합산되므로, endpoint:detail 태그로
+  // 부하 구간의 상세 조회 요청만 걸러서 threshold를 검증한다
   thresholds: {
-    http_req_duration: ['p(95)<250'],
-    http_req_failed: ['rate<0.01'],
-    http_reqs: ['rate>=20'],
+    'http_req_duration{endpoint:detail}': ['p(95)<100', 'p(99)<250'],
+    'http_req_failed{endpoint:detail}': ['rate<0.01'],
+    'http_reqs{endpoint:detail}': ['rate>=7'],
   },
 };
 
@@ -67,7 +83,10 @@ export function setup() {
 }
 
 export default function (data) {
-  const res = http.get(`${config.baseUrl}/api/v1/categories/${data.categoryId}`, authHeaders(data.token));
+  const res = http.get(`${config.baseUrl}/api/v1/categories/${data.categoryId}`, {
+    ...authHeaders(data.token),
+    tags: { endpoint: 'detail' },
+  });
   checkStatus(res, 200);
   sleep(1);
 }
