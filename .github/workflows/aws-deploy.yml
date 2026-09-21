@@ -182,8 +182,20 @@ jobs:
         if: inputs.action == 'plan'
         run: terraform -chdir="$TF_DIR" plan -input=false -no-color -var "release_sha=$RELEASE_SHA" -var "app_running=$APP_RUNNING"
 
+      - name: Start RDS before Terraform
+        if: inputs.action == 'deploy' || inputs.action == 'start'
+        run: python3 .github/scripts/aws-power.py start "$TF_DIR/persistent.auto.tfvars.json"
+
+      - name: Stop existing workloads
+        if: inputs.action == 'stop'
+        run: python3 .github/scripts/aws-power.py stop "$TF_DIR/persistent.auto.tfvars.json"
+
+      - name: Refresh stopped runtime state
+        if: inputs.action == 'stop'
+        run: terraform -chdir="$TF_DIR" apply -refresh-only -auto-approve -input=false -no-color -var "release_sha=$RELEASE_SHA" -var "app_running=false"
+
       - name: Terraform apply
-        if: inputs.action == 'deploy' || inputs.action == 'start' || inputs.action == 'stop'
+        if: inputs.action == 'deploy' || inputs.action == 'start'
         run: terraform -chdir="$TF_DIR" apply -auto-approve -input=false -no-color -var "release_sha=$RELEASE_SHA" -var "app_running=$APP_RUNNING"
 
       - name: Terraform destroy runtime
