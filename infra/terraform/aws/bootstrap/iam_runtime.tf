@@ -49,6 +49,19 @@ data "aws_iam_policy_document" "runtime_deploy" {
     resources = ["*"]
   }
 
+  # AWS provider steady-state waits use the deployment APIs in addition to DescribeServices.
+  statement {
+    sid       = "EcsDeploymentList"
+    actions   = ["ecs:ListServiceDeployments"]
+    resources = [local.ecs_service_arn]
+  }
+
+  statement {
+    sid       = "EcsDeploymentRead"
+    actions   = ["ecs:DescribeServiceDeployments"]
+    resources = ["arn:aws:ecs:${var.aws_region}:${local.account_id}:service-deployment/${var.name_prefix}/${var.name_prefix}-*/*"]
+  }
+
   # These ECS actions have no resource-level scoping in IAM, so they must be "*".
   statement {
     sid = "EcsUnscoped"
