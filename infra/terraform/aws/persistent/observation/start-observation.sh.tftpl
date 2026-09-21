@@ -65,7 +65,8 @@ DATASOURCE
 cat > "$ETC_ROOT/grafana/dashboards/dashboards.yml" <<'PROVIDER'
 ${dashboard_provider}
 PROVIDER
-cat > "$ETC_ROOT/grafana/dashboards/k6-prometheus.json" <<'DASHBOARD'
+# Grafana의 이중 중괄호를 SSM 매개변수로 해석하지 않도록 서버에서 복원한다.
+base64 --decode > "$ETC_ROOT/grafana/dashboards/k6-prometheus.json" <<'DASHBOARD'
 ${k6_dashboard}
 DASHBOARD
 

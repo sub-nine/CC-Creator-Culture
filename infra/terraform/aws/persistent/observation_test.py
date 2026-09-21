@@ -1,5 +1,6 @@
 """Render the SSM shell template without a provider, state or AWS credentials."""
 
+import base64
 import json
 from pathlib import Path
 import subprocess
@@ -15,7 +16,9 @@ variables = {
     "grafana_secret_arn": "test-only-secret",
     "cloudmap_namespace": "cc-test.internal",
     "name_prefix": "cc-test",
-    "k6_dashboard": json.dumps(json.loads(dashboard.read_text()), separators=(",", ":")),
+    "k6_dashboard": base64.b64encode(
+        json.dumps(json.loads(dashboard.read_text()), separators=(",", ":")).encode()
+    ).decode(),
     "dashboard_provider": (dashboard.parent / "dashboards.yml").read_text(),
     "prometheus_source": (root / "deploy/grafana/provisioning/datasources/prometheus.yml")
     .read_text().replace("http://prometheus:9090", "http://127.0.0.1:9090"),
@@ -31,6 +34,14 @@ with tempfile.TemporaryDirectory() as directory:
     # terraform console uses a heredoc for multiline strings.
     rendered = output.split("\n", 1)[1].rsplit("\nEOT", 1)[0] if output.startswith("<<EOT") else json.loads(output)
     subprocess.run(["bash", "-n"], input=rendered, text=True, check=True)
+    assert "{{" not in rendered, "SSM command contains undeclared parameter expressions"
+    dashboard_directory = Path(directory) / "grafana/dashboards"
+    dashboard_directory.mkdir(parents=True)
+    restore_dashboard = rendered.split("PROVIDER\n", 1)[1].split("\nraw=", 1)[0]
+    subprocess.run(
+        ["bash", "-c", 'ETC_ROOT="$1"\n' + restore_dashboard, "test", directory], check=True,
+    )
+    assert json.loads((dashboard_directory / dashboard.name).read_text()) == json.loads(dashboard.read_text())
     document = {"schemaVersion": "2.2", "description": "Observation bootstrap", "mainSteps": [
         {"action": "aws:runShellScript", "name": "StartObservation", "inputs": {"timeoutSeconds": "900", "runCommand": [rendered]}}
     ]}

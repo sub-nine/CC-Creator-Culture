@@ -27,7 +27,7 @@ resource "aws_ecs_task_definition" "embedding" {
         command     = ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs', timeout=4)"]
         interval    = 10
         timeout     = 5
-        retries     = 12
+        retries     = 10
         startPeriod = 120
       }
       logConfiguration = {

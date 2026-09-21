@@ -57,7 +57,7 @@ resource "aws_ssm_document" "start_observation" {
               grafana_secret_arn = aws_secretsmanager_secret.grafana.arn
               cloudmap_namespace = aws_service_discovery_private_dns_namespace.this.name
               name_prefix        = var.name_prefix
-              k6_dashboard       = jsonencode(jsondecode(file("${path.module}/../../../../docker/grafana/provisioning/dashboards/k6-prometheus.json")))
+              k6_dashboard       = base64encode(jsonencode(jsondecode(file("${path.module}/../../../../docker/grafana/provisioning/dashboards/k6-prometheus.json"))))
               dashboard_provider = file("${path.module}/../../../../docker/grafana/provisioning/dashboards/dashboards.yml")
               prometheus_source  = replace(file("${path.module}/../../../../deploy/grafana/provisioning/datasources/prometheus.yml"), "http://prometheus:9090", "http://127.0.0.1:9090")
             })
