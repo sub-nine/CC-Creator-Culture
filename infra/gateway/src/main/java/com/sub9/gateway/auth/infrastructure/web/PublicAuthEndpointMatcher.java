@@ -17,7 +17,13 @@ public class PublicAuthEndpointMatcher {
             new PublicEndpoint(HttpMethod.POST, "/api/v1/auth/reissue"),
             new PublicEndpoint(HttpMethod.GET, "/api/v1/products"),
             new PublicEndpoint(HttpMethod.GET, "/api/v1/products/*"),
-            new PublicEndpoint(HttpMethod.GET, "/api/v1/products/*/reviews"));
+            new PublicEndpoint(HttpMethod.GET, "/api/v1/products/*/reviews"),
+            new PublicEndpoint(HttpMethod.GET, "/api/v1/categories"),
+            new PublicEndpoint(HttpMethod.GET, "/api/v1/categories/*"),
+            new PublicEndpoint(HttpMethod.GET, "/api/v1/categories/*/hashtags"),
+            new PublicEndpoint(HttpMethod.GET, "/api/v1/hashtags"),
+            new PublicEndpoint(HttpMethod.GET, "/api/v1/leaderboards/categories"),
+            new PublicEndpoint(HttpMethod.GET, "/api/v1/leaderboards/hashtags"));
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
