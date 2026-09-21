@@ -1,9 +1,10 @@
 import http from 'k6/http';
 import { sleep } from 'k6';
+import { Trend } from 'k6/metrics';
 import config from '../../../config/index.js';
 import { login, authHeaders } from '../../../lib/auth.js';
 import { signupApprovedCreator } from '../../../lib/creator.js';
-import { createProductWithSku } from '../../../lib/product.js';
+import { registerProduct, waitForSkuAndHashtagId } from '../../../lib/product.js';
 import { checkStatus } from '../../../lib/checks.js';
 
 /**
@@ -13,7 +14,9 @@ import { checkStatus } from '../../../lib/checks.js';
  *   (해시태그는 상품 등록 시 HashtagProduct 링크가 바로 생겨서 admin 카테고리 연결 단계가
  *   필요 없다) 주문 결제 점수는 OrderPaidEventConsumer가 Kafka 메시지 수신 즉시 동기
  *   반영하므로(product-view 시나리오의 ProductViewCountScheduler 매분 배치와 달리 배치 대기가
- *   없음), 반영 대기 시간을 짧게 잡는다.
+ *   없음), 고정 대기 대신 리더보드를 폴링해 해시태그 10개 전부 기대 점수(주문 수량 i+1개 *
+ *   ORDER_PAID 가중치 1.5)로 반영될 때까지 확인하고 그 지연을 leaderboard_ready_latency로
+ *   측정한다.
  * 엔드포인트: GET /api/v1/leaderboards/hashtags (게이트웨이 정책상 로그인 필요)
  * 테스트 유형: 부하 테스트 (load)
  * 최대 VUser: 25
@@ -35,6 +38,8 @@ import { checkStatus } from '../../../lib/checks.js';
  * TODO: TPS를 진짜 병목 탐지 게이트로 쓰려면 arrival-rate(open model) executor로 전환 필요
  */
 export const options = {
+  // 결제 x10 + 폴링까지 setup()이 길어질 수 있어 k6 기본값(60초)보다 넉넉히 잡음
+  setupTimeout: '90s',
   stages: [
     { duration: '30s', target: 25 },
     { duration: '1m', target: 25 },
@@ -44,8 +49,13 @@ export const options = {
     'http_req_duration{endpoint:leaderboard}': ['p(95)<100', 'p(99)<250'],
     'http_req_failed{endpoint:leaderboard}': ['rate<0.01'],
     'http_reqs{endpoint:leaderboard}': ['rate>=8'],
+    leaderboard_ready_latency: ['p(95)<10000'],
   },
 };
+
+const leaderboardReadyLatency = new Trend('leaderboard_ready_latency', true);
+const POLL_INTERVAL_SECONDS = 1;
+const POLL_MAX_ATTEMPTS = 10;
 
 export function setup() {
   const unique = `${Date.now()}`;
@@ -72,12 +82,15 @@ export function setup() {
   const creatorToken = signupApprovedCreator(config.baseUrl, 'hashlboseed', unique);
   const PRODUCT_COUNT = 10;
   const skuIds = [];
+  const hashtagIds = [];
   for (let i = 0; i < PRODUCT_COUNT; i++) {
-    const hashtagName = `k6hlbo${unique.slice(-4)}${i}`;
-    const skuId = createProductWithSku(config.baseUrl, creatorToken, `${unique}-${i}`, 'k6 해시태그 리더보드(주문) 시드 상품', [
+    const hashtagName = `k6hlo${unique.slice(-4)}${i}`;
+    const productId = registerProduct(config.baseUrl, creatorToken, `${unique}-${i}`, 'k6 해시태그 리더보드(주문) 시드 상품', [
       hashtagName,
     ]);
+    const { skuId, hashtagId } = waitForSkuAndHashtagId(config.baseUrl, creatorToken, productId);
     skuIds.push(skuId);
+    hashtagIds.push(hashtagId);
   }
 
   // 상품마다 다른 수량으로 주문·결제를 완료해서(i번째 상품을 (i+1)개 주문) 순위 편차를 만든다
@@ -124,8 +137,27 @@ export function setup() {
     }
   });
 
-  // 주문 결제 점수는 Kafka 메시지 수신 즉시 동기 반영이라, 배치 스케줄러 대기 없이 전파 지연만 대기
-  sleep(5);
+  // 고정 대기 대신, 해시태그 10개 전부 기대 점수(i+1개 * 가중치 1.5)로 반영될 때까지 폴링하며
+  // 실제 반영 지연을 측정한다
+  const triggeredAt = Date.now();
+  let ready = false;
+  for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+    sleep(POLL_INTERVAL_SECONDS);
+
+    // limit을 넉넉히 잡아 다른 시나리오가 남긴 해시태그에 밀려 못 잡히는 상황을 방지
+    const leaderboardRes = http.get(`${config.baseUrl}/api/v1/leaderboards/hashtags?period=WEEKLY&limit=200`, authHeaders(token));
+    checkStatus(leaderboardRes, 200);
+    const items = leaderboardRes.json('data.items') || [];
+    const scoreById = new Map(items.map((item) => [item.targetId, item.score]));
+    ready = hashtagIds.every((hashtagId, i) => Math.abs((scoreById.get(hashtagId) ?? -1) - (i + 1) * 1.5) < 0.01);
+    if (ready) {
+      break;
+    }
+  }
+  leaderboardReadyLatency.add(Date.now() - triggeredAt);
+  if (!ready) {
+    throw new Error('setup 실패 - 해시태그 10개의 리더보드 점수 반영 확인 실패');
+  }
 
   return { token };
 }
