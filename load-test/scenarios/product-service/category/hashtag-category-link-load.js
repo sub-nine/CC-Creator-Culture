@@ -20,9 +20,11 @@ import { checkStatus } from '../../../lib/checks.js';
  *   게이트웨이 정책상 로그인 필요
  * 테스트 유형: 부하 테스트 (load), 비동기 파이프라인 처리 지연 측정
  * 최대 VUser: 10
- * 목표 TPS: 상품 등록 자체는 3 req/s 내외 (등록 API 응답은 빠르지만, 뒤쪽 파이프라인이 병목이라
- *   VU를 크게 늘리지 않음 - embedding-service/HikariCP 압박 정도는 Grafana Infra Monitoring 참고)
+ * 목표 TPS: 상품 등록 자체는 1.4 req/s 이상 (iteration이 등록+최대 15초 폴링 루프로 구성돼
+ *   등록 반복 주기가 폴링 완료 시간에 종속됨 - VU 평균 8명 / 평균 iteration 길이 ~5.5초로 역산.
+ *   embedding-service/HikariCP 압박 정도는 Grafana Infra Monitoring 참고)
  * 목표 P95: 상품 등록 API 자체는 500ms, 해시태그->카테고리 연결까지는 10s
+ * 목표 P99: 상품 등록 API 자체는 1000ms (P95의 2배 수준, 등록 API의 드문 꼬리 지연 허용 범위 확인용)
  * 허용 에러율: 상품 등록 1% 미만, 해시태그 연결(비동기) 완료율 95% 이상
  * 프로파일 선정 이유: 등록 응답은 Kafka 이벤트 발행 후 바로 돌아오므로 http_req_duration만으로는
  *   파이프라인 부하를 알 수 없음 - 등록 후 두 조회 API를 폴링해 실제 연결(MERGE 또는
@@ -35,9 +37,12 @@ export const options = {
     { duration: '1m', target: 10 },
     { duration: '10s', target: 0 },
   ],
+  // 등록 응답 + 폴링용 GET이 섞여서 http_req_duration에 합산되므로, endpoint:register
+  // 태그로 상품 등록 요청만 걸러서 threshold를 검증한다
   thresholds: {
-    http_req_duration: ['p(95)<500'],
-    http_req_failed: ['rate<0.01'],
+    'http_req_duration{endpoint:register}': ['p(95)<500', 'p(99)<1000'],
+    'http_req_failed{endpoint:register}': ['rate<0.01'],
+    'http_reqs{endpoint:register}': ['rate>=1.4'],
     hashtag_link_latency: ['p(95)<10000'],
     hashtag_link_success: ['rate>0.95'],
   },
@@ -75,9 +80,14 @@ export default function (data) {
   const suffix = (Date.now() * 100 + (__VU % 10) * 10 + (__ITER % 10)).toString(36).slice(-8);
   const hashtagName = `k6${suffix}`;
 
-  const productId = registerProduct(config.baseUrl, data.creatorToken, unique, 'k6 해시태그 부하 테스트 상품', [
-    hashtagName,
-  ]);
+  const productId = registerProduct(
+    config.baseUrl,
+    data.creatorToken,
+    unique,
+    'k6 해시태그 부하 테스트 상품',
+    [hashtagName],
+    { endpoint: 'register' },
+  );
 
   const startedAt = Date.now();
   let linked = false;
