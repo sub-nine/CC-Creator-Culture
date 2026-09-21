@@ -13,6 +13,7 @@ on:
       - ".dockerignore"
       - ".github/workflows/ci-aws.yml"
       - ".github/workflows/aws-deploy.yml"
+      - ".github/scripts/aws-deploy_test.py"
       - ".github/workflows/deploy-dev.yml"
       - ".github/scripts/validate-candidate-manifest.sh"
       - ".github/scripts/validate-candidate-manifest_test.sh"
@@ -39,6 +40,7 @@ on:
       - ".dockerignore"
       - ".github/workflows/ci-aws.yml"
       - ".github/workflows/aws-deploy.yml"
+      - ".github/scripts/aws-deploy_test.py"
       - ".github/workflows/deploy-dev.yml"
       - ".github/scripts/validate-candidate-manifest.sh"
       - ".github/scripts/validate-candidate-manifest_test.sh"
@@ -89,6 +91,9 @@ jobs:
               .github/scripts/validate-candidate-manifest.sh \
               .github/scripts/smoke-embedding-image.sh \
               .github/scripts/service-revisions.sh
+
+      - name: AWS deployment input tests
+        run: python3 .github/scripts/aws-deploy_test.py
 
       - name: Candidate manifest validator tests
         run: bash .github/scripts/validate-candidate-manifest_test.sh
