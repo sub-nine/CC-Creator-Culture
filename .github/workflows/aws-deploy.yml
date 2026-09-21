@@ -34,6 +34,7 @@ env:
   TF_DIR: infra/terraform/aws/runtime
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "0"
+  TF_VAR_api_hostname: api.nodyy.com
   TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
   TF_VAR_redis_user_group_id: ${{ vars.REDIS_USER_GROUP_ID }}
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -177,6 +178,10 @@ jobs:
           [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "No release_sha in state. Run deploy first." >&2; exit 65; }
           echo "RELEASE_SHA=$sha" >> "$GITHUB_ENV"
           echo "APP_RUNNING=$running" >> "$GITHUB_ENV"
+
+      - name: Import existing API DNS record
+        if: inputs.action == 'deploy' || inputs.action == 'start' || (inputs.action == 'plan' && inputs.release_ref != '')
+        run: python3 .github/scripts/aws-dns-import.py
 
       - name: Terraform plan
         if: inputs.action == 'plan'

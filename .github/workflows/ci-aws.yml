@@ -96,6 +96,7 @@ jobs:
         run: |
           python3 .github/scripts/aws-deploy_test.py
           python3 .github/scripts/aws-power_test.py
+          python3 .github/scripts/aws-dns-import_test.py
 
       - name: Candidate manifest validator tests
         run: bash .github/scripts/validate-candidate-manifest_test.sh
