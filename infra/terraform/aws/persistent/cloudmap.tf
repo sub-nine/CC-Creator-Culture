@@ -44,6 +44,8 @@ resource "aws_service_discovery_service" "core" {
   # 기존 Config/Eureka 서비스에는 이 설정이 없어 추가하면 DNS 자원이 교체된다.
   dynamic "health_check_custom_config" {
     for_each = each.key == "embedding-service" ? [true] : []
-    content {}
+    content {
+      failure_threshold = 1
+    }
   }
 }
