@@ -224,8 +224,12 @@ class CouponPersistenceIntegrationTest {
     @DisplayName("발급 이력이 있는 쿠폰은 조건부 수정에서 제외한다")
     void when_coupon_has_been_issued_conditional_update_changes_nothing() {
         Coupon coupon = coupon(10);
-        coupon.issue(uuidGenerator.generate(), STARTED_AT);
-        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+        UUID userId = uuidGenerator.generate();
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(coupon);
+            userCouponRepository.save(UserCoupon.issue(
+                    uuidGenerator.generate(), coupon, userId, STARTED_AT));
+        });
         Integer affectedRows = transaction().execute(status -> couponRepository.updateIfUnissued(
                 coupon.getId(), "수정 시도 쿠폰", 20, 30,
                 STARTED_AT, EXPIRED_AT,
@@ -263,8 +267,12 @@ class CouponPersistenceIntegrationTest {
     @DisplayName("발급 이력이 있는 쿠폰은 조건부 삭제에서 제외한다")
     void when_coupon_has_been_issued_conditional_delete_changes_nothing() {
         Coupon coupon = coupon(10);
-        coupon.issue(uuidGenerator.generate(), STARTED_AT);
-        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+        UUID userId = uuidGenerator.generate();
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(coupon);
+            userCouponRepository.save(UserCoupon.issue(
+                    uuidGenerator.generate(), coupon, userId, STARTED_AT));
+        });
 
         Integer affectedRows = transaction().execute(status -> couponRepository.deleteIfUnissued(
                 coupon.getId(), uuidGenerator.generate(), STARTED_AT.plusSeconds(1)));

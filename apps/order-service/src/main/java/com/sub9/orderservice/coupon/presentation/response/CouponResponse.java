@@ -9,9 +9,13 @@ public record CouponResponse(
         int issuedQuantity, Instant startedAt, Instant expiredAt
 ) {
     public static CouponResponse from(Coupon coupon) {
+        return from(coupon, coupon.getIssuedQuantity());
+    }
+
+    public static CouponResponse from(Coupon coupon, int issuedQuantity) {
         return new CouponResponse(
                 coupon.getId(), coupon.getCouponName(), coupon.getDiscountRate(),
-                coupon.getTotalQuantity(), coupon.getIssuedQuantity(),
+                coupon.getTotalQuantity(), issuedQuantity,
                 coupon.getStartedAt(), coupon.getExpiredAt());
     }
 }

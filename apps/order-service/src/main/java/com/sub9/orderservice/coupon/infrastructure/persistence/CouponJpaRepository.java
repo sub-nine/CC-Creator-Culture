@@ -29,7 +29,11 @@ public interface CouponJpaRepository extends JpaRepository<Coupon, UUID> {
                    c.updatedBy = :updaterId
              where c.id = :couponId
                and c.deletedAt is null
-               and c.issuedQuantity = 0
+               and not exists (
+                   select uc.id
+                     from UserCoupon uc
+                    where uc.coupon = c
+               )
             """)
     int updateIfUnissued(
             @Param("couponId") UUID couponId,
@@ -50,7 +54,11 @@ public interface CouponJpaRepository extends JpaRepository<Coupon, UUID> {
                    c.updatedBy = :deleterId
              where c.id = :couponId
                and c.deletedAt is null
-               and c.issuedQuantity = 0
+               and not exists (
+                   select uc.id
+                     from UserCoupon uc
+                    where uc.coupon = c
+               )
             """)
     int deleteIfUnissued(
             @Param("couponId") UUID couponId,
