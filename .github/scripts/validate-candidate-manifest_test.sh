@@ -17,8 +17,10 @@ write_valid() {
     ci_url: "https://github.com/example/cc-service/actions/runs/1",
     images: {
       "config-server": ("nrt.ocir.io/ns/cc-dev/config-server@" + $digest),
+      "embedding-service": ("nrt.ocir.io/ns/cc-dev/embedding-service@" + $digest),
       "eureka-server": ("nrt.ocir.io/ns/cc-dev/eureka-server@" + $digest),
       "gateway": ("nrt.ocir.io/ns/cc-dev/gateway@" + $digest),
+      "k6": ("nrt.ocir.io/ns/cc-dev/k6@" + $digest),
       "order-service": ("nrt.ocir.io/ns/cc-dev/order-service@" + $digest),
       "product-service": ("nrt.ocir.io/ns/cc-dev/product-service@" + $digest),
       "user-service": ("nrt.ocir.io/ns/cc-dev/user-service@" + $digest)
@@ -60,6 +62,10 @@ expect_fail uppercase "$TEST_ROOT/uppercase.json"
 
 jq 'del(.images["order-service"])' "$TEST_ROOT/valid.json" > "$TEST_ROOT/missing.json"
 expect_fail missing "$TEST_ROOT/missing.json"
+jq 'del(.images["embedding-service"])' "$TEST_ROOT/valid.json" > "$TEST_ROOT/missing-embedding.json"
+expect_fail missing-embedding "$TEST_ROOT/missing-embedding.json"
+jq 'del(.images["k6"])' "$TEST_ROOT/valid.json" > "$TEST_ROOT/missing-k6.json"
+expect_fail missing-k6 "$TEST_ROOT/missing-k6.json"
 
 jq '.images["payment-service"] = .images["user-service"]' "$TEST_ROOT/valid.json" > "$TEST_ROOT/unknown.json"
 expect_fail unknown "$TEST_ROOT/unknown.json"

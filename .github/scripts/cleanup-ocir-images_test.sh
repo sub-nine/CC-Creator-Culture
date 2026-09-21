@@ -24,7 +24,9 @@ jq -n --arg current "$CURRENT" --arg previous "$PREVIOUS" '{
     "gateway": [$current, $previous],
     "user-service": [$current, $previous],
     "product-service": [$current, $previous],
-    "order-service": [$current, $previous]
+    "order-service": [$current, $previous],
+    "embedding-service": [$current],
+    "k6": [$current]
   }
 }' > "$TEST_ROOT/retained.json"
 

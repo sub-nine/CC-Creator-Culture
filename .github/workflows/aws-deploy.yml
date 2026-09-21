@@ -130,7 +130,7 @@ jobs:
           fi
           if image_tags="$(terraform -chdir="$TF_DIR" output -json image_tags 2>/dev/null)" \
             && config_labels="$(terraform -chdir="$TF_DIR" output -json config_labels 2>/dev/null)" \
-            && jq -e 'type == "object" and (keys | length) == 7' <<<"$image_tags" >/dev/null \
+            && jq -e 'type == "object" and (keys | length) == 9' <<<"$image_tags" >/dev/null \
             && jq -e 'type == "object" and (keys | length) == 6' <<<"$config_labels" >/dev/null; then
             jq -n --argjson image_tags "$image_tags" --argjson config_labels "$config_labels" \
               '{image_tags: $image_tags, config_labels: $config_labels}' \
@@ -143,7 +143,7 @@ jobs:
         if: inputs.action == 'deploy'
         run: |
           set -euo pipefail
-          for name in config-server eureka-server gateway user-service product-service order-service db-seed; do
+          for name in config-server eureka-server gateway user-service product-service order-service embedding-service k6 db-seed; do
             tag="$(jq -er --arg name "$name" '.image_tags[$name]' "$TF_DIR/revisions.auto.tfvars.json")"
             aws ecr describe-images --repository-name "${ECR_PREFIX}${name}" --image-ids "imageTag=${tag}" >/dev/null \
               || { echo "Missing ECR image ${ECR_PREFIX}${name}:${tag}. Run deploy-dev.yml for this revision first." >&2; exit 65; }

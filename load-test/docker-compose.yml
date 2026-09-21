@@ -1,24 +1,32 @@
 services:
   k6:
-    image: grafana/k6:latest
+    image: grafana/k6:2.2.0@sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6
     working_dir: /scripts
     networks:
       - cc-service-apps_default
     environment:
-      - TARGET=local
-      - K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write
+      - TARGET=${TARGET:-local}
+      - BASE_URL=${BASE_URL:-}
+      - SMOKE_URL=${SMOKE_URL:-}
+      - EMBED_URL=${EMBED_URL:-}
+      - TESTID=${TESTID:-}
+      - K6_PROMETHEUS_RW_SERVER_URL=${K6_PROMETHEUS_RW_SERVER_URL:-http://prometheus:9090/api/v1/write}
       - K6_PROMETHEUS_RW_TREND_STATS=avg,min,med,max,p(90),p(95),p(99)
     volumes:
       - .:/scripts
 
   k6-all:
-    image: grafana/k6:latest
+    image: grafana/k6:2.2.0@sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6
     working_dir: /scripts
     networks:
       - cc-service-apps_default
     environment:
-      - TARGET=local
-      - K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write
+      - TARGET=${TARGET:-local}
+      - BASE_URL=${BASE_URL:-}
+      - SMOKE_URL=${SMOKE_URL:-}
+      - EMBED_URL=${EMBED_URL:-}
+      - TESTID=${TESTID:-}
+      - K6_PROMETHEUS_RW_SERVER_URL=${K6_PROMETHEUS_RW_SERVER_URL:-http://prometheus:9090/api/v1/write}
       - K6_PROMETHEUS_RW_TREND_STATS=avg,min,med,max,p(90),p(95),p(99)
     entrypoint: ["sh", "entrypoint.sh"]
     volumes:
@@ -27,3 +35,4 @@ services:
 networks:
   cc-service-apps_default:
     external: true
+    name: ${K6_NETWORK:-cc-service-apps_default}

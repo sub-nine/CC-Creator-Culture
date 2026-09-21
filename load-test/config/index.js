@@ -9,4 +9,8 @@ if (!environments[target]) {
   throw new Error(`알 수 없는 TARGET: ${target} (local/dev/prod 중 하나여야 함)`);
 }
 
+if ((target === 'dev' || target === 'prod') && !environments[target].baseUrl) {
+  throw new Error(`TARGET=${target} 실행에는 BASE_URL이 필요합니다`);
+}
+
 export default environments[target];

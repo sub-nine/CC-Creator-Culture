@@ -43,6 +43,9 @@ scrape_configs:
       - source_labels: [__meta_eureka_app_name]
         regex: '(?i)(config-server|eureka-server)'
         action: drop
+      - source_labels: [__meta_eureka_app_name]
+        target_label: job
+        action: lowercase
       - source_labels: [__meta_eureka_app_instance_ip_addr]
         regex: (.+)
         replacement: $1:9090
@@ -54,6 +57,17 @@ scrape_configs:
           - config-server.${cloudmap_namespace}:9090
           - eureka-server.${cloudmap_namespace}:9090
 PROM
+
+mkdir -p "$ETC_ROOT/grafana/datasources" "$ETC_ROOT/grafana/dashboards"
+cat > "$ETC_ROOT/grafana/datasources/prometheus.yml" <<'DATASOURCE'
+${prometheus_source}
+DATASOURCE
+cat > "$ETC_ROOT/grafana/dashboards/dashboards.yml" <<'PROVIDER'
+${dashboard_provider}
+PROVIDER
+cat > "$ETC_ROOT/grafana/dashboards/k6-prometheus.json" <<'DASHBOARD'
+${k6_dashboard}
+DASHBOARD
 
 raw="$(aws secretsmanager get-secret-value --secret-id "$GRAFANA_SECRET_ARN" --query SecretString --output text)"
 GRAFANA_ADMIN_USER="$(printf '%s' "$raw" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("username") or "admin", end="")')"
@@ -81,11 +95,13 @@ docker run -d --name prometheus --restart unless-stopped --network host \
   "$PROM_IMAGE" \
   --config.file=/etc/prometheus/prometheus.yml \
   --storage.tsdb.path=/prometheus \
-  --web.listen-address=127.0.0.1:9090
+  --web.listen-address=0.0.0.0:9090 \
+  --web.enable-remote-write-receiver
 
 restart_container grafana
 docker run -d --name grafana --restart unless-stopped --network host \
   -v "$DATA_ROOT/grafana:/var/lib/grafana" \
+  -v "$ETC_ROOT/grafana:/etc/grafana/provisioning:ro" \
   -e GF_SECURITY_ADMIN_USER="$GRAFANA_ADMIN_USER" \
   -e GF_SECURITY_ADMIN_PASSWORD="$GRAFANA_ADMIN_PASSWORD" \
   -e GF_USERS_ALLOW_SIGN_UP=false \

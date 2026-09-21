@@ -1,5 +1,5 @@
 resource "aws_security_group" "app" {
-  for_each    = local.app_keys
+  for_each    = local.workload_keys
   name        = "${var.name_prefix}-${each.key}"
   description = "Fargate tasks for ${each.key}"
   vpc_id      = aws_vpc.this.id

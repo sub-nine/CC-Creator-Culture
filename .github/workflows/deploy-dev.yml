@@ -176,6 +176,21 @@ jobs:
             target: service
             context: .
             file: Dockerfile
+          # OCI candidate manifest image: Python embedding inference service.
+          - service: embedding-service
+            gradle-task: ""
+            module-dir: ""
+            target: ""
+            context: apps/embedding-service
+            file: apps/embedding-service/Dockerfile
+          # OCI candidate manifest image: k6 load-test runner. Not an always-run service.
+          # The load-test compose consumes it through the K6_IMAGE release env.
+          - service: k6
+            gradle-task: ""
+            module-dir: ""
+            target: ""
+            context: load-test
+            file: load-test/Dockerfile.cloud
           # AWS demo seed artifact: ECR only, no Java build, not part of the OCI candidate manifest.
           # Every step is skipped for this entry when AWS_ECR_REGISTRY is empty.
           - service: db-seed
@@ -286,8 +301,10 @@ jobs:
 
           if [[ -n "$GRADLE_TASK" ]]; then
             build_args="JAR_FILE=.image/app.jar"
-          else
+          elif [[ "$SERVICE" == db-seed ]]; then
             build_args="RELEASE_SHA=${SHA}"
+          else
+            build_args=""
           fi
 
           {
@@ -327,7 +344,7 @@ jobs:
           cp "${boot_jars[0]}" .image/app.jar
 
       - id: build
-        if: steps.tags.outputs.tags != ''
+        if: steps.tags.outputs.tags != '' && matrix.service != 'embedding-service'
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
@@ -336,6 +353,38 @@ jobs:
           platforms: linux/arm64
           push: true
           build-args: ${{ steps.tags.outputs.build_args }}
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.prepare.outputs.sha }}
+
+      # Validate the embedding image before it leaves the runner: start it without any
+      # network, wait for /docs readiness, and confirm one /embed call returns a finite
+      # 768-value vector via the stdlib smoke script baked into the image.
+      - name: Build embedding image for smoke validation
+        id: build-smoke
+        if: matrix.service == 'embedding-service' && steps.tags.outputs.tags != ''
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: linux/arm64
+          load: true
+          tags: cc-embedding-smoke:${{ needs.prepare.outputs.sha }}
+
+      - name: Validate embedding image before push
+        if: matrix.service == 'embedding-service' && steps.tags.outputs.tags != ''
+        env:
+          SMOKE_IMAGE: cc-embedding-smoke:${{ needs.prepare.outputs.sha }}
+        run: bash .github/scripts/smoke-embedding-image.sh "$SMOKE_IMAGE"
+
+      - id: build-embedding
+        if: matrix.service == 'embedding-service' && steps.tags.outputs.tags != ''
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: linux/arm64
+          push: true
           tags: ${{ steps.tags.outputs.tags }}
           labels: |
             org.opencontainers.image.revision=${{ needs.prepare.outputs.sha }}
@@ -351,10 +400,10 @@ jobs:
           echo "Copied ${COPY_SRC} to ${COPY_DST}."
 
       - name: Record immutable image reference
-        if: matrix.gradle-task != ''
+        if: matrix.service != 'db-seed'
         env:
           SERVICE: ${{ matrix.service }}
-          DIGEST: ${{ steps.build.outputs.digest }}
+          DIGEST: ${{ steps.build.outputs.digest || steps.build-embedding.outputs.digest }}
           DIGEST_REF: ${{ steps.tags.outputs.digest_ref }}
           IMAGE_BASE: ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_NAMESPACE }}/cc-dev/${{ matrix.service }}
         run: |
@@ -374,7 +423,7 @@ jobs:
             '{service: $service, image: $image}' > "$RUNNER_TEMP/${SERVICE}.json"
 
       - uses: actions/upload-artifact@v4
-        if: matrix.gradle-task != ''
+        if: matrix.service != 'db-seed'
         with:
           name: image-digest-${{ matrix.service }}
           path: ${{ runner.temp }}/${{ matrix.service }}.json

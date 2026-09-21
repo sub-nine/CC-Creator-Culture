@@ -101,6 +101,8 @@ user_service_image="$(java_image_tag apps/user-service "${app_extra_paths[@]}")"
 product_service_image="$(java_image_tag apps/product-service "${app_extra_paths[@]}")"
 order_service_image="$(java_image_tag apps/order-service "${app_extra_paths[@]}")"
 db_seed_image="$(image_tag deploy/aws/seed)"
+embedding_service_image="$(image_tag apps/embedding-service)"
+k6_image="$(image_tag load-test)"
 
 config_server_label="$(config_label config-server)"
 eureka_server_label="$(config_label eureka-server)"
@@ -123,6 +125,8 @@ jq -nc \
   --arg order_service_image "$order_service_image" \
   --arg order_service_label "$order_service_label" \
   --arg db_seed_image "$db_seed_image" \
+  --arg embedding_service_image "$embedding_service_image" \
+  --arg k6_image "$k6_image" \
   '{
     "config-server": {"image_tag": $config_server_image, "config_label": $config_server_label},
     "eureka-server": {"image_tag": $eureka_server_image, "config_label": $eureka_server_label},
@@ -130,5 +134,7 @@ jq -nc \
     "user-service": {"image_tag": $user_service_image, "config_label": $user_service_label},
     "product-service": {"image_tag": $product_service_image, "config_label": $product_service_label},
     "order-service": {"image_tag": $order_service_image, "config_label": $order_service_label},
-    "db-seed": {"image_tag": $db_seed_image}
+    "db-seed": {"image_tag": $db_seed_image},
+    "embedding-service": {"image_tag": $embedding_service_image},
+    "k6": {"image_tag": $k6_image}
   }'

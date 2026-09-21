@@ -18,9 +18,11 @@ sh load-test/scripts/up.sh
 
 ### dev / prod
 
-이미 배포되어 있는 서버를 대상으로 하므로 로컬에서 별도로 띄울 것은 없습니다. 다만 `config/environments/dev.js`, `prod.js`에 대상 서버의 baseUrl을 설정해야 합니다 (현재 TODO 상태).
+이미 배포되어 있는 서버를 대상으로 하므로 로컬에서 별도로 띄울 것은 없습니다. 일반 시나리오의 대상 주소는 `BASE_URL` 환경변수로 전달합니다. dev/prod에서 주소가 없으면 요청 전에 실패합니다.
 
 ## 실행
+
+로컬은 고정 버전의 공식 k6 이미지에 이 디렉터리를 마운트합니다. 스크립트 변경 시 이미지를 다시 빌드하지 않습니다. 클라우드 배포 이미지만 `Dockerfile.cloud`로 빌드합니다.
 
 ### 스크립트 하나만 실행
 
@@ -39,8 +41,8 @@ sh load-test/scripts/run-all.sh
 기본값은 `local`이며, 두 스크립트 모두 마지막 인자로 대상 환경을 받습니다.
 
 ```bash
-sh load-test/scripts/run.sh scenarios/product-service/search-products.js dev
-sh load-test/scripts/run-all.sh dev
+BASE_URL=https://dev.example.com sh load-test/scripts/run.sh scenarios/product-service/search-products.js dev
+BASE_URL=https://dev.example.com sh load-test/scripts/run-all.sh dev
 ```
 
 ## 결과 확인
@@ -53,7 +55,7 @@ sh load-test/scripts/run-all.sh dev
 
 ## 테스트 데이터 정리
 
-시나리오가 만드는 데이터는 `k6-test-`로 시작하는 프리픽스를 Unique 값으로 씁니다. local은 DB가 로컬 볼륨이라 정리 대신 통째로 밀고 다시 띄우는 게 더 간단합니다:
+시나리오가 만드는 데이터는 `k6-test-`로 시작하는 프리픽스를 Unique 값으로 씁니다. local은 DB가 로컬 볼륨이라 정리 대신 통째로 밀고 다시 띄우는 게 더 간단합니다.
 
 ```bash
 sh load-test/scripts/teardown.sh
@@ -62,3 +64,9 @@ sh load-test/scripts/teardown.sh
 볼륨을 밀고 재기동한 뒤 MASTER 계정 시드까지 이 스크립트 하나로 끝납니다.
 
 dev처럼 공유 DB를 밀 수 없는 환경에서는 이 방식을 쓸 수 없으니 별도 정리 방법이 필요합니다 (TODO).
+
+## 클라우드 실행
+
+OCI는 배포된 이미지로 `scripts/run-dev.sh`, AWS는 일회성 Fargate 태스크로 `scripts/run-aws.sh`를 사용합니다. 두 실행기 모두 시나리오를 지정해야 하며 배포만으로 실행되지 않습니다.
+
+연결 확인은 `scenarios/smoke.js`(읽기 1회)와 `scenarios/embedding-smoke.js`(추론 1회)를 사용합니다. 전체 실행기는 이 두 파일을 제외합니다. 주소, 환경 파일, 중지 방법과 지표 확인은 [클라우드 운영 절차](../deploy/cloud-load-test.md)를 참고하세요.

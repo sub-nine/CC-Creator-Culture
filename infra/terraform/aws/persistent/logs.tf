@@ -1,5 +1,5 @@
 resource "aws_cloudwatch_log_group" "app" {
-  for_each          = local.app_keys
+  for_each          = local.workload_keys
   name              = "/ecs/${var.name_prefix}/${each.key}"
   retention_in_days = 7
 
