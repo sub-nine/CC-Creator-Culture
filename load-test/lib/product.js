@@ -57,3 +57,20 @@ export function waitForHashtagId(baseUrl, token, productId, maxAttempts = 5) {
   }
   throw new Error(`setup 실패 - 상품(${productId})에서 hashtagId를 ${maxAttempts}회 재시도 후에도 못 찾음`);
 }
+
+// waitForHashtagId와 동일한 지연 사유로, 상품 상세에서 skuId와 hashtagId를 함께 가져온다
+// (주문 흐름은 skuId, admin 카테고리 연결은 hashtagId가 둘 다 필요한 시나리오용)
+export function waitForSkuAndHashtagId(baseUrl, token, productId, maxAttempts = 5) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const productRes = http.get(`${baseUrl}/api/v1/products/${productId}`, authHeaders(token));
+    if (productRes.status !== 200) {
+      throw new Error(`setup 실패 - 상품 조회 status=${productRes.status} body=${productRes.body}`);
+    }
+    const data = productRes.json('data');
+    if (data.hashtags && data.hashtags.length > 0) {
+      return { skuId: data.skus[0].skuId, hashtagId: data.hashtags[0].hashtagId };
+    }
+    sleep(0.3);
+  }
+  throw new Error(`setup 실패 - 상품(${productId})에서 hashtagId를 ${maxAttempts}회 재시도 후에도 못 찾음`);
+}
