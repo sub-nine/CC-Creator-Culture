@@ -57,9 +57,12 @@ data "aws_iam_policy_document" "runtime_deploy" {
   }
 
   statement {
-    sid       = "EcsDeploymentRead"
-    actions   = ["ecs:DescribeServiceDeployments"]
-    resources = ["arn:aws:ecs:${var.aws_region}:${local.account_id}:service-deployment/${var.name_prefix}/${var.name_prefix}-*/*"]
+    sid     = "EcsDeploymentRead"
+    actions = ["ecs:DescribeServiceDeployments"]
+    resources = [
+      local.ecs_service_arn,
+      "arn:aws:ecs:${var.aws_region}:${local.account_id}:service-deployment/${var.name_prefix}/${var.name_prefix}-*/*",
+    ]
   }
 
   # These ECS actions have no resource-level scoping in IAM, so they must be "*".
