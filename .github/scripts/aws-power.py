@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 
 def aws(*args):
@@ -10,11 +11,22 @@ def aws(*args):
     return json.loads(output) if output.strip() else {}
 
 
+def wait_database_stopped(identifier):
+    for _ in range(120):
+        state = aws('rds', 'describe-db-instances', '--db-instance-identifier', identifier)['DBInstances'][0]['DBInstanceStatus']
+        if state == 'stopped':
+            return
+        if state != 'stopping':
+            raise RuntimeError(f'{identifier}: unexpected RDS state {state}')
+        time.sleep(15)
+    raise TimeoutError(f'{identifier}: RDS did not stop within 30 minutes')
+
+
 def database(identifier, running):
     args = ['--db-instance-identifier', identifier]
     state = aws('rds', 'describe-db-instances', *args)['DBInstances'][0]['DBInstanceStatus']
     if state == 'stopping':
-        aws('rds', 'wait', 'db-instance-stopped', *args)
+        wait_database_stopped(identifier)
         state = 'stopped'
     if running:
         if state == 'stopped':
@@ -24,7 +36,7 @@ def database(identifier, running):
         if state != 'available':
             aws('rds', 'wait', 'db-instance-available', *args)
         aws('rds', 'stop-db-instance', *args)
-        aws('rds', 'wait', 'db-instance-stopped', *args)
+        wait_database_stopped(identifier)
 
 
 def stop_services(cluster):
