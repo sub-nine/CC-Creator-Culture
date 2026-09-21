@@ -42,6 +42,11 @@ public class UserCouponRepositoryAdapter implements UserCouponRepository {
     }
 
     @Override
+    public long countByCouponId(UUID couponId) {
+        return userCouponJpaRepository.countByCoupon_Id(couponId);
+    }
+
+    @Override
     public int useIfAvailable(UUID userCouponId, UUID orderId, Instant usedAt) {
         return userCouponJpaRepository.useIfAvailable(userCouponId, orderId, usedAt);
     }

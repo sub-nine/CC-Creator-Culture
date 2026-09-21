@@ -39,29 +39,26 @@ UUID_PATTERN='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 [[ "$EXPECTED_REMAINING" =~ ^[0-9]{1,10}$ ]] || { echo 'Invalid EXPECTED_REMAINING' >&2; exit 1; }
 
 ROWS=$("${PSQL[@]}" -c "SELECT COUNT(*) FROM public.p_user_coupons WHERE coupon_id = '${COUPON_ID}';")
-ISSUED=$("${PSQL[@]}" -c "SELECT issued_quantity FROM public.p_coupons WHERE id = '${COUPON_ID}';")
 TOTAL=$("${PSQL[@]}" -c "SELECT total_quantity FROM public.p_coupons WHERE id = '${COUPON_ID}';")
 DUP=$("${PSQL[@]}" -c "SELECT COUNT(*) FROM (SELECT user_id FROM public.p_user_coupons WHERE coupon_id='${COUPON_ID}' GROUP BY user_id HAVING COUNT(*) > 1) t;")
 REMAINING=$("${REDIS[@]}" GET "coupon:${COUPON_ID}:remaining")
 
-for value in "$ROWS" "$ISSUED" "$TOTAL" "$DUP" "$REMAINING"; do
+for value in "$ROWS" "$TOTAL" "$DUP" "$REMAINING"; do
     [[ "$value" =~ ^[0-9]{1,10}$ ]] || { echo '[NG] Missing or invalid DB/Redis value' >&2; exit 1; }
 done
 
 echo "p_user_coupons 행 수 : ${ROWS}"
-echo "issued_quantity      : ${ISSUED}"
 echo "total_quantity       : ${TOTAL}"
 echo "Redis remaining      : ${REMAINING}"
 echo "중복 발급 사용자      : ${DUP}"
 echo
 
 FAIL=0
-[ "${ROWS}" = "${ISSUED}" ]            || { echo "[NG] 행 수와 issued_quantity 불일치"; FAIL=1; }
-[ "${ISSUED}" = "${EXPECTED_ISSUED}" ] || { echo "[NG] 발급 수량이 기대값(${EXPECTED_ISSUED})과 다름"; FAIL=1; }
+[ "${ROWS}" = "${EXPECTED_ISSUED}" ] || { echo "[NG] 발급 수량이 기대값(${EXPECTED_ISSUED})과 다름"; FAIL=1; }
 [ "${REMAINING}" = "${EXPECTED_REMAINING}" ] || { echo "[NG] Redis 잔여 수량이 기대값(${EXPECTED_REMAINING})과 다름"; FAIL=1; }
-[ "${ISSUED}" -le "${TOTAL}" ]         || { echo "[NG] issued_quantity 가 total_quantity 초과"; FAIL=1; }
+[ "${ROWS}" -le "${TOTAL}" ]           || { echo "[NG] 발급 이력 수가 total_quantity 초과"; FAIL=1; }
 [ "${DUP}" = "0" ]                     || { echo "[NG] 중복 발급 발생"; FAIL=1; }
-[ $((ISSUED + REMAINING)) = "${TOTAL}" ] || { echo "[NG] Redis 잔여 수량과 DB 발급 수량의 합이 총량과 다름"; FAIL=1; }
+[ $((ROWS + REMAINING)) = "${TOTAL}" ] || { echo "[NG] Redis 잔여 수량과 DB 발급 이력의 합이 총량과 다름"; FAIL=1; }
 
 [ "${FAIL}" = "0" ] && echo "[OK] 정합성 검증 통과"
 exit "${FAIL}"

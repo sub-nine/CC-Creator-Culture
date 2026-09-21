@@ -88,8 +88,8 @@ class CouponIssueTransactionIntegrationTest {
     }
 
     @Test
-    @DisplayName("수량 증가와 사용자 쿠폰 저장을 함께 커밋한다")
-    void when_issue_succeeds_quantity_and_user_coupon_are_committed_together() {
+    @DisplayName("쿠폰 수량을 갱신하지 않고 사용자 쿠폰을 커밋한다")
+    void when_issue_succeeds_only_user_coupon_is_committed() {
         Coupon coupon = saveIssuableCoupon(2);
         UUID userId = generator.generate();
 
@@ -97,17 +97,15 @@ class CouponIssueTransactionIntegrationTest {
                 new CouponReservation(coupon.getId(), userId, generator.generate()));
 
         Coupon updated = couponRepository.findActiveById(coupon.getId()).orElseThrow();
-        assertThat(updated.getIssuedQuantity()).isEqualTo(1);
-        assertThat(updated.getUpdatedAt()).isEqualTo(ISSUE_TIME);
-        assertThat(updated.getUpdatedBy()).isEqualTo(userId);
+        assertThat(updated.getIssuedQuantity()).isZero();
         assertThat(jdbcTemplate.queryForObject(
                 "select count(*) from p_user_coupons where id = ?", Integer.class, userCouponId))
                 .isEqualTo(1);
     }
 
     @Test
-    @DisplayName("사용자 쿠폰 중복 저장이 실패하면 두 번째 수량 증가도 롤백한다")
-    void when_user_coupon_insert_fails_quantity_increase_is_rolled_back() {
+    @DisplayName("사용자 쿠폰 중복 저장이 실패하면 발급 이력이 추가되지 않는다")
+    void when_user_coupon_insert_fails_issue_history_is_not_added() {
         Coupon coupon = saveIssuableCoupon(3);
         UUID userId = generator.generate();
         couponIssueProcessor.process(new CouponReservation(coupon.getId(), userId, generator.generate()));
@@ -121,28 +119,24 @@ class CouponIssueTransactionIntegrationTest {
                 .isEqualTo(CouponIssueFailureType.ALREADY_ISSUED);
 
         assertThat(couponRepository.findActiveById(coupon.getId()).orElseThrow().getIssuedQuantity())
-                .isEqualTo(1);
+                .isZero();
         assertThat(jdbcTemplate.queryForObject(
                 "select count(*) from p_user_coupons where coupon_id = ?", Integer.class, coupon.getId()))
                 .isEqualTo(1);
     }
 
     @Test
-    @DisplayName("발급 기간 밖이면 수량과 사용자 쿠폰을 변경하지 않는다")
-    void when_coupon_is_outside_period_nothing_is_persisted() {
-        Coupon coupon = Coupon.create(generator.generate(), "종료 쿠폰", 10, 2,
-                ISSUE_TIME.minusSeconds(60), ISSUE_TIME.minusSeconds(1),
-                generator.generate(), ISSUE_TIME.minusSeconds(120));
-        couponRepository.save(coupon);
+    @DisplayName("쿠폰이 없으면 사용자 쿠폰을 저장하지 않는다")
+    void when_coupon_does_not_exist_nothing_is_persisted() {
+        UUID couponId = generator.generate();
 
         assertThatThrownBy(() -> couponIssueProcessor.process(
-                new CouponReservation(coupon.getId(), generator.generate(), generator.generate())))
+                new CouponReservation(couponId, generator.generate(), generator.generate())))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.getErrorCode())
-                                .isEqualTo(CouponErrorCode.NOT_IN_ISSUE_PERIOD));
-        assertThat(couponRepository.findActiveById(coupon.getId()).orElseThrow().getIssuedQuantity()).isZero();
+                                .isEqualTo(CouponErrorCode.COUPON_NOT_FOUND));
         assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from p_user_coupons where coupon_id = ?", Integer.class, coupon.getId()))
+                "select count(*) from p_user_coupons where coupon_id = ?", Integer.class, couponId))
                 .isZero();
     }
 
