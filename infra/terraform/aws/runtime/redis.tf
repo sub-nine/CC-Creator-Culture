@@ -8,6 +8,7 @@ resource "aws_elasticache_replication_group" "this" {
   description          = "cc-test redis"
   engine               = "redis"
   engine_version       = "7.1"
+  parameter_group_name = "default.redis7"
   node_type            = "cache.t4g.small"
   num_cache_clusters   = 1
   port                 = 6379

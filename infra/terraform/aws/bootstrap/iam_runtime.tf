@@ -270,6 +270,7 @@ data "aws_iam_policy_document" "runtime_deploy" {
     sid = "RuntimeNetwork"
     actions = [
       "ec2:Describe*",
+      "ec2:GetSecurityGroupsForVpc",
       "ec2:AllocateAddress",
       "ec2:ReleaseAddress",
       "ec2:AssociateAddress",

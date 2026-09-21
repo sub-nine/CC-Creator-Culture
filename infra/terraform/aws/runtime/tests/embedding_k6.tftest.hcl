@@ -104,6 +104,14 @@ run "running" {
   command = plan
   variables { app_running = true }
   assert {
+    condition     = jsondecode(aws_ecs_task_definition.embedding.container_definitions)[0].healthCheck.retries <= 10
+    error_message = "ECS health check retries must not exceed 10."
+  }
+  assert {
+    condition     = aws_elasticache_replication_group.this.parameter_group_name == "default.redis7"
+    error_message = "Redis creation must name the parameter group permitted by IAM."
+  }
+  assert {
     condition     = aws_ecs_service.embedding.desired_count == 1 && aws_ecs_task_definition.embedding.cpu == "512" && aws_ecs_task_definition.embedding.memory == "2048"
     error_message = "Embedding must run once with 0.5 CPU and 2 GiB."
   }
