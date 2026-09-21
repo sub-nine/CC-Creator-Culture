@@ -18,8 +18,6 @@ public interface CategoryCommandRepository {
 
     Optional<CategoryHashtag> findCategoryHashtagById(UUID requestId);
 
-    void linkCategoryHashtag(CategoryHashtag categoryHashtag);
-
     Optional<CategoryHashtag> findCategoryHashtagByCategoryIdAndHashtagId(UUID categoryId, UUID hashtagId);
 
     // 이름으로 조회하고 없으면 원자적으로 생성 - 동시에 같은 이름으로 호출돼도 하나만 생성됨
