@@ -19,7 +19,10 @@ export function signupApprovedCreator(baseUrl, label, unique) {
 
   const email = `k6-test-${label}-creator-${unique}@example.com`;
   const password = 'Passw0rd!';
-  const phoneDigits = unique.slice(-8).padStart(8, '0');
+  // unique(타임스탬프)만으로는 여러 시나리오가 비슷한 시각에 호출될 때 마지막 8자리가
+  // 겹칠 수 있어(전화번호 중복 409 발생) 랜덤 값을 섞어 충돌 가능성을 낮춘다
+  const phoneSeed = `${unique}${Math.floor(Math.random() * 1e6)}`;
+  const phoneDigits = phoneSeed.slice(-8).padStart(8, '0');
 
   const signupRes = http.post(
     `${baseUrl}/api/v1/auth/signup/creator`,
