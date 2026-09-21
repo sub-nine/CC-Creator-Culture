@@ -9,7 +9,7 @@ required=(
   public_subnet_ids app_subnet_ids data_subnet_ids
   private_route_table_id
   config-server eureka-server gateway user-service product-service order-service
-  alb observation kafka redis migration
+  alb observation kafka redis migration embedding-service k6
   rds_instances db_endpoints
   rds_master jwt redis
   ecs_execution ecs_task

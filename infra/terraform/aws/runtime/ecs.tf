@@ -105,7 +105,7 @@ resource "aws_ecs_service" "app" {
     assign_public_ip = false
   }
 
-  depends_on = [aws_ecs_service.platform]
+  depends_on = [aws_ecs_service.platform, aws_ecs_service.embedding]
 }
 
 resource "aws_ecs_service" "gateway" {
@@ -160,6 +160,12 @@ resource "aws_appautoscaling_target" "service" {
   resource_id        = "service/${aws_ecs_cluster.this.name}/${local.ecs_service_names[each.key]}"
   min_capacity       = local.desired_count
   max_capacity       = local.autoscaling_max[each.key]
+
+  suspended_state {
+    dynamic_scaling_in_suspended  = !var.app_running
+    dynamic_scaling_out_suspended = !var.app_running
+    scheduled_scaling_suspended   = !var.app_running
+  }
 }
 
 # Power state. app_running=false stops RDS and the observation/kafka EC2 together with the services.

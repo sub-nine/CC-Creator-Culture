@@ -2,6 +2,7 @@ package com.sub9.productservice.review.application.command;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.review.application.command.dto.CreateReviewCommand;
+import com.sub9.productservice.review.application.command.dto.DeleteReviewCommand;
 import com.sub9.productservice.review.application.command.dto.UpdateReviewCommand;
 import com.sub9.productservice.review.application.port.in.ReviewCommandUseCase;
 import com.sub9.productservice.review.application.port.out.ReviewOrderQueryPort;
@@ -9,9 +10,9 @@ import com.sub9.productservice.review.application.port.out.dto.ProductPurchaseIn
 import com.sub9.productservice.review.domain.exception.ReviewErrorCode;
 import com.sub9.productservice.review.domain.model.Review;
 import com.sub9.productservice.review.domain.repository.ReviewRepository;
-import com.sub9.productservice.review.application.command.dto.DeleteReviewCommand;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,7 +43,11 @@ public class ReviewCommandService implements ReviewCommandUseCase {
             command.userId(),
             command.rating(),
             command.content());
-    return reviewRepository.save(review).getId();
+    try {
+      return reviewRepository.save(review).getId();
+    } catch (DataIntegrityViolationException e) {
+      throw new BusinessException(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
+    }
   }
 
   @Override

@@ -24,7 +24,7 @@ done
   exit 65
 }
 
-required_services='["config-server","eureka-server","gateway","order-service","product-service","user-service"]'
+required_services='["config-server","embedding-service","eureka-server","gateway","k6","order-service","product-service","user-service"]'
 jq -e --argjson required "$required_services" '
   (.services | keys | sort) == $required
   and all(.services[]; length >= 1 and length <= 2)

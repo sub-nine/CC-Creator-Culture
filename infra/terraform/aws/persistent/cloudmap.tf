@@ -28,7 +28,7 @@ resource "aws_service_discovery_instance" "kafka" {
 }
 
 resource "aws_service_discovery_service" "core" {
-  for_each = toset(["config-server", "eureka-server"])
+  for_each = toset(["config-server", "eureka-server", "embedding-service"])
   name     = each.key
 
   dns_config {
@@ -41,5 +41,11 @@ resource "aws_service_discovery_service" "core" {
     }
   }
 
-  health_check_custom_config {}
+  # 기존 Config/Eureka 서비스에는 이 설정이 없어 추가하면 DNS 자원이 교체된다.
+  dynamic "health_check_custom_config" {
+    for_each = each.key == "embedding-service" ? [true] : []
+    content {
+      failure_threshold = 1
+    }
+  }
 }

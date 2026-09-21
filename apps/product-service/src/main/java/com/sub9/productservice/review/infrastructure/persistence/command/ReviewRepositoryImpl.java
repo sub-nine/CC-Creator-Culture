@@ -14,7 +14,7 @@ public class ReviewRepositoryImpl implements ReviewRepository {
 
   @Override
   public Review save(Review review) {
-    return jpaRepository.save(review);
+    return jpaRepository.saveAndFlush(review);
   }
 
   @Override

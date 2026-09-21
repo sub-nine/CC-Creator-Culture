@@ -78,6 +78,19 @@ jq -e '
 ' <<<"$deploy_config" >/dev/null
 
 jq -e \
+  --arg embedding "$EMBEDDING_SERVICE_IMAGE" \
+  '
+  .services["embedding-service"].image == $embedding
+  and ((.services["embedding-service"].networks | keys) == ["internal"])
+  and (.services["embedding-service"].healthcheck.test[3] | contains("localhost:8000/docs"))
+  and (.services["product-service"].depends_on | has("embedding-service"))
+  and (.services["product-service"].depends_on["embedding-service"].condition == "service_healthy")
+  and (.services["product-service"].environment.EMBEDDING_SERVICE_URL == "http://embedding-service:8000")
+  and (.services.prometheus.command | index("--web.enable-remote-write-receiver") != null)
+  and (.services.grafana.volumes | any((.source | endswith("/deploy/grafana/provisioning/dashboards")) and .target == "/etc/grafana/provisioning/dashboards"))
+' <<<"$deploy_config" >/dev/null
+
+jq -e \
   --arg config_server "$CONFIG_SERVER_CONFIG_LABEL" \
   --arg gateway "$GATEWAY_CONFIG_LABEL" \
   --arg user_service "$USER_SERVICE_CONFIG_LABEL" \

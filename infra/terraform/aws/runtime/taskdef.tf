@@ -25,6 +25,9 @@ locals {
         { name = "SPRING_CLOUD_CONFIG_LABEL", value = var.config_labels[name] },
         { name = "EUREKA_CLIENT_SERVICEURL_DEFAULTZONE", value = local.eureka_zone },
       ],
+      name == "product-service" ? [
+        { name = "EMBEDDING_SERVICE_URL", value = local.embedding_url },
+      ] : [],
       contains(local.redis_clients, name) ? [
         { name = "REDIS_HOST", value = local.redis_host },
         { name = "REDIS_PORT", value = "6379" },

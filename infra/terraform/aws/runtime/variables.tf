@@ -55,7 +55,7 @@ variable "release_sha" {
 }
 
 variable "image_tags" {
-  description = "Content-hash tags for the six services and db-seed. Keys must match the ECR repository names."
+  description = "Content-hash tags for the seven services, db-seed and k6. Keys must match the ECR repository names."
   type        = map(string)
 
   validation {
@@ -67,10 +67,12 @@ variable "image_tags" {
       "product-service",
       "order-service",
       "db-seed",
+      "embedding-service",
+      "k6",
       ]) && alltrue([
       for tag in values(var.image_tags) : can(regex("^[0-9a-f]{64}$", tag))
     ])
-    error_message = "image_tags must have exactly the seven service keys, each a 64-character lowercase hex content hash."
+    error_message = "image_tags must have exactly the nine image keys, each a 64-character lowercase hex content hash."
   }
 }
 
@@ -135,17 +137,19 @@ variable "persistent_config" {
     selected_manifest_key = string
     log_groups            = map(string)
     security_groups = object({
-      config-server   = string
-      eureka-server   = string
-      gateway         = string
-      user-service    = string
-      product-service = string
-      order-service   = string
-      alb             = string
-      observation     = string
-      kafka           = string
-      redis           = string
-      migration       = string
+      config-server     = string
+      eureka-server     = string
+      gateway           = string
+      user-service      = string
+      product-service   = string
+      order-service     = string
+      embedding-service = string
+      k6                = string
+      alb               = string
+      observation       = string
+      kafka             = string
+      redis             = string
+      migration         = string
       rds = object({
         user-service    = string
         product-service = string

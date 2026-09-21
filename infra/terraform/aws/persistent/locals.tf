@@ -15,6 +15,8 @@ locals {
     "order-service",
   ])
 
+  workload_keys = setunion(local.app_keys, toset(["embedding-service", "k6"]))
+
   db_keys = toset([
     "user-service",
     "product-service",
