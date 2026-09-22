@@ -103,8 +103,15 @@ export function setup() {
     if (addRes.status !== 200) {
       throw new Error(`setup 실패 - 장바구니 담기 status=${addRes.status} body=${addRes.body}`);
     }
+    // 주문 후 카트 아이템 삭제는 CartCleanupScheduler가 5초 주기로 비동기 처리하기 때문에,
+    // 방금 주문한 이전 skuId 항목이 아직 카트에 남아있을 수 있다. data[0]으로 가정하면 그
+    // 오래된 항목을 다시 주문하게 돼(레이스), skuId로 정확히 이번 항목을 찾는다
     const cartRes = http.get(`${config.baseUrl}/api/v1/cart/items`, authHeaders(token));
-    const cartItemId = cartRes.json().data[0].cartId;
+    const cartItem = cartRes.json().data.find((item) => item.skuId === skuId);
+    if (!cartItem) {
+      throw new Error(`setup 실패 - 장바구니에서 skuId=${skuId} 항목을 못 찾음`);
+    }
+    const cartItemId = cartItem.cartId;
 
     const orderHeaders = authHeaders(token);
     orderHeaders.headers['Idempotency-Key'] = `k6-test-hashlbo-${unique}-${i}`;
@@ -149,7 +156,9 @@ export function setup() {
     checkStatus(leaderboardRes, 200);
     const items = leaderboardRes.json('data.items') || [];
     const scoreById = new Map(items.map((item) => [item.targetId, item.score]));
-    ready = hashtagIds.every((hashtagId, i) => Math.abs((scoreById.get(hashtagId) ?? -1) - (i + 1) * 1.5) < 0.01);
+    // hashtagId 조회(creator 계정 GET)도 조회수로 잡혀서, ProductViewCountScheduler 타이밍에 따라
+    // 주문 점수 위에 조회 점수가 얹힐 수 있다(플레이키) - 정확히 일치가 아니라 기대치 이상인지로 판정
+    ready = hashtagIds.every((hashtagId, i) => (scoreById.get(hashtagId) ?? -1) >= (i + 1) * 1.5 - 0.01);
     if (ready) {
       break;
     }
