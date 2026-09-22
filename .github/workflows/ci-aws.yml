@@ -12,6 +12,7 @@ on:
       - "Dockerfile"
       - ".dockerignore"
       - ".github/workflows/ci-aws.yml"
+      - ".github/workflows/ci-k6.yml"
       - ".github/workflows/aws-deploy.yml"
       - ".github/scripts/aws-*.py"
       - ".github/workflows/deploy-dev.yml"
@@ -39,6 +40,7 @@ on:
       - "Dockerfile"
       - ".dockerignore"
       - ".github/workflows/ci-aws.yml"
+      - ".github/workflows/ci-k6.yml"
       - ".github/workflows/aws-deploy.yml"
       - ".github/scripts/aws-*.py"
       - ".github/workflows/deploy-dev.yml"
@@ -80,7 +82,7 @@ jobs:
           sudo apt-get install -y shellcheck
 
       - name: actionlint
-        run: ./actionlint .github/workflows/aws-deploy.yml .github/workflows/ci-aws.yml .github/workflows/deploy-dev.yml
+        run: ./actionlint .github/workflows/aws-deploy.yml .github/workflows/ci-aws.yml .github/workflows/ci-k6.yml .github/workflows/deploy-dev.yml
 
       - name: shellcheck
         run: |
@@ -145,22 +147,6 @@ jobs:
             exit 1
           fi
           echo "RDS CA bundle checksum matches upstream: sha256:$upstream"
-
-  k6-image:
-    name: Inspect ARM64 k6 scenarios
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-      - uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-      - name: Build and inspect without requests
-        run: |
-          docker build --platform linux/arm64 -f load-test/Dockerfile.cloud -t cc-k6:verify load-test
-          docker run --rm --network none --entrypoint sh \
-            -e SMOKE_URL=http://example.test/docs -e EMBED_URL=http://example.test/embed \
-            cc-k6:verify -eu -c 'find scenarios -name "*.js" | while read -r script; do k6 inspect --include-system-env-vars "$script" >/dev/null; done'
 
   seed-image:
     name: Seed image against PostgreSQL 17
