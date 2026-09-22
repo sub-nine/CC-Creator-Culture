@@ -37,7 +37,8 @@ public class AdminCategoryCommandService {
     }
 
     /**
-     * 카테고리-해시태그 수동 연결
+     * 카테고리-해시태그 수동 연결. 자동 파이프라인이 같은 조합을 먼저 연결해놨을 수 있어(레이스),
+     * 이미 있으면 예외 없이 조용히 스킵(멱등)
      */
     @Transactional
     public void linkHashtag(UUID categoryId, UUID hashtagId) {
@@ -47,7 +48,7 @@ public class AdminCategoryCommandService {
         Hashtag hashtag = hashtagCommandRepository.findById(hashtagId)
                 .orElseThrow(() -> new BusinessException(CategoryErrorCode.HASHTAG_NOT_FOUND));
 
-        categoryCommandRepository.linkCategoryHashtag(
+        categoryCommandRepository.linkCategoryHashtagIfAbsent(
                 category.linkManually(hashtag, 0.0)
         );
     }

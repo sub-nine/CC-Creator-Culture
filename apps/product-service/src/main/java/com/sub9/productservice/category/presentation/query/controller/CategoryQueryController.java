@@ -59,6 +59,7 @@ public class CategoryQueryController {
     /**
      * 모호한 해시태그 연결 승인 대기 목록 조회 (MASTER, MANAGER)
      */
+    // TODO: hashtagName/categoryName으로 필터링할 수 있는 keyword 파라미터 추가
     @PreAuthorize("hasAnyRole  ('MASTER', 'MANAGER')")
     @GetMapping("/api/v1/admin/categories/merge-requests")
     public ApiResponse<Page<MergeRequestResponse>> getMergeRequests(
