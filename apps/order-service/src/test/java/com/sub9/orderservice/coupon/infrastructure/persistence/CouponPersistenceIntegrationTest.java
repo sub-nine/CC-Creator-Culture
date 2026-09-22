@@ -113,6 +113,7 @@ class CouponPersistenceIntegrationTest {
             .extracting(UserCoupon::getCouponId, UserCoupon::getUserId)
             .containsExactly(coupon.getId(), userId);
         assertThat(userCouponRepository.existsByCouponIdAndUserId(coupon.getId(), userId)).isTrue();
+        assertThat(userCouponRepository.countByCouponId(coupon.getId())).isEqualTo(1L);
     }
 
     @Test
@@ -195,27 +196,6 @@ class CouponPersistenceIntegrationTest {
     }
 
     @Test
-    @DisplayName("발급 가능한 쿠폰만 조건부로 수량과 수정 감사를 갱신한다")
-    void when_coupon_is_issuable_conditional_update_changes_quantity_and_audit() {
-        Coupon coupon = coupon(1);
-        UUID userId = uuidGenerator.generate();
-        Instant issuedAt = STARTED_AT.plusSeconds(1);
-        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
-
-        Integer affectedRows = transaction().execute(status ->
-            couponRepository.increaseIssuedQuantityIfIssuable(coupon.getId(), userId, issuedAt));
-        Coupon updated = couponRepository.findActiveById(coupon.getId()).orElseThrow();
-        Integer soldOutRows = transaction().execute(status ->
-            couponRepository.increaseIssuedQuantityIfIssuable(coupon.getId(), userId, issuedAt));
-
-        assertThat(affectedRows).isEqualTo(1);
-        assertThat(updated.getIssuedQuantity()).isEqualTo(1);
-        assertThat(updated.getUpdatedBy()).isEqualTo(userId);
-        assertThat(updated.getUpdatedAt()).isEqualTo(issuedAt);
-        assertThat(soldOutRows).isZero();
-    }
-
-    @Test
     @DisplayName("미발급 쿠폰만 조건부로 내용과 수정 감사를 갱신한다")
     void when_coupon_is_unissued_conditional_update_changes_values_and_audit() {
         Coupon coupon = coupon(10);
@@ -244,8 +224,12 @@ class CouponPersistenceIntegrationTest {
     @DisplayName("발급 이력이 있는 쿠폰은 조건부 수정에서 제외한다")
     void when_coupon_has_been_issued_conditional_update_changes_nothing() {
         Coupon coupon = coupon(10);
-        coupon.issue(uuidGenerator.generate(), STARTED_AT);
-        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+        UUID userId = uuidGenerator.generate();
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(coupon);
+            userCouponRepository.save(UserCoupon.issue(
+                    uuidGenerator.generate(), coupon, userId, STARTED_AT));
+        });
         Integer affectedRows = transaction().execute(status -> couponRepository.updateIfUnissued(
                 coupon.getId(), "수정 시도 쿠폰", 20, 30,
                 STARTED_AT, EXPIRED_AT,
@@ -283,31 +267,18 @@ class CouponPersistenceIntegrationTest {
     @DisplayName("발급 이력이 있는 쿠폰은 조건부 삭제에서 제외한다")
     void when_coupon_has_been_issued_conditional_delete_changes_nothing() {
         Coupon coupon = coupon(10);
-        coupon.issue(uuidGenerator.generate(), STARTED_AT);
-        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
+        UUID userId = uuidGenerator.generate();
+        transaction().executeWithoutResult(status -> {
+            couponRepository.save(coupon);
+            userCouponRepository.save(UserCoupon.issue(
+                    uuidGenerator.generate(), coupon, userId, STARTED_AT));
+        });
 
         Integer affectedRows = transaction().execute(status -> couponRepository.deleteIfUnissued(
                 coupon.getId(), uuidGenerator.generate(), STARTED_AT.plusSeconds(1)));
 
         assertThat(affectedRows).isZero();
         assertThat(couponRepository.findActiveById(coupon.getId())).isPresent();
-    }
-
-    @Test
-    @DisplayName("기간 밖이거나 삭제된 쿠폰은 조건부 수량 갱신에서 제외한다")
-    void when_coupon_is_outside_period_or_deleted_conditional_update_changes_nothing() {
-        Coupon coupon = coupon(10);
-        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
-
-        Integer beforeStart = transaction().execute(status -> couponRepository
-            .increaseIssuedQuantityIfIssuable(coupon.getId(), uuidGenerator.generate(), STARTED_AT.minusSeconds(1)));
-        coupon.delete(uuidGenerator.generate(), STARTED_AT.plusSeconds(1));
-        transaction().executeWithoutResult(status -> couponRepository.save(coupon));
-        Integer deleted = transaction().execute(status -> couponRepository
-            .increaseIssuedQuantityIfIssuable(coupon.getId(), uuidGenerator.generate(), STARTED_AT.plusSeconds(2)));
-
-        assertThat(beforeStart).isZero();
-        assertThat(deleted).isZero();
     }
 
     @Test

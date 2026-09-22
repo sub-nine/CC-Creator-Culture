@@ -20,23 +20,6 @@ public interface CouponJpaRepository extends JpaRepository<Coupon, UUID> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Coupon c
-               set c.issuedQuantity = c.issuedQuantity + 1,
-                   c.updatedAt = :issuedAt,
-                   c.updatedBy = :userId
-             where c.id = :couponId
-               and c.deletedAt is null
-               and c.startedAt <= :issuedAt
-               and c.expiredAt >= :issuedAt
-               and c.issuedQuantity < c.totalQuantity
-            """)
-    int increaseIssuedQuantityIfIssuable(
-            @Param("couponId") UUID couponId,
-            @Param("userId") UUID userId,
-            @Param("issuedAt") Instant issuedAt);
-
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("""
-            update Coupon c
                set c.couponName = :couponName,
                    c.discountRate = :discountRate,
                    c.totalQuantity = :totalQuantity,
@@ -46,7 +29,11 @@ public interface CouponJpaRepository extends JpaRepository<Coupon, UUID> {
                    c.updatedBy = :updaterId
              where c.id = :couponId
                and c.deletedAt is null
-               and c.issuedQuantity = 0
+               and not exists (
+                   select uc.id
+                     from UserCoupon uc
+                    where uc.coupon = c
+               )
             """)
     int updateIfUnissued(
             @Param("couponId") UUID couponId,
@@ -67,7 +54,11 @@ public interface CouponJpaRepository extends JpaRepository<Coupon, UUID> {
                    c.updatedBy = :deleterId
              where c.id = :couponId
                and c.deletedAt is null
-               and c.issuedQuantity = 0
+               and not exists (
+                   select uc.id
+                     from UserCoupon uc
+                    where uc.coupon = c
+               )
             """)
     int deleteIfUnissued(
             @Param("couponId") UUID couponId,

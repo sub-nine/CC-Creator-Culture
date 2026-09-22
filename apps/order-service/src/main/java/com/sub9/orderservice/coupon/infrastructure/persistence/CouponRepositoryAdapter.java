@@ -32,11 +32,6 @@ public class CouponRepositoryAdapter implements CouponRepository {
     }
 
     @Override
-    public int increaseIssuedQuantityIfIssuable(UUID couponId, UUID userId, Instant issuedAt) {
-        return couponJpaRepository.increaseIssuedQuantityIfIssuable(couponId, userId, issuedAt);
-    }
-
-    @Override
     public int updateIfUnissued(
             UUID couponId,
             String couponName,

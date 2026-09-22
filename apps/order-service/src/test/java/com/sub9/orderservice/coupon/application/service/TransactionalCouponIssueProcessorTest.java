@@ -33,8 +33,8 @@ class TransactionalCouponIssueProcessorTest {
     @Mock private UuidV7Generator uuidV7Generator;
 
     @Test
-    @DisplayName("발급 수량 증가 후 동일한 발급 시각으로 사용자 쿠폰을 저장한다")
-    void when_conditional_update_succeeds_user_coupon_is_saved_with_same_issue_time() {
+    @DisplayName("Redis 선점 후 쿠폰 수량을 갱신하지 않고 사용자 쿠폰을 저장한다")
+    void when_reservation_succeeds_user_coupon_is_saved_without_coupon_quantity_update() {
         Coupon coupon = Coupon.create(generator.generate(), "발급 쿠폰", 10, 10,
                 ISSUE_TIME.minusSeconds(1), ISSUE_TIME.plusSeconds(60), generator.generate(),
                 ISSUE_TIME.minusSeconds(10));
@@ -42,8 +42,6 @@ class TransactionalCouponIssueProcessorTest {
         UUID userCouponId = generator.generate();
         CouponReservation reservation = new CouponReservation(coupon.getId(), userId, generator.generate());
         when(couponRepository.findActiveById(coupon.getId())).thenReturn(Optional.of(coupon));
-        when(couponRepository.increaseIssuedQuantityIfIssuable(coupon.getId(), userId, ISSUE_TIME))
-                .thenReturn(1);
         when(uuidV7Generator.generate()).thenReturn(userCouponId);
         when(userCouponRepository.save(any(UserCoupon.class))).thenAnswer(invocation -> invocation.getArgument(0));
         var processor = new TransactionalCouponIssueProcessor(
