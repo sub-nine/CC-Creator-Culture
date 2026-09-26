@@ -7,6 +7,7 @@ import static com.sub9.productservice.product.domain.model.QSku.sku;
 import static com.sub9.productservice.product.domain.model.QStock.stock;
 
 import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.types.Expression;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -22,7 +23,7 @@ import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import com.sub9.productservice.product.domain.model.QImage;
-
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.*;
@@ -36,7 +37,15 @@ import org.springframework.util.StringUtils;
 @Repository
 @RequiredArgsConstructor
 public class ProductQueryRepositoryImpl implements ProductQueryRepository {
+  private final ProductQueryJpaRepository jpaRepository;
   private final JPAQueryFactory queryFactory;
+
+  private static final Expression<BigDecimal> AVERAGE_RATING =
+      Expressions.numberTemplate(
+          BigDecimal.class,
+          "CASE WHEN {1} = 0 THEN NULL ELSE ROUND(CAST({0} AS BigDecimal) / {1}, 1) END",
+          product.ratingSum,
+          product.reviewCount);
 
   @Override
   public Page<ProductInfo> searchProducts(
@@ -123,31 +132,13 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
 
   @Override
   public boolean existsSkuOwnedByCreatorId(UUID creatorId, UUID skuId) {
-    return queryFactory
-            .selectOne()
-            .from(sku)
-            .join(product)
-            .on(sku.productId.eq(product.id))
-            .where(
-                sku.id.eq(skuId),
-                product.creatorId.eq(creatorId),
-                sku.deletedAt.isNull(),
-                product.deletedAt.isNull())
-            .fetchFirst()
-        != null;
+    return jpaRepository.existsSkuOwnedByCreatorId(creatorId, skuId);
   }
 
   @Override
   public boolean existsById(UUID productId) {
-    return queryFactory
-            .selectOne()
-            .from(product)
-            .where(
-                product.id.eq(productId),
-                product.deletedAt.isNull(),
-                product.status.ne(ProductStatus.SUSPENDED))
-            .fetchFirst()
-        != null;
+    return jpaRepository.existsByIdAndDeletedAtIsNullAndStatusNot(
+        productId, ProductStatus.SUSPENDED);
   }
 
   @Override
@@ -161,7 +152,7 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
                 Expressions.nullExpression(String.class),
                 product.name,
                 product.status,
-                product.averageRating,
+                AVERAGE_RATING,
                 product.reviewCount,
                 sku.price,
                 stock.quantity,
@@ -186,16 +177,14 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
         .fetchOne();
   }
 
-  private BooleanBuilder searchCondition (
-      String keword, Set<UUID> metadataProductIds
-  ) {
+  private BooleanBuilder searchCondition(String keword, Set<UUID> metadataProductIds) {
     BooleanBuilder searchCondition = new BooleanBuilder();
 
     if (!StringUtils.hasText(keword)) {
       return searchCondition;
     }
 
-    searchCondition.or(QuerydslUtils.containsIgnoreCase(product.name, keword));
+    searchCondition.or(product.name.containsIgnoreCase(keword));
 
     if (!metadataProductIds.isEmpty()) {
       searchCondition.or(product.id.in(metadataProductIds));
