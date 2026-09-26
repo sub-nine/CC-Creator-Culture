@@ -10,6 +10,8 @@ public interface CartCleanupTaskRepository {
     CartCleanupTask save(CartCleanupTask task);
     List<CartCleanupTask> findDue(Instant now, int limit);
     Optional<CartCleanupTask> findDueForUpdate(UUID id, Instant now);
+    List<CartCleanupTask> claimDue(Instant now, int limit);
     void delete(CartCleanupTask task);
+    void deleteAll(List<CartCleanupTask> tasks);
     void postpone(UUID id, Instant nextAttemptAt);
 }

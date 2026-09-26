@@ -106,6 +106,30 @@ class CartCleanupTaskPersistenceTest {
     }
 
     @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DisplayName("다른 실행기가 일괄 점유한 작업은 건너뛰고 남은 작업만 점유한다")
+    void when_batch_is_claimed_other_claim_skips_locked_tasks() {
+        TransactionTemplate tx = new TransactionTemplate(manager);
+        CartCleanupTask first = tx.execute(status -> repository.save(task(NOW)));
+        CartCleanupTask second = tx.execute(status -> repository.save(task(NOW.plusSeconds(1))));
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            tx.executeWithoutResult(status -> {
+                assertThat(repository.claimDue(NOW.plusSeconds(1), 1))
+                        .extracting(CartCleanupTask::getId).containsExactly(first.getId());
+                try {
+                    assertThat(executor.submit(() -> tx.execute(other -> repository.claimDue(NOW.plusSeconds(1), 100)
+                            .stream().map(CartCleanupTask::getId).toList())).get(5, TimeUnit.SECONDS))
+                            .containsExactly(second.getId());
+                } catch (Exception exception) {
+                    throw new AssertionError(exception);
+                }
+            });
+        } finally {
+            jpa.deleteAll();
+        }
+    }
+
+    @Test
     @DisplayName("배포 SQL로 만든 테이블에서 작업 저장과 잠금 조회가 동작한다")
     void when_deployment_sql_creates_table_task_can_be_processed() throws Exception {
         jdbc.execute("create schema cart_cleanup_ddl");
