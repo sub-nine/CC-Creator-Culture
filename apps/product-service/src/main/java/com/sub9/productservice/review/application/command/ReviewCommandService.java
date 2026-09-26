@@ -6,6 +6,7 @@ import com.sub9.productservice.review.application.command.dto.DeleteReviewComman
 import com.sub9.productservice.review.application.command.dto.UpdateReviewCommand;
 import com.sub9.productservice.review.application.port.in.ReviewCommandUseCase;
 import com.sub9.productservice.review.application.port.out.ReviewOrderQueryPort;
+import com.sub9.productservice.review.application.port.out.ReviewProductPort;
 import com.sub9.productservice.review.application.port.out.dto.ProductPurchaseInfo;
 import com.sub9.productservice.review.domain.exception.ReviewErrorCode;
 import com.sub9.productservice.review.domain.model.Review;
@@ -20,8 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 @RequiredArgsConstructor
 public class ReviewCommandService implements ReviewCommandUseCase {
-  private final ReviewRepository reviewRepository;
   private final ReviewOrderQueryPort reviewOrderQueryPort;
+  private final ReviewProductPort reviewProductPort;
+  private final ReviewRepository reviewRepository;
 
   @Override
   public UUID createReview(CreateReviewCommand command) {
@@ -43,7 +45,9 @@ public class ReviewCommandService implements ReviewCommandUseCase {
             command.userId(),
             command.rating(),
             command.content());
+
     try {
+      reviewProductPort.addReviewStats(productPurchaseInfo.productId(), command.rating());
       return reviewRepository.save(review).getId();
     } catch (DataIntegrityViolationException e) {
       throw new BusinessException(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
@@ -53,12 +57,15 @@ public class ReviewCommandService implements ReviewCommandUseCase {
   @Override
   public void updateReview(UpdateReviewCommand command) {
     Review review = getReview(command.reviewId(), command.userId());
+    reviewProductPort.updateReviewRating(
+        review.getProductId(), review.getRating(), command.rating());
     review.update(command.rating(), command.content());
   }
 
   @Override
   public void deleteReview(DeleteReviewCommand command) {
     Review review = getReview(command.reviewId(), command.userId());
+    reviewProductPort.removeReviewStats(review.getProductId(), review.getRating());
     review.delete(command.userId());
   }
 
