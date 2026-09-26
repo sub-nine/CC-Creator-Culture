@@ -11,6 +11,7 @@ import com.sub9.orderservice.cart.domain.model.Cart;
 import com.sub9.orderservice.cart.infrastructure.persistence.CartJpaRepository;
 import com.sub9.orderservice.support.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,7 +23,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Transactional
 @SpringBootTest
@@ -136,6 +139,31 @@ class CartCommandServiceIntegrationTest extends AbstractIntegrationTest {
       assertThat(saved.getQuantity()).isEqualTo(2);
       assertThat(cartRepository.countByUserId(userId)).isEqualTo(1);
       verify(cartProductPort).getValidatedProductIdForCart(skuId);
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DisplayName("장바구니를 등록하면 상품 검증은 트랜잭션 밖에서 호출하고 항목을 저장한다.")
+    void when_cart_item_is_added_product_validation_is_called_outside_transaction() {
+      // given
+      List<Boolean> transactionActive = new ArrayList<>();
+      org.mockito.BDDMockito.given(cartProductPort.getValidatedProductIdForCart(skuId))
+          .willAnswer(
+              invocation -> {
+                transactionActive.add(TransactionSynchronizationManager.isActualTransactionActive());
+                return UUID.randomUUID();
+              });
+
+      // when
+      UUID cartId = cartCommandService.addCartItem(new AddCartItemCommand(userId, skuId, 1));
+
+      // then
+      try {
+        assertThat(transactionActive).containsExactly(false);
+        assertThat(cartRepository.findById(cartId)).isPresent();
+      } finally {
+        cartRepository.deleteById(cartId);
+      }
     }
   }
 
