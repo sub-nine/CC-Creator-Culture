@@ -22,7 +22,7 @@ public class CartCleanupScheduler {
     private final Clock clock;
     private final CartCleanupMetrics metrics;
 
-    @Scheduled(fixedDelayString = "${order.cart-cleanup.interval-ms:5000}", initialDelay = 5_000L)
+    @Scheduled(fixedDelayString = "${order.cart-cleanup.interval-ms:500}", initialDelay = 5_000L)
     public void cleanup() {
         long started = System.nanoTime();
         try {
