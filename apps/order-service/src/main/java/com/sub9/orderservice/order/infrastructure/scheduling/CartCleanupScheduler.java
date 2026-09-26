@@ -21,7 +21,7 @@ public class CartCleanupScheduler {
     private final CartCleanupTransactionService transactions;
     private final Clock clock;
 
-    @Scheduled(fixedDelay = 5_000L, initialDelay = 5_000L)
+    @Scheduled(fixedDelayString = "${order.cart-cleanup.interval-ms:5000}", initialDelay = 5_000L)
     public void cleanup() {
         Instant now = clock.instant();
         for (CartCleanupTask task : tasks.findDue(now, 100)) {
