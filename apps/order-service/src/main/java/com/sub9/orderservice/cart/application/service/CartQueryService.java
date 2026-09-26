@@ -17,11 +17,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+// Product와 User 호출 동안 DB 연결을 점유하지 않도록 조회마다 저장소의 짧은 트랜잭션만 사용한다.
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class CartQueryService implements CartQueryUseCase {
   private final CartProductPort cartProductPort;
   private final CartRepository cartRepository;
