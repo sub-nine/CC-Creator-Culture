@@ -1,12 +1,11 @@
 package com.sub9.productservice.product.domain.model;
 
 import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDate;
-import java.util.UUID;
 
 @Getter
 @Entity
@@ -29,4 +28,7 @@ public class ProductDailyView {
 
   @Column(nullable = false)
   LocalDate viewDate;
+
+  @Column(nullable = false)
+  boolean aggregated;
 }
