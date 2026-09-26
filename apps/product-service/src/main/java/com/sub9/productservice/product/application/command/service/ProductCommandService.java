@@ -4,10 +4,7 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.kafka.event.ProductCreatedEvent;
 import com.sub9.common.kafka.event.ProductDeletedEvent;
-import com.sub9.productservice.product.application.command.dto.product.CreateProductCommand;
-import com.sub9.productservice.product.application.command.dto.product.UpdateProductCommand;
-import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
-import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
+import com.sub9.productservice.product.application.command.dto.product.*;
 import com.sub9.productservice.product.application.command.dto.sku.CreateSkuCommand;
 import com.sub9.productservice.product.application.port.in.image.ProductImageCommandUseCase;
 import com.sub9.productservice.product.application.port.in.product.AdminProductStatusUseCase;
@@ -39,7 +36,7 @@ public class ProductCommandService implements ProductCommandUseCase, AdminProduc
   private final ProductImageCommandUseCase productImageCommandUseCase;
 
   @Override
-  public UUID createProduct(CreateProductCommand command, List<UploadImageCommand> images) {
+  public UUID createProduct(CreateProductCommand command) {
     SkuValidator.validateForCreate(command.skus());
 
     Product product = Product.create(command.creatorId(), command.name(), command.content());
@@ -63,7 +60,8 @@ public class ProductCommandService implements ProductCommandUseCase, AdminProduc
       stockRepository.save(stock);
     }
 
-    productImageCommandUseCase.uploadImages(productId, images);
+    productImageCommandUseCase.addImages(
+        new AddImagesCommand(productId, command.creatorId(), command.imageUploadIds()));
 
     // Category 생성 및 매핑 이벤트
     eventPublisher.publishEvent(

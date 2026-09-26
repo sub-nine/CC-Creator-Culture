@@ -13,7 +13,8 @@ public enum ProductErrorCode implements ErrorCode {
   PRODUCT_NOT_FOR_SALE("PRODUCT_004", HttpStatus.BAD_REQUEST, "현재 판매 중인 상품이 아닙니다."),
   PRODUCT_SOLD_OUT("PRODUCT_0005", HttpStatus.CONFLICT, "품절된 상품입니다."),
   PRODUCT_IMAGE_NOT_FOUND("PRODUCT_006", HttpStatus.NOT_FOUND, "유효하지 않은 상품 이미지 입니다."),
-  INVALID_PRODUCT_IMAGE_INFO("PRODUCT_0007", HttpStatus.BAD_REQUEST, "요청한 상품 이미지 정보가 올바르지 않습니다");
+  INVALID_PRODUCT_IMAGE_INFO("PRODUCT_0007", HttpStatus.BAD_REQUEST, "요청한 상품 이미지 정보가 올바르지 않습니다"),
+  IMAGE_UPLOAD_NOT_FOUND("PRODUCT_0008", HttpStatus.NOT_FOUND, "업로드된 이미지를 찾을 수 없습니다.");
 
   private final String code;
   private final HttpStatus status;

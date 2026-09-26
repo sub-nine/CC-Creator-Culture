@@ -238,6 +238,8 @@ Temporary Items
 Thumbs.db
 Thumbs.db:encryptable
 ehthumbs.db
+
+/load-test/data/
 ehthumbs_vista.db
 
 # Dump file
@@ -324,6 +326,3 @@ __pycache__/
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,intellij+all,eclipse,macos,windows,gradle,java
 /skills-lock.json
-
-# k6 부하 테스트 결과물
-load-test/results/

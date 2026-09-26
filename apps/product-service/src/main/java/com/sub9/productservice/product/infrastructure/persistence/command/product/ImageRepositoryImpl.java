@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @RequiredArgsConstructor
@@ -29,16 +30,13 @@ public class ImageRepositoryImpl implements ImageRepository {
   }
 
   @Override
-  public void deleteAll(List<Image> images) {
-    jpaRepository.deleteAll(images);
-  }
-
-  @Override
+  @Transactional(readOnly = true)
   public List<Image> findExpiredImages(Instant cutoff) {
     return jpaRepository.findCleanUpTargets(cutoff);
   }
 
   @Override
+  @Transactional
   public void hardDeleteById(UUID imageId) {
     jpaRepository.hardDeleteById(imageId);
   }
@@ -48,4 +46,3 @@ public class ImageRepositoryImpl implements ImageRepository {
     return jpaRepository.softDelete(imageId, productId, creatorId) > 0;
   }
 }
-

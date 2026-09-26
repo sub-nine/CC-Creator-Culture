@@ -1,6 +1,5 @@
 package com.sub9.productservice.review.application.command;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -12,7 +11,6 @@ import com.sub9.productservice.review.application.command.dto.*;
 import com.sub9.productservice.review.application.port.out.ReviewOrderQueryPort;
 import com.sub9.productservice.review.application.port.out.dto.ProductPurchaseInfo;
 import com.sub9.productservice.review.domain.exception.ReviewErrorCode;
-import com.sub9.productservice.review.domain.model.Review;
 import com.sub9.productservice.review.domain.repository.ReviewRepository;
 import java.util.Optional;
 import java.util.UUID;
@@ -89,7 +87,7 @@ class ReviewCommandServiceUnitTest {
   }
 
   @Test
-  @DisplayName("본인의 리뷰가 없으면 수정을 거절한다")
+  @DisplayName("본인의 리뷰가 아니면 수정을 거절한다")
   void updateReview_fails_when_review_not_found() {
     // given
     given(reviewRepository.findByIdAndUserIdAndDeletedAtIsNull(reviewId, userId))
@@ -105,7 +103,7 @@ class ReviewCommandServiceUnitTest {
   }
 
   @Test
-  @DisplayName("본인의 리뷰가 없으면 삭제를 거절한다")
+  @DisplayName("본인의 리뷰가 아니면 삭제를 거절한다")
   void deleteReview_fails_when_review_not_found() {
     // given
     given(reviewRepository.findByIdAndUserIdAndDeletedAtIsNull(reviewId, userId))

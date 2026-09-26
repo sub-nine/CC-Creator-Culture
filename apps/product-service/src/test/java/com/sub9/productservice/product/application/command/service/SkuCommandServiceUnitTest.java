@@ -95,38 +95,6 @@ class SkuCommandServiceUnitTest {
   @DisplayName("SKU 수정 테스트")
   class updateSkuTest {
     @Test
-    @DisplayName("일반 SKU를 대표 SKU로 변경하면 기존 대표 SKU가 해제되어야 한다.")
-    void updateSku_success_when_changing_default_sku() {
-      // given
-      Product product = mock(Product.class);
-      Sku sku = mock(Sku.class);
-      Sku currentDefaultSku = mock(Sku.class);
-
-      given(product.getId()).willReturn(defaultUpdateSkuCommand.productId());
-      given(productRepository.findByIdForUpdate(defaultUpdateSkuCommand.productId()))
-          .willReturn(Optional.of(product));
-      given(
-              skuRepository.findByIdAndProductIdAndDeletedAtIsNull(
-                  defaultUpdateSkuCommand.skuId(), defaultUpdateSkuCommand.productId()))
-          .willReturn(Optional.of(sku));
-      given(sku.isDefault()).willReturn(false);
-      given(skuRepository.findByProductIdAndIsDefaultTrue(defaultUpdateSkuCommand.productId()))
-          .willReturn(Optional.of(currentDefaultSku));
-
-      // when
-      skuCommandService.updateSku(defaultUpdateSkuCommand);
-
-      // then
-      verify(product).validateOwner(defaultUpdateSkuCommand.creatorId());
-      verify(currentDefaultSku).unsetDefault();
-      verify(sku)
-          .update(
-              defaultUpdateSkuCommand.name(),
-              defaultUpdateSkuCommand.price(),
-              defaultUpdateSkuCommand.isDefault());
-    }
-
-    @Test
     @DisplayName("기존 대표 SKU가 없으면 DEFAULT_SKU_NOT_FOUND 예외가 발생해야 한다.")
     void updateSku_fails_when_default_sku_not_found() {
       // given

@@ -31,4 +31,19 @@ public class ProductRepositoryImpl implements ProductRepository {
   public void incrementViewCount(UUID productId, long viewCount) {
     jpaRepository.incrementViewCount(productId, viewCount);
   }
+
+  @Override
+  public void addReviewStats(UUID productId, int rating) {
+    jpaRepository.addReviewStats(productId, rating);
+  }
+
+  @Override
+  public void removeReviewStats(UUID productId, int rating) {
+    jpaRepository.removeReviewStats(productId, rating);
+  }
+
+  @Override
+  public void updateReviewRating(UUID productId, int oldRating, int newRating) {
+    jpaRepository.updateReviewRating(productId, oldRating, newRating);
+  }
 }

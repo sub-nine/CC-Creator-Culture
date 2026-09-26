@@ -17,12 +17,12 @@ public class ProductImageUploadedEventListner {
 
   @KafkaListener(
       topics = KafkaTopics.PRODUCT_IMAGE_UPLOADED,
-      groupId = "${kafka.product-group-id}"
-  )
+      groupId = "${kafka.product-group-id}",
+      concurrency = "3")
   public void handleProducImageUploadEvent(ProductImageUploadedEvent event, Acknowledgment ack) {
     try {
       imageProcessingUseCase.resizeImage(event.imageId(), event.productId(), event.originalKey());
-      
+
       ack.acknowledge();
     } catch (Exception e) {
       log.error("[ERROR] 이미지 리사이징 작업 실패 : ", e);

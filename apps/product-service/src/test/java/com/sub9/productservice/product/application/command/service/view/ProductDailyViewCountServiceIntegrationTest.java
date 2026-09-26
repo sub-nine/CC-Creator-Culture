@@ -42,7 +42,7 @@ class ProductDailyViewCountServiceIntegrationTest extends AbstractIntegrationTes
   @DisplayName("일별 조회수 저장 테스트")
   class IncrementDailyViewCountsTests {
     @Test
-    @DisplayName("같은 상품과 날짜는 한 행에 누적하고 다른 날짜는 별도로 저장한다.")
+    @DisplayName("같은 상품의 조회수는 날짜별로 누적된다.")
     void incrementDailyViewCounts_success() {
       // given
       UUID productId = UUID.randomUUID();
@@ -52,15 +52,22 @@ class ProductDailyViewCountServiceIntegrationTest extends AbstractIntegrationTes
       increment(productId, viewDate, 3L);
       increment(productId, viewDate, 4L);
       increment(productId, viewDate.plusDays(1), 2L);
+
       entityManager.flush();
       entityManager.clear();
 
       // then
-      List<ProductDailyView> views = dailyViewRepository.findAllByViewDate(viewDate);
-      assertThat(views).hasSize(1);
-      assertThat(views.getFirst().getProductId()).isEqualTo(productId);
-      assertThat(views.getFirst().getViewCount()).isEqualTo(7L);
-      assertThat(dailyViewRepository.findAllByViewDate(viewDate.plusDays(1)))
+      List<ProductDailyView> views = dailyViewRepository.findAll();
+      assertThat(views)
+          .filteredOn(
+              view -> view.getProductId().equals(productId) && view.getViewDate().equals(viewDate))
+          .singleElement()
+          .satisfies(view -> assertThat(view.getViewCount()).isEqualTo(7L));
+      assertThat(views)
+          .filteredOn(
+              view ->
+                  view.getProductId().equals(productId)
+                      && view.getViewDate().equals(viewDate.plusDays(1)))
           .extracting(ProductDailyView::getViewCount)
           .containsExactly(2L);
     }

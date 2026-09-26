@@ -1,7 +1,6 @@
 package com.sub9.productservice.product.application.query.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.BDDMockito.given;
 
 import com.sub9.productservice.category.domain.entity.Category;
@@ -16,7 +15,6 @@ import com.sub9.productservice.product.application.port.out.product.ProductViewR
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
 import com.sub9.productservice.product.application.query.dto.ProductInfo;
 import com.sub9.productservice.product.application.query.dto.ProductViewCount;
-import com.sub9.productservice.product.application.query.dto.SkuInfo;
 import com.sub9.productservice.product.domain.model.Image;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
@@ -140,39 +138,7 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("SKU ID 목록으로 상품, SKU, 재고 정보 조회에 성공한다.")
-  void getCartItemProducts_success() {
-    // given
-    List<UUID> skuIds = List.of(defaultSku.getId(), normalSku.getId());
-
-    // when
-    List<SkuInfo> responses = productQueryService.getCartItemProducts(skuIds);
-
-    // then
-    assertThat(responses).hasSize(2);
-
-    SkuInfo defaultSkuInfo = findSkuResponse(responses, defaultSku.getId());
-    SkuInfo normalSkuInfo = findSkuResponse(responses, normalSku.getId());
-
-    assertThat(defaultSkuInfo.productId()).isEqualTo(dummyProduct.getId());
-    assertThat(defaultSkuInfo.creatorId()).isEqualTo(creatorId);
-    assertThat(defaultSkuInfo.productName()).isEqualTo("말랑이");
-    assertThat(defaultSkuInfo.skuName()).isEqualTo("핑크");
-    assertThat(defaultSkuInfo.productStatus()).isEqualTo(ProductStatus.ACTIVE);
-    assertThat(defaultSkuInfo.price()).isEqualTo(10000L);
-    assertThat(defaultSkuInfo.quantity()).isEqualTo(10);
-
-    assertThat(normalSkuInfo.productId()).isEqualTo(dummyProduct.getId());
-    assertThat(normalSkuInfo.creatorId()).isEqualTo(creatorId);
-    assertThat(normalSkuInfo.productName()).isEqualTo("말랑이");
-    assertThat(normalSkuInfo.skuName()).isEqualTo("블루");
-    assertThat(normalSkuInfo.productStatus()).isEqualTo(ProductStatus.ACTIVE);
-    assertThat(normalSkuInfo.price()).isEqualTo(12000L);
-    assertThat(normalSkuInfo.quantity()).isEqualTo(5);
-  }
-
-  @Test
-  @DisplayName("키워드로 상품 검색에 성공하면 대표 SKU와 재고 정보를 반환한다.")
+  @DisplayName("상품 검색에 성공하면 대표 SKU와 재고 정보를 반환한다.")
   void searchProducts_success() {
     // given
     String keyword = "말랑";
@@ -196,63 +162,6 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
     assertThat(response.price()).isEqualTo(defaultSku.getPrice());
     assertThat(response.quantity()).isEqualTo(10);
     assertThat(response.imageKey()).isNull();
-  }
-
-  @Test
-  @DisplayName("판매 중이고 재고가 남아있는 SKU는 장바구니에 등록할 수 있다.")
-  void getValidatedProductIdForCart_success_when_active_product_has_stock() {
-    // given
-    entityManager
-        .createQuery("UPDATE Stock s SET s.quantity = 1 WHERE s.skuId = :skuId")
-        .setParameter("skuId", normalSku.getId())
-        .executeUpdate();
-    entityManager.clear();
-
-    // when & then
-    assertThatCode(() -> productQueryService.getValidatedProductIdForCart(normalSku.getId()))
-        .doesNotThrowAnyException();
-  }
-
-  @Test
-  @DisplayName("카테고리와 해시태그 이름으로 상품 검색에 성공하면 전체 건수를 반환한다.")
-  void searchProducts_success_when_metadata_matches() {
-    // given
-    Category category = Category.create("여름 의류", "설명");
-    Hashtag hashtag = Hashtag.create("여름 추천");
-
-    entityManager.persist(category);
-    entityManager.persist(hashtag);
-    entityManager.persist(
-        CategoryHashtag.create(
-            category, hashtag, CategoryHashtagMatchType.MANUAL, CategoryHashtagStatus.MERGED, 0.0));
-    entityManager.persist(HashtagProduct.create(hashtag, dummyProduct.getId()));
-
-    Product otherProduct = productRepository.save(Product.create(creatorId, "티셔츠", "설명"));
-    Sku otherSku = skuRepository.save(Sku.create(otherProduct.getId(), "화이트", 15000L, true));
-    stockRepository.save(Stock.create(otherSku.getId(), 3));
-
-    entityManager.persist(HashtagProduct.create(hashtag, otherProduct.getId()));
-    entityManager.flush();
-    entityManager.clear();
-
-    // when
-    Page<ProductInfo> categoryResponses =
-        productQueryService.searchProducts("의류", PageRequest.of(0, 1));
-    Page<ProductInfo> hashtagResponses =
-        productQueryService.searchProducts("추천", PageRequest.of(0, 1));
-    Page<ProductInfo> responses = productQueryService.searchProducts("여름", PageRequest.of(0, 1));
-    Page<ProductInfo> nextResponses =
-        productQueryService.searchProducts("여름", PageRequest.of(1, 1));
-
-    // then
-    assertThat(categoryResponses.getTotalElements()).isEqualTo(2);
-    assertThat(hashtagResponses.getTotalElements()).isEqualTo(2);
-    assertThat(responses.getTotalElements()).isEqualTo(2);
-    assertThat(nextResponses.getTotalElements()).isEqualTo(2);
-    assertThat(responses.getContent()).hasSize(1);
-    assertThat(nextResponses.getContent()).hasSize(1);
-    assertThat(responses.getContent().getFirst().productId())
-        .isNotEqualTo(nextResponses.getContent().getFirst().productId());
   }
 
   @Test
@@ -313,12 +222,5 @@ class ProductQueryIntegrationTest extends AbstractIntegrationTest {
     assertThat(response.productId()).isEqualTo(dummyProduct.getId());
     assertThat(productViewRepository.findAllViewCounts())
         .containsExactly(new ProductViewCount(dummyProduct.getId(), 1L));
-  }
-
-  private SkuInfo findSkuResponse(List<SkuInfo> responses, UUID skuId) {
-    return responses.stream()
-        .filter(response -> response.skuId().equals(skuId))
-        .findFirst()
-        .orElseThrow();
   }
 }

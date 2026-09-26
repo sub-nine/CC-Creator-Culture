@@ -19,7 +19,12 @@ public class ProductDailyViewRepositoryImpl implements ProductDailyViewRepositor
   }
 
   @Override
-  public List<ProductDailyView> findAllByViewDate(LocalDate viewDate) {
-    return jpaRepository.findAllByViewDate(viewDate);
+  public boolean tryMarkAsAggregated(UUID id) {
+    return jpaRepository.tryMarkAsAggregated(id) > 0;
+  }
+
+  @Override
+  public List<ProductDailyView> findAllByViewDateBeforeAndAggregatedFalse(LocalDate today) {
+    return jpaRepository.findAllByViewDateBeforeAndAggregatedFalse(today);
   }
 }

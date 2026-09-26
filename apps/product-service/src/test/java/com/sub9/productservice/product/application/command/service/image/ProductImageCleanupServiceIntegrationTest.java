@@ -1,11 +1,9 @@
 package com.sub9.productservice.product.application.command.service.image;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.BDDMockito.then;
 
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
-import com.sub9.productservice.product.application.command.dto.product.*;
 import com.sub9.productservice.product.application.port.out.image.*;
 import com.sub9.productservice.product.domain.model.*;
 import com.sub9.productservice.product.infrastructure.persistence.command.product.*;
@@ -26,8 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 class ProductImageCleanupServiceIntegrationTest extends AbstractIntegrationTest {
   @Autowired ProductCommandJpaRepository productRepository;
   @Autowired ImageCommandJpaRepository imageRepository;
+  @Autowired ImageUploadJpaRepository imageUploadRepository;
   @Autowired EntityManager entityManager;
   @MockitoBean ImageStoragePort imageStoragePort;
+
   private final UUID creatorId = UUID.randomUUID();
   private Product product;
 
@@ -51,7 +51,7 @@ class ProductImageCleanupServiceIntegrationTest extends AbstractIntegrationTest 
   @Autowired ProductImageCleanupService imageService;
 
   @Test
-  @DisplayName("복구 기한이 지난 상품과 개별 삭제 이미지만 파일과 DB에서 제거한다.")
+  @DisplayName("일정 기간이 지난 상품과 개별 삭제 이미지를 파일과 DB에서 제거한다.")
   void deleteExpiredImages_success() {
     // given
     Instant now = Instant.parse("2026-09-11T00:00:00Z");
@@ -95,9 +95,35 @@ class ProductImageCleanupServiceIntegrationTest extends AbstractIntegrationTest 
     assertThat(imageRepository.findById(parentDeleted.getId())).isEmpty();
     assertThat(imageRepository.findById(recent.getId())).isPresent();
     assertThat(imageRepository.findById(active.getId())).isPresent();
-    verify(imageStoragePort).delete("original/expired");
-    verify(imageStoragePort).delete("original/parent");
-    verify(imageStoragePort).delete("processed/parent");
-    verifyNoMoreInteractions(imageStoragePort);
+    then(imageStoragePort).should().delete("original/expired");
+    then(imageStoragePort).should().delete("original/parent");
+    then(imageStoragePort).should().delete("processed/parent");
+    then(imageStoragePort).shouldHaveNoMoreInteractions();
+  }
+
+  @Test
+  @DisplayName("만료된 임시 이미지 업로드 데이터를 R2와 DB에서 정리한다.")
+  void deleteExpiredImageUploads_success() {
+    // given
+    Instant now = Instant.parse("2026-09-11T00:00:00Z");
+    Instant cutoff = now.minusSeconds(3600);
+    ImageUpload upload =
+        imageUploadRepository.save(ImageUpload.create("original/upload", "image/png"));
+
+    entityManager.flush();
+    entityManager
+        .createQuery("UPDATE ImageUpload i SET i.createdAt = :createdAt WHERE i.id = :id")
+        .setParameter("createdAt", cutoff.minusSeconds(1))
+        .setParameter("id", upload.getId())
+        .executeUpdate();
+    entityManager.clear();
+
+    // when
+    imageService.deleteExpiredImageUploads(now);
+    flushAndClear();
+
+    // then
+    assertThat(imageUploadRepository.findById(upload.getId())).isEmpty();
+    then(imageStoragePort).should().delete("original/upload");
   }
 }

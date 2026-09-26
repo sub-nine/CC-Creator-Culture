@@ -7,6 +7,7 @@ import com.sub9.productservice.product.application.port.out.image.ImageData;
 import com.sub9.productservice.product.application.port.out.image.ImageProcessorPort;
 import com.sub9.productservice.product.application.port.out.image.ImageStoragePort;
 import com.sub9.productservice.product.application.support.ImageStorageRollbackCleaner;
+import com.sub9.productservice.product.application.validation.ImageValidator;
 import com.sub9.productservice.product.domain.repository.ImageRepository;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,8 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 @RequiredArgsConstructor
 public class ProductImageProcessingService implements ProductImageProcessingUseCase {
-  private static final String PROCESSED_KEY_FORMAT = "products/%s/images/processed/%s";
-
+  private static final String PROCESSED_KEY_FORMAT = "products/images/processed/%s.%s.jpg";
   private final ImageStorageRollbackCleaner imageStorageRollbackCleaner;
   private final ImageRepository imageRepository;
   private final ImageProcessorPort imageProcessorPort;
@@ -35,6 +35,15 @@ public class ProductImageProcessingService implements ProductImageProcessingUseC
     imageStorageRollbackCleaner.registerRollbackCleanup(uploadedKeys);
 
     ImageData originalImageData = imageStoragePort.download(originalKey);
+
+    try { // 이미지 검증 실패 시 원본 데이터 삭제
+      ImageValidator.resolveMediaType(originalImageData.data());
+    } catch (BusinessException e) {
+      imageStoragePort.delete(originalKey);
+      imageRepository.hardDeleteById(imageId);
+      return;
+    }
+
     ImageData resizedImageData = imageProcessorPort.resize(originalImageData);
 
     imageStoragePort.upload(processedKey, resizedImageData);

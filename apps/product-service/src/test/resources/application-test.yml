@@ -30,12 +30,11 @@ spring:
   flyway:
     enabled: true
 
-cloudflare:
-  r2:
-    access-key: "test-access-key"
-    secret-key: "test-secret-key"
-    endpoint: "https://test.r2.cloudflarestorage.com"
-    bucket: "test-bucket"
+aws:
+  s3:
+    region: ap-northeast-2
+    bucket: test-bucket
+    public-url: https://images.example.com
 
 kafka:
   # @EmbeddedKafka가 활성화된 테스트에서는 임베디드 브로커 주소로 자동 치환되고,
