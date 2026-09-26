@@ -14,7 +14,7 @@ spring:
             - id: product-service
               uri: lb://product-service
               predicates:
-                - Path=/api/v1/products/**,/api/v1/categories/**,/api/v1/hashtags/**,/api/v1/leaderboards/**,/api/v1/admin/categories/**,/api/v1/skus/**,/api/v1/admin/hashtags/**,/api/v1/admin/leaderboards/**
+                - Path=/api/v1/products/**,/api/v1/categories/**,/api/v1/hashtags/**,/api/v1/leaderboards/**,/api/v1/admin/categories/**,/api/v1/skus/**,/api/v1/admin/hashtags/**,/api/v1/admin/leaderboards/**,/api/v1/images/**
             - id: order-service
               uri: lb://order-service
               predicates:

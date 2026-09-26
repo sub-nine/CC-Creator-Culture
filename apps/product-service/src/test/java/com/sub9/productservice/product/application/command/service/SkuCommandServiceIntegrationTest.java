@@ -50,7 +50,8 @@ class SkuCommandServiceIntegrationTest extends AbstractIntegrationTest {
             "말랑이 설명",
             List.of(
                 new CreateSkuCommand("핑크", 10000L, true, 10),
-                new CreateSkuCommand("블루", 12000L, false, 5)));
+                new CreateSkuCommand("블루", 12000L, false, 5)),
+            List.of());
 
     Product product = Product.create(command.creatorId(), command.name(), command.content());
 
@@ -107,7 +108,7 @@ class SkuCommandServiceIntegrationTest extends AbstractIntegrationTest {
   @DisplayName("SKU 수정 테스트")
   class UpdateSku {
     @Test
-    @DisplayName("일반 SKU 정보 수정에 성공한다.")
+    @DisplayName("SKU 정보 수정에 성공한다.")
     void updateSku_success() {
       // given
       Sku targetSku = dummySku.get(1);
@@ -130,7 +131,7 @@ class SkuCommandServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("일반 SKU를 대표 SKU로 수정하면 기존 대표 SKU가 해제된다.")
+    @DisplayName("SKU를 대표 SKU로 수정하면 기존 대표 SKU가 해제된다.")
     void updateSku_success_when_changing_default_sku() {
       // given
       Sku currentDefaultSku = dummySku.get(0);

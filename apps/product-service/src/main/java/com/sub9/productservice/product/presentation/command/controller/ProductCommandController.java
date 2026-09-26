@@ -8,17 +8,12 @@ import com.sub9.productservice.product.presentation.command.dto.product.CreatePr
 import com.sub9.productservice.product.presentation.command.dto.product.CreateProductResponse;
 import com.sub9.productservice.product.presentation.command.dto.product.UpdateProductRequest;
 import com.sub9.productservice.product.presentation.command.dto.product.UpdateProductStatusRequest;
-import com.sub9.productservice.product.presentation.command.mapper.UploadImageMapper;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Size;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 @Creator
 @RestController
@@ -27,18 +22,13 @@ import org.springframework.web.multipart.MultipartFile;
 public class ProductCommandController {
   private final ProductCommandUseCase productCommandUseCase;
 
+  @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ApiResponse<CreateProductResponse> createProduct(
       @AuthenticationPrincipal AuthUser authUser,
-      @Valid @RequestPart CreateProductRequest request,
-      @RequestPart(value = "images", required = false)
-          @Size(max = 5, message = "이미지는 최대 5개까지 등록할 수 있습니다.")
-          List<MultipartFile> images) {
+      @Valid @RequestBody CreateProductRequest request) {
 
-    UUID response =
-        productCommandUseCase.createProduct(
-            request.toCommand(authUser.id()), UploadImageMapper.from(images));
+    UUID response = productCommandUseCase.createProduct(request.toCommand(authUser.id()));
 
     return ApiResponse.success("상품 등록에 성공했습니다.", new CreateProductResponse(response));
   }

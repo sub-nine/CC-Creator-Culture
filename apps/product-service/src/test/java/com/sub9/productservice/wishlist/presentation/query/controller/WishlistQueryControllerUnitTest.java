@@ -9,7 +9,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.sub9.productservice.common.config.r2.R2Properties;
+import com.sub9.productservice.common.config.s3.S3Properties;
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.support.AbstractControllerTest;
@@ -34,7 +34,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @DisplayName("WishlistQueryController - 단위 테스트")
 class WishlistQueryControllerUnitTest extends AbstractControllerTest {
   @MockitoBean WishlistQueryUseCase wishlistQueryUseCase;
-  @MockitoBean R2Properties r2Properties;
+  @MockitoBean S3Properties s3Properties;
 
   private final UUID userId = UUID.randomUUID();
   private final AuthUser authUser = new AuthUser(userId, "CUSTOMER");
@@ -55,7 +55,7 @@ class WishlistQueryControllerUnitTest extends AbstractControllerTest {
         new WishlistInfo(wishlistId, productId, "말랑이", "ACTIVE", 10000L, "products/main.webp");
     given(wishlistQueryUseCase.getWishlist(userId, pageable))
         .willReturn(new SliceImpl<>(List.of(info), pageable, true));
-    given(r2Properties.publicUrl()).willReturn("https://images.example.com");
+    given(s3Properties.publicUrl()).willReturn("https://images.example.com");
 
     // when & then
     mockMvc

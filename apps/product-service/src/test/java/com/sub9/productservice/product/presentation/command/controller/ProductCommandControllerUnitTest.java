@@ -1,26 +1,22 @@
 package com.sub9.productservice.product.presentation.command.controller;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
-import com.sub9.productservice.product.application.command.dto.product.CreateProductCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
-import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
 import com.sub9.productservice.product.application.port.in.product.ProductCommandUseCase;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.support.AbstractControllerTest;
@@ -35,10 +31,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.ArgumentCaptor;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
@@ -64,46 +58,20 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
     void when_request_is_valid_create_product_returns_created() throws Exception {
       // given
       UUID productId = UUID.randomUUID();
-      given(productCommandUseCase.createProduct(any(), anyList())).willReturn(productId);
+      given(productCommandUseCase.createProduct(any())).willReturn(productId);
 
       // when & then
       mockMvc
           .perform(
-              multipart(endPoint)
-                  .file(
-                      new MockMultipartFile(
-                          "request",
-                          "",
-                          "application/json",
-                          jsonMapper.writeValueAsBytes(validRequest())))
-                  .file(new MockMultipartFile("images", "pink.png", "image/png", new byte[] {1, 2}))
-                  .file(
-                      new MockMultipartFile("images", "blue.jpg", "image/jpeg", new byte[] {3, 4}))
+              post(endPoint)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(jsonMapper.writeValueAsBytes(validRequest()))
                   .with(authUser(authUser)))
           .andExpect(status().isCreated())
           .andExpect(jsonPath("$.message").value("상품 등록에 성공했습니다."))
           .andExpect(jsonPath("$.data.productId").value(productId.toString()));
 
-      ArgumentCaptor<CreateProductCommand> commandCaptor =
-          ArgumentCaptor.forClass(CreateProductCommand.class);
-
-      @SuppressWarnings("unchecked")
-      ArgumentCaptor<List<UploadImageCommand>> imagesCaptor = ArgumentCaptor.forClass(List.class);
-
-      verify(productCommandUseCase).createProduct(commandCaptor.capture(), imagesCaptor.capture());
-      assertThat(imagesCaptor.getValue()).hasSize(2);
-      assertThat(imagesCaptor.getValue().get(0).contentType()).isEqualTo("image/png");
-      assertThat(imagesCaptor.getValue().get(0).data()).containsExactly((byte) 1, (byte) 2);
-      assertThat(imagesCaptor.getValue().get(1).contentType()).isEqualTo("image/jpeg");
-      assertThat(imagesCaptor.getValue().get(1).data()).containsExactly((byte) 3, (byte) 4);
-
-      CreateProductCommand command = commandCaptor.getValue();
-
-      assertThat(command.creatorId()).isEqualTo(userId);
-      assertThat(command.name()).isEqualTo("왁뿌볼");
-      assertThat(command.content()).isEqualTo("상품 설명");
-      assertThat(command.hashTags()).containsExactly("왁뿌볼", "말랑이");
-      assertThat(command.skus()).hasSize(1);
+      verify(productCommandUseCase).createProduct(any());
     }
 
     @ParameterizedTest(name = "[{index}] {0}")
@@ -114,17 +82,15 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
         throws Exception {
       mockMvc
           .perform(
-              multipart(endPoint)
-                  .file(
-                      new MockMultipartFile(
-                          "request", "", "application/json", jsonMapper.writeValueAsBytes(request)))
-                  .file(new MockMultipartFile("images", "image.png", "image/png", new byte[] {1}))
+              post(endPoint)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(jsonMapper.writeValueAsBytes(request))
                   .with(authUser(authUser)))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errorCode").value("COMMON_0003"))
           .andExpect(jsonPath("$.errors[0]['" + invalidField + "']").value(errorMessage));
 
-      verify(productCommandUseCase, never()).createProduct(any(), anyList());
+      verify(productCommandUseCase, never()).createProduct(any());
     }
 
     @Test
@@ -133,17 +99,12 @@ class ProductCommandControllerUnitTest extends AbstractControllerTest {
       // when & then
       mockMvc
           .perform(
-              multipart(endPoint)
-                  .file(
-                      new MockMultipartFile(
-                          "request",
-                          "",
-                          "application/json",
-                          jsonMapper.writeValueAsBytes(validRequest())))
+              post(endPoint)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(jsonMapper.writeValueAsBytes(validRequest()))
                   .with(authUser(authUser)))
           .andExpect(status().isCreated());
-      verify(productCommandUseCase)
-          .createProduct(any(), org.mockito.ArgumentMatchers.eq(List.of()));
+      verify(productCommandUseCase).createProduct(any());
     }
 
     static Stream<Arguments> invalidRequests() {

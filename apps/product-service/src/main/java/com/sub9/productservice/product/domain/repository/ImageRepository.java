@@ -1,6 +1,5 @@
 package com.sub9.productservice.product.domain.repository;
 
-import com.sub9.productservice.product.application.command.dto.product.DeleteProductImageCommand;
 import com.sub9.productservice.product.domain.model.Image;
 import java.time.Instant;
 import java.util.List;
@@ -12,8 +11,6 @@ public interface ImageRepository {
   boolean completeProcessing(UUID imageId, String processedKey);
 
   List<Image> findAllByProductIdAndDeletedAtIsNull(UUID productId);
-
-  void deleteAll(List<Image> images);
 
   List<Image> findExpiredImages(Instant cutoff);
 

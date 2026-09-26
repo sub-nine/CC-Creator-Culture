@@ -13,10 +13,9 @@ import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.product.application.command.dto.product.CreateProductCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
-import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
 import com.sub9.productservice.product.application.port.in.image.ProductImageCommandUseCase;
-import com.sub9.productservice.product.domain.exception.SkuErrorCode;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.product.domain.exception.SkuErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import com.sub9.productservice.product.domain.repository.ProductRepository;
@@ -47,11 +46,11 @@ class ProductCommandServiceUnitTest {
   @DisplayName("SKU가 없는 상품은 이미지를 업로드하지 않고 등록을 거부한다.")
   void createProduct_fails_when_skus_are_empty() {
     // given
-    var command = new CreateProductCommand(List.of("말랑이"), creatorId, "말랑이", "상품 설명", List.of());
-    var image = new UploadImageCommand("image/png", new byte[] {1});
+    var command =
+        new CreateProductCommand(List.of("말랑이"), creatorId, "말랑이", "상품 설명", List.of(), List.of());
 
     // when & then
-    assertThatThrownBy(() -> productCommandService.createProduct(command, List.of(image)))
+    assertThatThrownBy(() -> productCommandService.createProduct(command))
         .isInstanceOf(BusinessException.class)
         .hasMessage(SkuErrorCode.SKU_REQUIRED.message());
     verifyNoInteractions(imageCommandService, productRepository);
@@ -103,26 +102,6 @@ class ProductCommandServiceUnitTest {
   @DisplayName("상품 상태 수정 테스트")
   class UpdateStatusProductTests {
     @Test
-    @DisplayName("관리자는 소유권 검증 없이 상품 상태를 수정할 수 있어야 한다.")
-    void updateStatusProduct_success_for_admin() {
-      // given
-      Product product = mock(Product.class);
-      UpdateProductStatusCommand command =
-          new UpdateProductStatusCommand(
-              UUID.randomUUID(), productId, "MASTER", ProductStatus.ACTIVE.name());
-
-      given(productRepository.findByIdAndDeletedAtIsNull(productId))
-          .willReturn(Optional.of(product));
-
-      // when
-      productCommandService.updateStatusProduct(command);
-
-      // then
-      verify(product, never()).validateOwner(command.userId());
-      verify(product).updateStatusByAdmin(ProductStatus.ACTIVE);
-    }
-
-    @Test
     @DisplayName("상품이 존재하지 않으면 PRODUCT_NOT_FOUND 예외가 발생해야 한다.")
     void updateStatusProduct_fails_when_product_not_found() {
       // given
@@ -168,7 +147,7 @@ class ProductCommandServiceUnitTest {
   @DisplayName("상품 삭제 테스트")
   class DeleteProductTests {
     @Test
-    @DisplayName("소유자가 아니면 상품과 이미지 삭제를 수행하지 않는다.")
+    @DisplayName("소유자가 아니면 상품과 이미지 삭제할 수 없다.")
     void deleteProduct_fails_when_not_owner() {
       // given
       Product product = Product.create(UUID.randomUUID(), "말랑이", "상품 설명");

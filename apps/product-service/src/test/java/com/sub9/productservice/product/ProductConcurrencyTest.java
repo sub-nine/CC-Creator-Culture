@@ -6,14 +6,12 @@ import static org.mockito.BDDMockito.given;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.ErrorCode;
-import com.sub9.productservice.product.application.command.dto.product.IncrementDailyViewCountsCommand;
 import com.sub9.productservice.product.application.command.dto.sku.AddSkuCommand;
 import com.sub9.productservice.product.application.command.dto.sku.UpdateSkuCommand;
 import com.sub9.productservice.product.application.command.dto.stock.DeductStockCommand;
 import com.sub9.productservice.product.application.command.dto.stock.RestoreStockCommand;
 import com.sub9.productservice.product.application.port.in.sku.SkuCommandUseCase;
 import com.sub9.productservice.product.application.port.in.stock.OrderStockUseCase;
-import com.sub9.productservice.product.application.port.in.view.IncrementDailyViewCountsUseCase;
 import com.sub9.productservice.product.domain.exception.StockErrorCode;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.Sku;
@@ -23,7 +21,6 @@ import com.sub9.productservice.product.infrastructure.persistence.command.produc
 import com.sub9.productservice.product.infrastructure.persistence.command.sku.SkuCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.stock.StockCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.stock.StockHistoryCommandJpaRepository;
-import com.sub9.productservice.product.infrastructure.scheduler.ProductTotalViewCountScheduler;
 import com.sub9.productservice.review.application.command.dto.CreateReviewCommand;
 import com.sub9.productservice.review.application.port.in.ReviewCommandUseCase;
 import com.sub9.productservice.review.application.port.out.ReviewOrderQueryPort;
@@ -32,7 +29,6 @@ import com.sub9.productservice.review.domain.exception.ReviewErrorCode;
 import com.sub9.productservice.review.infrastructure.persistence.command.ReviewJpaRepository;
 import com.sub9.productservice.support.AbstractIntegrationTest;
 import com.sub9.productservice.support.ConcurrencyTestingUtil;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Queue;
 import java.util.UUID;
@@ -40,7 +36,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -60,8 +55,6 @@ public class ProductConcurrencyTest extends AbstractIntegrationTest {
   @MockitoBean ReviewOrderQueryPort reviewOrderQueryPort;
   @Autowired ReviewCommandUseCase reviewCommandUseCase;
   @Autowired ReviewJpaRepository reviewRepository;
-  @Autowired IncrementDailyViewCountsUseCase dailyViewCountsUseCase;
-  @Autowired ProductTotalViewCountScheduler totalViewCountScheduler;
 
   private UUID creatorId;
   private Product product;
@@ -262,31 +255,6 @@ public class ProductConcurrencyTest extends AbstractIntegrationTest {
       // then
       assertThat(reviewRepository.findAll()).hasSize(1);
       assertThat(errorCodes).hasSize(2).containsOnly(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
-    }
-  }
-
-  @Nested
-  @DisplayName("ProductTotalViewCountScheduler - 동시성 테스트")
-  class ViewCountConcurrencyTests {
-    @Test
-    @Disabled("중복 집계 방지 구현 후 활성화")
-    @DisplayName("토탈 조회수 반영 스케쥴러가 동시에 실행되어도 전체 조회수에 한번만 반영한다.")
-    void execute_concurrently() throws Exception {
-      // given
-      LocalDate yesterday = LocalDate.now().minusDays(1);
-
-      dailyViewCountsUseCase.incrementDailyViewCounts(
-          new IncrementDailyViewCountsCommand(
-              UUID.randomUUID(),
-              yesterday,
-              List.of(new IncrementDailyViewCountsCommand.ViewCount(product.getId(), 1000L))));
-
-      // when
-      ConcurrencyTestingUtil.run(3, totalViewCountScheduler::execute);
-
-      // then
-      assertThat(productRepository.findById(product.getId()).orElseThrow().getViewCount())
-          .isEqualTo(1000L);
     }
   }
 }

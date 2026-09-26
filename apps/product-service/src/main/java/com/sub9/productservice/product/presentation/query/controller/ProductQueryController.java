@@ -3,7 +3,7 @@ package com.sub9.productservice.product.presentation.query.controller;
 import static com.sub9.productservice.product.presentation.support.VisitorCookieResolver.VISITOR_COOKIE;
 
 import com.sub9.common.dto.response.ApiResponse;
-import com.sub9.productservice.common.config.r2.R2Properties;
+import com.sub9.productservice.common.config.s3.S3Properties;
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.product.application.port.in.product.ProductQueryUseCase;
 import com.sub9.productservice.product.presentation.query.dto.ProductDetailResponse;
@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/products")
 public class ProductQueryController {
   private final ProductQueryUseCase productQueryUseCase;
-  private final R2Properties r2Properties;
+  private final S3Properties s3Properties;
 
   @GetMapping
   public ApiResponse<Page<ProductResponse>> searchProducts(
@@ -35,7 +35,7 @@ public class ProductQueryController {
     Page<ProductResponse> response =
         productQueryUseCase
             .searchProducts(keyword, normalizePageSize(pageable))
-            .map(info -> ProductResponse.of(info, r2Properties.publicUrl()));
+            .map(info -> ProductResponse.of(info, s3Properties.publicUrl()));
     return ApiResponse.success(response);
   }
 
@@ -49,7 +49,7 @@ public class ProductQueryController {
     String visitorId = VisitorCookieResolver.resolve(authUser, visitorCookie, response);
     var result = productQueryUseCase.getProductDetail(productId, visitorId);
 
-    return ApiResponse.success(ProductDetailResponse.of(result, r2Properties.publicUrl()));
+    return ApiResponse.success(ProductDetailResponse.of(result, s3Properties.publicUrl()));
   }
 
   private Pageable normalizePageSize(Pageable pageable) {

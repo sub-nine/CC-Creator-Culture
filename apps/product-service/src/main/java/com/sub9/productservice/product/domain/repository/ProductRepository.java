@@ -12,4 +12,10 @@ public interface ProductRepository {
   Optional<Product> findByIdForUpdate(UUID productId);
 
   void incrementViewCount(UUID productId, long viewCount);
+
+  void addReviewStats(UUID productId, int rating);
+
+  void removeReviewStats(UUID productId, int rating);
+
+  void updateReviewRating(UUID productId, int oldRating, int newRating);
 }
