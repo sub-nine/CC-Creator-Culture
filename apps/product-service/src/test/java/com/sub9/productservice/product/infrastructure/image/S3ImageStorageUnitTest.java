@@ -8,7 +8,7 @@ import static org.mockito.Mockito.verify;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.CommonErrorCode;
-import com.sub9.productservice.common.config.r2.R2Properties;
+import com.sub9.productservice.common.config.s3.S3Properties;
 import com.sub9.productservice.product.application.port.out.image.ImageData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,25 +25,23 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("R2ImageStorage - 단위 테스트")
-class R2ImageStorageUnitTest {
+class S3ImageStorageUnitTest {
   @Mock S3Client s3Client;
-  private R2ImageStorage storage;
+  @Mock S3Presigner s3Presigner;
+  private S3ImageStorage storage;
   private final String objectKey = "products/product/images/original/image";
   private final byte[] bytes = {1, 2, 3};
 
   @BeforeEach
   void setUp() {
     storage =
-        new R2ImageStorage(
-            new R2Properties(
-                "test",
-                "test",
-                "https://example.invalid",
-                "test-bucket",
-                "https://images.example.com"),
+        new S3ImageStorage(
+            new S3Properties("ap-northeast-2", "test-bucket", "https://images.example.com"),
+            s3Presigner,
             s3Client);
   }
 
@@ -51,7 +49,7 @@ class R2ImageStorageUnitTest {
   @DisplayName("원본 및 처리 이미지 업로드 테스트")
   class UploadTests {
     @Test
-    @DisplayName("지정한 키와 타입으로 이미지 바이트를 업로드하고 키를 반환한다.")
+    @DisplayName("지정한 키와 타입으로 이미지를 업로드하고 키를 반환한다.")
     void upload_success() throws Exception {
       // when
       String result = storage.upload(objectKey, new ImageData("image/png", bytes));
@@ -73,11 +71,11 @@ class R2ImageStorageUnitTest {
     }
 
     @Test
-    @DisplayName("R2 업로드에 실패하면 INTERNAL_SERVER_ERROR 예외가 발생해야한다..")
+    @DisplayName("S3 업로드에 실패하면 INTERNAL_SERVER_ERROR 예외가 발생해야한다..")
     void upload_fails_when_storage_unavailable() {
       // given
       given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
-          .willThrow(SdkClientException.create("R2 unavailable"));
+          .willThrow(SdkClientException.create("S3 unavailable"));
 
       // when & then
       assertThatThrownBy(() -> storage.upload(objectKey, new ImageData("image/png", bytes)))

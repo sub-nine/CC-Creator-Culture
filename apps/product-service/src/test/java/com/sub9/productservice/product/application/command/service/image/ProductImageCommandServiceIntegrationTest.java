@@ -52,10 +52,10 @@ class ProductImageCommandServiceIntegrationTest extends AbstractIntegrationTest 
 
   @Test
   @DisplayName("이미지를 첨부하지 않으면 이미지가 저장되지 않는다.")
-  void uploadImages_success_without_images() {
+  void addImages_success_without_images() {
     // when
-    imageService.uploadImages(product.getId(), List.of());
-    imageService.uploadImages(product.getId(), null);
+    imageService.addImages(new AddImagesCommand(product.getId(), creatorId, List.of()));
+    imageService.addImages(new AddImagesCommand(product.getId(), creatorId, null));
     flushAndClear();
 
     // then

@@ -35,13 +35,11 @@ spring:
       max-file-size: 5MB
       max-request-size: 26MB
 
-cloudflare:
-  r2:
-    access-key: ${R2_ACCESS_KEY}
-    secret-key: ${R2_SECRET_KEY}
-    endpoint: ${R2_ENDPOINT}
-    bucket: ${R2_BUCKET}
-    public-url: ${R2_PUBLIC_URL}
+aws:
+  s3:
+    region: ${AWS_REGION:ap-northeast-2}
+    bucket: ${AWS_S3_BUCKET}
+    public-url: ${AWS_S3_PUBLIC_URL}
 
 embedding:
   client:
