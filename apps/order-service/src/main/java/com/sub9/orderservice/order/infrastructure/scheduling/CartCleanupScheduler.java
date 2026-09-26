@@ -54,26 +54,42 @@ public class CartCleanupScheduler {
         Instant now = clock.instant();
         // 스케줄러 스레드를 주문 만료와 공유하므로, 적체가 길어도 연속 배치 상한에서 양보한다.
         for (int batch = 0; batch < maxConsecutiveBatches; batch++) {
-            List<CartCleanupTask> due = tasks.findDue(now, batchSize);
-            for (CartCleanupTask task : due) {
-                try {
-                    // 프록시의 트랜잭션 커밋이 끝난 뒤에만 실제 삭제 성공을 집계한다.
-                    if (transactions.process(task.getId(), now)) {
-                        metrics.succeeded(task.getCreatedAt());
-                    }
-                } catch (RuntimeException exception) {
-                    metrics.failed();
-                    log.error("장바구니 정리 실패: orderId={}", task.getOrderId(), exception);
-                    try {
-                        transactions.postpone(task.getId(), clock.instant().plusSeconds(60));
-                    } catch (RuntimeException retryException) {
-                        log.error("장바구니 정리 재시도 시각 저장 실패: orderId={}", task.getOrderId(), retryException);
-                    }
-                }
-            }
-            if (due.size() < batchSize) {
+            if (processBatch(now) < batchSize) {
                 return;
             }
         }
+    }
+
+    private int processBatch(Instant now) {
+        try {
+            List<Instant> completed = transactions.processBatch(now, batchSize);
+            // 프록시의 트랜잭션 커밋이 끝난 뒤에만 실제 삭제 성공을 집계한다.
+            completed.forEach(metrics::succeeded);
+            return completed.size();
+        } catch (RuntimeException exception) {
+            log.warn("장바구니 정리 일괄 처리 실패, 건별 처리로 전환", exception);
+            return processEach(now);
+        }
+    }
+
+    // 일괄 처리가 롤백되면 건별 트랜잭션으로 다시 처리해 실패한 작업만 60초 뒤로 미룬다.
+    private int processEach(Instant now) {
+        List<CartCleanupTask> due = tasks.findDue(now, batchSize);
+        for (CartCleanupTask task : due) {
+            try {
+                if (transactions.process(task.getId(), now)) {
+                    metrics.succeeded(task.getCreatedAt());
+                }
+            } catch (RuntimeException exception) {
+                metrics.failed();
+                log.error("장바구니 정리 실패: orderId={}", task.getOrderId(), exception);
+                try {
+                    transactions.postpone(task.getId(), clock.instant().plusSeconds(60));
+                } catch (RuntimeException retryException) {
+                    log.error("장바구니 정리 재시도 시각 저장 실패: orderId={}", task.getOrderId(), retryException);
+                }
+            }
+        }
+        return due.size();
     }
 }

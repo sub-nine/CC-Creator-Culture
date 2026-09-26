@@ -169,6 +169,7 @@ class CartCleanupIntegrationTest {
         Cart second = cart(UUID.randomUUID());
         CartCleanupTask successful = enqueue(second);
         CartCleanupTransactionService failing = mock(CartCleanupTransactionService.class);
+        doThrow(new IllegalStateException("일괄 실패")).when(failing).processBatch(any(), anyInt());
         doThrow(new IllegalStateException("삭제 실패")).when(failing).process(failed.getId(), NOW);
         doThrow(new IllegalStateException("재시도 기록 실패")).when(failing).postpone(eq(failed.getId()), any());
         doAnswer(call -> worker.process(successful.getId(), NOW))
@@ -194,7 +195,7 @@ class CartCleanupIntegrationTest {
         new CartCleanupScheduler(tasks, worker, Clock.fixed(NOW, ZoneOffset.UTC), metrics, 1, 3).cleanup();
 
         assertThat(taskJpa.count()).isEqualTo(1);
-        verify(taskRepository, times(3)).findDue(NOW, 1);
+        verify(taskRepository, times(3)).claimDue(NOW, 1);
     }
 
     @Test
@@ -207,7 +208,43 @@ class CartCleanupIntegrationTest {
         new CartCleanupScheduler(tasks, worker, Clock.fixed(NOW, ZoneOffset.UTC), metrics, 3, 10).cleanup();
 
         assertThat(taskJpa.count()).isZero();
-        verify(taskRepository, times(1)).findDue(NOW, 3);
+        verify(taskRepository, times(1)).claimDue(NOW, 3);
+    }
+
+    @Test
+    @DisplayName("일괄 삭제 중 한 건이 실패하면 배치 전체를 롤백한다")
+    void when_one_task_fails_in_batch_whole_batch_is_rolled_back() {
+        Cart healthy = cart(UUID.randomUUID());
+        CartCleanupTask healthyTask = enqueue(healthy);
+        Cart broken = cart(UUID.randomUUID());
+        CartCleanupTask brokenTask = enqueue(broken);
+        failCleanupFor(broken);
+
+        assertThatThrownBy(() -> worker.processBatch(NOW, 100)).hasMessage("일부 삭제 실패");
+
+        assertThat(carts.findById(healthy.getId())).isPresent();
+        assertThat(carts.findById(broken.getId())).isPresent();
+        assertThat(taskJpa.findById(healthyTask.getId())).isPresent();
+        assertThat(taskJpa.findById(brokenTask.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("일괄 삭제가 실패하면 건별로 다시 처리해 실패한 작업만 60초 뒤로 미룬다")
+    void when_batch_fails_scheduler_retries_each_and_postpones_only_failed_task() {
+        Cart healthy = cart(UUID.randomUUID());
+        CartCleanupTask healthyTask = enqueue(healthy);
+        Cart broken = cart(UUID.randomUUID());
+        CartCleanupTask brokenTask = enqueue(broken);
+        failCleanupFor(broken);
+        double failures = meters.counter("order.cart.cleanup.tasks", "result", "failure").count();
+
+        scheduler(NOW).cleanup();
+
+        assertThat(carts.findById(healthy.getId())).isEmpty();
+        assertThat(taskJpa.findById(healthyTask.getId())).isEmpty();
+        assertThat(carts.findById(broken.getId())).isPresent();
+        assertThat(taskJpa.findById(brokenTask.getId()).orElseThrow().getNextAttemptAt()).isEqualTo(NOW.plusSeconds(60));
+        assertThat(meters.counter("order.cart.cleanup.tasks", "result", "failure").count()).isEqualTo(failures + 1);
     }
 
     @Test
@@ -373,6 +410,11 @@ class CartCleanupIntegrationTest {
             entityManager.flush();
             throw new IllegalStateException("완료 저장 장애");
         }).when(taskRepository).delete(any());
+        doAnswer(call -> {
+            call.callRealMethod();
+            entityManager.flush();
+            throw new IllegalStateException("완료 저장 장애");
+        }).when(taskRepository).deleteAll(any());
         scheduler(NOW).cleanup();
         assertThat(carts.findById(selected.getId())).isPresent();
         assertThat(taskJpa.findById(task.getId())).isPresent();
@@ -380,6 +422,17 @@ class CartCleanupIntegrationTest {
         scheduler(NOW.plusSeconds(60)).cleanup();
         assertThat(carts.findById(selected.getId())).isEmpty();
         assertThat(taskJpa.findById(task.getId())).isEmpty();
+    }
+
+    private void failCleanupFor(Cart target) {
+        doAnswer(call -> {
+            CartCleanupCommand command = call.getArgument(0);
+            call.callRealMethod();
+            if (command.cartItemIds().contains(target.getId())) {
+                throw new IllegalStateException("일부 삭제 실패");
+            }
+            return null;
+        }).when(cleanup).cleanup(any());
     }
 
     private String status(Order order) {
