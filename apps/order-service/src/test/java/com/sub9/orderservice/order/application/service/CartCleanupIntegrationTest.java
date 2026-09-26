@@ -23,6 +23,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import com.sub9.orderservice.order.infrastructure.scheduling.CartCleanupScheduler;
+import com.sub9.orderservice.order.infrastructure.scheduling.CartCleanupMetrics;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -63,6 +65,8 @@ class CartCleanupIntegrationTest {
     @Container
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
     @Autowired CartCleanupTaskRepository tasks;
+    @Autowired CartCleanupMetrics metrics;
+    @Autowired MeterRegistry meters;
     @Autowired CartCleanupTaskJpaRepository taskJpa;
     @Autowired CartJpaRepository carts;
     @Autowired CartCleanupTransactionService worker;
@@ -108,6 +112,7 @@ class CartCleanupIntegrationTest {
         Cart unselected = cart(selected.getUserId());
         Cart other = cart(UUID.randomUUID());
         CartCleanupTask task = enqueue(selected, other.getId());
+        double before = meters.counter("order.cart.cleanup.tasks", "result", "success").count();
 
         scheduler(NOW).cleanup();
 
@@ -115,6 +120,9 @@ class CartCleanupIntegrationTest {
         assertThat(carts.findById(unselected.getId())).isPresent();
         assertThat(carts.findById(other.getId())).isPresent();
         assertThat(taskJpa.findById(task.getId())).isEmpty();
+        assertThat(meters.counter("order.cart.cleanup.tasks", "result", "success").count()).isEqualTo(before + 1);
+        scheduler(NOW).cleanup();
+        assertThat(meters.counter("order.cart.cleanup.tasks", "result", "success").count()).isEqualTo(before + 1);
         Cart added = carts.save(Cart.create(UUID.randomUUID(), selected.getUserId(), selected.getProductId(), selected.getSkuId(), 3));
         worker.process(task.getId(), NOW);
         // 동일 요청이 다시 전달되어도 원본 ID만 삭제한다.
@@ -130,6 +138,8 @@ class CartCleanupIntegrationTest {
         Order order = order(selected);
         payments.process(order.getCustomerId(), order.getOrderNumber(), PaymentStatus.SUCCESS);
         CartCleanupTask task = tasks.findDue(NOW, 100).getFirst();
+        double before = meters.counter("order.cart.cleanup.tasks", "result", "success").count();
+        double failures = meters.counter("order.cart.cleanup.tasks", "result", "failure").count();
         doAnswer(call -> {
             call.callRealMethod();
             throw new IllegalStateException("삭제 이후 장애");
@@ -141,6 +151,8 @@ class CartCleanupIntegrationTest {
         assertThat(status(order)).isEqualTo("PAID");
         assertThat(paymentRepository.findByOrderId(order.getId())).isPresent();
         assertThat(taskJpa.findById(task.getId()).orElseThrow().getNextAttemptAt()).isEqualTo(NOW.plusSeconds(60));
+        assertThat(meters.counter("order.cart.cleanup.tasks", "result", "success").count()).isEqualTo(before);
+        assertThat(meters.counter("order.cart.cleanup.tasks", "result", "failure").count()).isEqualTo(failures + 1);
         reset(cleanup);
         scheduler(NOW.plusSeconds(59)).cleanup();
         assertThat(carts.findById(selected.getId())).isPresent();
@@ -159,10 +171,10 @@ class CartCleanupIntegrationTest {
         CartCleanupTransactionService failing = mock(CartCleanupTransactionService.class);
         doThrow(new IllegalStateException("삭제 실패")).when(failing).process(failed.getId(), NOW);
         doThrow(new IllegalStateException("재시도 기록 실패")).when(failing).postpone(eq(failed.getId()), any());
-        doAnswer(call -> { worker.process(successful.getId(), NOW); return null; })
+        doAnswer(call -> worker.process(successful.getId(), NOW))
                 .when(failing).process(successful.getId(), NOW);
 
-        new CartCleanupScheduler(tasks, failing, Clock.fixed(NOW, ZoneOffset.UTC)).cleanup();
+        new CartCleanupScheduler(tasks, failing, Clock.fixed(NOW, ZoneOffset.UTC), metrics).cleanup();
 
         assertThat(taskJpa.findById(failed.getId())).isPresent();
         assertThat(carts.findById(first.getId())).isPresent();
@@ -362,7 +374,7 @@ class CartCleanupIntegrationTest {
     }
 
     private CartCleanupScheduler scheduler(Instant now) {
-        return new CartCleanupScheduler(tasks, worker, Clock.fixed(now, ZoneOffset.UTC));
+        return new CartCleanupScheduler(tasks, worker, Clock.fixed(now, ZoneOffset.UTC), metrics);
     }
 
     private Cart cart(UUID userId) {
