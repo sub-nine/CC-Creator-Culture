@@ -53,6 +53,10 @@ import tools.jackson.databind.json.JsonMapper;
         "spring.kafka.producer.properties[max.block.ms]=2000",
         "spring.kafka.producer.properties[request.timeout.ms]=1000",
         "spring.kafka.producer.properties[delivery.timeout.ms]=3000",
+        "order.event-outbox.enabled=true",
+        "order.event-outbox.interval-ms=200",
+        // 브로커 복구 후 재발행을 테스트 시간 안에 확인하도록 재시도 간격을 줄인다.
+        "order.event-outbox.retry-delay=1s",
         "order.cart-cleanup.enabled=false",
         "management.tracing.export.enabled=false"
 })
@@ -130,6 +134,7 @@ class OrderPaymentEventKafkaIntegrationTest extends AbstractIntegrationTest {
 
     @AfterEach
     void cleanDatabase() {
+        jdbcTemplate.update("delete from p_order_event_outbox");
         jdbcTemplate.update("delete from p_order_items");
         jdbcTemplate.update("delete from p_orders");
     }
@@ -153,8 +158,8 @@ class OrderPaymentEventKafkaIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("브로커 장애 중 결제가 커밋되면 복구 후에도 해당 이벤트가 발행되지 않는다")
-    void when_broker_is_unavailable_at_payment_commit_events_are_not_republished_after_recovery() {
+    @DisplayName("브로커 장애 중 결제가 커밋되면 결제 이벤트는 복구 후 발행되고 알림 이벤트는 유실된다")
+    void when_broker_is_unavailable_at_payment_commit_paid_event_is_published_after_recovery() {
         Order lost = saveOrder();
         Order recovered = saveOrder();
 
@@ -178,11 +183,11 @@ class OrderPaymentEventKafkaIntegrationTest extends AbstractIntegrationTest {
 
         paymentResultUseCase.markPaid(recovered.getId(), recovered.getExpiresAt().minusSeconds(1));
 
-        // 현재 동작 확인용. Outbox 전환 시 복구 후 발행으로 바꾼다.
-        for (String topic : TOPICS) {
-            assertThat(keys(recordsUntil(topic, recovered.getId())))
-                    .doesNotContain(lost.getId().toString());
-        }
+        // order.paid는 Outbox에 남아 있다가 복구 후 발행된다.
+        assertThat(keys(recordsUntil(KafkaTopics.ORDER_PAID, lost.getId()))).contains(lost.getId().toString());
+        // order.notification은 아직 커밋 후 바로 전송하므로 유실된다. Outbox 전환 시 복구 후 발행으로 바꾼다.
+        assertThat(keys(recordsUntil(KafkaTopics.ORDER_NOTIFICATION, recovered.getId())))
+                .doesNotContain(lost.getId().toString());
     }
 
     private static String failure(String topic, String key) {

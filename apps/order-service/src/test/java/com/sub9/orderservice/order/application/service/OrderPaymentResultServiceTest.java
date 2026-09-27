@@ -18,6 +18,7 @@ import com.sub9.orderservice.order.domain.model.OrderStatus;
 import com.sub9.orderservice.order.domain.model.ProductSnapshot;
 import com.sub9.orderservice.order.domain.model.ShippingAddress;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
+import com.sub9.orderservice.order.infrastructure.outbox.OrderEventOutboxWriter;
 import java.time.Instant;
 import java.util.List;
 import com.sub9.common.kafka.event.OrderPaidEvent;
@@ -57,6 +58,9 @@ class OrderPaymentResultServiceTest {
 
     @Mock
     private tools.jackson.databind.json.JsonMapper jsonMapper;
+
+    @Mock
+    private OrderEventOutboxWriter outbox;
 
     @InjectMocks
     private OrderPaymentResultService paymentResultService;
@@ -154,7 +158,7 @@ class OrderPaymentResultServiceTest {
     }
 
     @Test
-    @DisplayName("여러 SKU를 결제하면 상품별 수량을 합산한 불변 이벤트를 등록한다")
+    @DisplayName("여러 SKU를 결제하면 상품별 수량을 합산한 불변 이벤트를 Outbox에 기록한다")
     void when_multiple_skus_are_paid_quantities_are_summed_by_product() {
         UUID first = uuid(900);
         UUID second = uuid(901);
@@ -165,7 +169,8 @@ class OrderPaymentResultServiceTest {
         paymentResultService.markPaid(order.getId(), CREATED_AT.plusSeconds(1));
 
         ArgumentCaptor<OrderPaidEvent> event = ArgumentCaptor.forClass(OrderPaidEvent.class);
-        verify(eventPublisher).publishEvent(event.capture());
+        verify(outbox).write(org.mockito.ArgumentMatchers.eq("order.paid"),
+                org.mockito.ArgumentMatchers.eq(order.getId().toString()), event.capture());
         assertThat(event.getValue().orderId()).isEqualTo(order.getId());
         assertThat(event.getValue().productQuantities()).containsExactlyInAnyOrder(
                 new OrderPaidEvent.ProductQuantity(first, 5L),
@@ -183,7 +188,7 @@ class OrderPaymentResultServiceTest {
 
         assertOrderError(() -> paymentResultService.markPaid(order.getId(), CREATED_AT.plusSeconds(2)),
                 OrderErrorCode.INVALID_ORDER_STATUS);
-        verifyNoInteractions(eventPublisher);
+        verifyNoInteractions(eventPublisher, outbox);
     }
 
     private void assertNotification(Order order, String eventType, String status, Instant occurredAt) {

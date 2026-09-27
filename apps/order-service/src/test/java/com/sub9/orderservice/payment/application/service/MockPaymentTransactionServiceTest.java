@@ -65,7 +65,9 @@ class MockPaymentTransactionServiceTest {
         service = new MockPaymentTransactionService(
                 orders, payments, new OrderPaymentResultService(orders, coupons, events, ids,
                         org.mockito.Mockito.mock(com.sub9.orderservice.order.domain.repository.CartCleanupTaskRepository.class),
-                        tools.jackson.databind.json.JsonMapper.builder().build()), clock, ids);
+                        tools.jackson.databind.json.JsonMapper.builder().build(),
+                        org.mockito.Mockito.mock(com.sub9.orderservice.order.infrastructure.outbox.OrderEventOutboxWriter.class)),
+                clock, ids);
     }
 
     @Test

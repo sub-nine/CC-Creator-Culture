@@ -132,6 +132,7 @@ class MockPaymentIntegrationTest {
 
     @AfterEach
     void cleanDatabase() {
+        jdbc.update("delete from p_order_event_outbox");
         jdbc.update("delete from public.p_payment_cancellations");
         jdbc.update("delete from public.p_payments");
         jdbc.update("delete from p_order_items");
@@ -148,11 +149,11 @@ class MockPaymentIntegrationTest {
         when(clock.instant()).thenReturn(order.getExpiresAt().plusSeconds(60));
         MockPaymentResult repeated = process(order, status);
         if (status == PaymentStatus.SUCCESS) {
-            ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
-            verify(kafka).send(eq("order.paid"), eq(order.getId().toString()), payload.capture());
-            assertThat(mapper.readValue(payload.getValue(), OrderPaidEvent.class))
+            assertThat(mapper.readValue(outboxPayload("order.paid", order), OrderPaidEvent.class))
                     .isEqualTo(new OrderPaidEvent(order.getId(),
                             List.of(new OrderPaidEvent.ProductQuantity(order.getItems().getFirst().getProductId(), 2L))));
+        } else {
+            assertThat(outboxCount("order.paid", order)).isZero();
         }
         ArgumentCaptor<String> notificationPayload = ArgumentCaptor.forClass(String.class);
         verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), notificationPayload.capture());
@@ -391,7 +392,7 @@ class MockPaymentIntegrationTest {
 
         process(order, PaymentStatus.SUCCESS);
 
-        verify(kafka).send(eq("order.paid"), eq(order.getId().toString()), anyString());
+        assertThat(outboxCount("order.paid", order)).isEqualTo(1);
         verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
     }
 
@@ -413,7 +414,7 @@ class MockPaymentIntegrationTest {
         assertThat(orderStatus(order)).isEqualTo("PAID");
         assertThat(paymentCount()).isEqualTo(1);
         assertThat(process(order, PaymentStatus.SUCCESS)).isEqualTo(result);
-        verify(kafka).send(eq("order.paid"), eq(order.getId().toString()), anyString());
+        assertThat(outboxCount("order.paid", order)).isEqualTo(1);
         verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
     }
 
@@ -460,6 +461,7 @@ class MockPaymentIntegrationTest {
         assertThat(orderStatus(order)).isEqualTo("PENDING_PAYMENT");
         assertThat(queries.findDetailByOrderNumber(order.getOrderNumber()).orElseThrow().getPaidAt()).isNull();
         verifyNoInteractions(stock, kafka);
+        assertThat(outboxCount("order.paid", order)).isZero();
     }
 
     private void assertBusinessError(Runnable action, OrderErrorCode expected) {
@@ -469,6 +471,16 @@ class MockPaymentIntegrationTest {
 
     private int paymentCount() {
         return jdbc.queryForObject("select count(*) from public.p_payments", Integer.class);
+    }
+
+    private int outboxCount(String topic, Order order) {
+        return jdbc.queryForObject("select count(*) from p_order_event_outbox where topic = ? and message_key = ?",
+                Integer.class, topic, order.getId().toString());
+    }
+
+    private String outboxPayload(String topic, Order order) {
+        return jdbc.queryForObject("select payload from p_order_event_outbox where topic = ? and message_key = ?",
+                String.class, topic, order.getId().toString());
     }
 
     private String orderStatus(Order order) {

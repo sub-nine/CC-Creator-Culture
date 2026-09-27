@@ -15,6 +15,8 @@ import com.sub9.orderservice.order.application.port.output.StockRestoreCommand;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
+import com.sub9.orderservice.order.infrastructure.outbox.OrderEventOutboxWriter;
+import com.sub9.common.kafka.topic.KafkaTopics;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +39,7 @@ public class OrderPaymentResultService implements PaymentResultUseCase {
     private final UuidV7Generator uuidGenerator;
     private final CartCleanupTaskRepository cleanupTasks;
     private final JsonMapper jsonMapper;
+    private final OrderEventOutboxWriter outbox;
 
     @Override
     @Transactional
@@ -49,7 +52,7 @@ public class OrderPaymentResultService implements PaymentResultUseCase {
                 .collect(Collectors.groupingBy(
                         item -> item.getProductId(),
                         Collectors.summingLong(item -> item.getProductSnapshot().getQuantity())));
-        eventPublisher.publishEvent(new OrderPaidEvent(orderId, quantities.entrySet().stream()
+        outbox.write(KafkaTopics.ORDER_PAID, orderId.toString(), new OrderPaidEvent(orderId, quantities.entrySet().stream()
                 .map(entry -> new OrderPaidEvent.ProductQuantity(entry.getKey(), entry.getValue()))
                 .toList()));
         publishNotification(order, "PAYMENT_PAID", "PAID", processedAt);
