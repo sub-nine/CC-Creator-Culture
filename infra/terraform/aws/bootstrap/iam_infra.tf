@@ -2,6 +2,7 @@ locals {
   persistent_role_names = [
     "${var.name_prefix}-ecs-execution",
     "${var.name_prefix}-ecs-task",
+    "${var.name_prefix}-product-service-task",
     "${var.name_prefix}-observation",
     "${var.name_prefix}-kafka",
   ]
