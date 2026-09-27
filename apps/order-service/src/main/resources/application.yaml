@@ -13,6 +13,13 @@ spring:
   jpa:
     open-in-view: false
 
+  # 기본 스케줄러 스레드는 1개다. Outbox 발행기, 장바구니 정리, 주문 만료가 한 스레드를 나눠 쓰면
+  # 브로커 장애 중 발행기가 전송을 기다리는 동안 다른 두 작업도 멈추므로 작업마다 스레드를 둔다.
+  task:
+    scheduling:
+      pool:
+        size: 3
+
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
