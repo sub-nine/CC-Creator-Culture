@@ -31,8 +31,13 @@ import { createProductWithSku } from '../../lib/product.js';
  * 장바구니 요청은 구매 SLA에서 제외하지만 서버 부하와 VU 점유 시간에는 포함된다.
  * 실행 중 장바구니 준비 실패는 해당 반복만 종료하고 별도 실패율 0.1% 이하로 판정한다.
  * P95, P99와 에러율은 실패 응답도 포함한다. 유지 구간은 P95 200ms, P99 300ms 미만이어야 한다.
+ * MODE=capacity(기본): 500 VU 폐쇄형으로 한계와 병목을 기록한다. P95/P99는 판정하지 않는다.
+ * MODE=sla: 구매 반복 도착률을 고정(기본 초당 105회, 약 420 req/s)해 요구사항 충족 여부를 판정한다.
+ *   SLA_RATE로 초당 반복 수를 바꿀 수 있고, 건너뛴 반복(dropped_iterations)이 있으면 실패로 본다.
  */
 const smoke = __ENV.SMOKE_TEST === '1';
+const sla = __ENV.MODE === 'sla';
+const rate = Number(__ENV.SLA_RATE || 105);
 const ramp = smoke ? 1 : 300;
 const steady = smoke ? 3 : 900;
 const down = smoke ? 1 : 120;
@@ -57,27 +62,38 @@ for (const scope of ['', 'phase:steady']) {
     const suffix = tags ? `{${tags}}` : '';
     thresholds[`purchase_requests${suffix}`] = ['count>=0'];
     thresholds[`purchase_successes${suffix}`] = ['count>=0'];
-    thresholds[`purchase_duration${suffix}`] = scope ? ['p(95)<200', 'p(99)<300'] : ['p(95)>=0'];
+    thresholds[`purchase_duration${suffix}`] = scope && (sla || smoke) ? ['p(95)<200', 'p(99)<300'] : ['p(95)>=0'];
     thresholds[`purchase_errors${suffix}`] = [smoke ? 'rate==0' : scope ? 'rate<=0.001' : 'rate<=1'];
   }
 }
 thresholds['purchase_completed'] = [smoke ? 'count>=1' : 'count>=0'];
 thresholds['purchase_completed{phase:steady}'] = ['count>=0'];
 if (!smoke) thresholds['purchase_successes{phase:steady}'] = [`count>=${400 * steady}`];
+if (sla && !smoke) thresholds['dropped_iterations'] = ['count==0'];
+
+const purchase = sla && !smoke ? {
+  // 도착률 고정. 반복마다 VU 하나가 고객 하나를 쓰므로 VU 상한은 준비한 고객 수와 같다.
+  executor: 'ramping-arrival-rate', startRate: 0, timeUnit: '1s',
+  preAllocatedVUs: vus, maxVUs: vus,
+  stages: [
+    { duration: `${ramp}s`, target: rate },
+    { duration: `${steady}s`, target: rate },
+    { duration: `${down}s`, target: 0 },
+  ],
+  gracefulStop: '30s',
+} : {
+  executor: 'ramping-vus', startVUs: 0,
+  stages: [
+    { duration: `${ramp}s`, target: vus },
+    { duration: `${steady}s`, target: vus },
+    { duration: `${down}s`, target: 0 },
+  ],
+  gracefulRampDown: '30s', gracefulStop: '30s',
+};
 
 export const options = {
   setupTimeout: '10m',
-  scenarios: {
-    purchase: {
-      executor: 'ramping-vus', startVUs: 0,
-      stages: [
-        { duration: `${ramp}s`, target: vus },
-        { duration: `${steady}s`, target: vus },
-        { duration: `${down}s`, target: 0 },
-      ],
-      gracefulRampDown: '30s', gracefulStop: '30s',
-    },
-  },
+  scenarios: { purchase },
   thresholds,
   summaryTrendStats: ['avg', 'p(95)', 'p(99)'],
   // 실제 주문번호가 URL 태그로 쌓이지 않도록 고정 name 태그만 사용한다.

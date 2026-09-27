@@ -31,8 +31,18 @@ public class CartCleanupTaskRepositoryAdapter implements CartCleanupTaskReposito
     }
 
     @Override
+    public List<CartCleanupTask> claimDue(Instant now, int limit) {
+        return repository.claimDue(now, limit);
+    }
+
+    @Override
     public void delete(CartCleanupTask task) {
         repository.delete(task);
+    }
+
+    @Override
+    public void deleteAll(List<CartCleanupTask> tasks) {
+        repository.deleteAllInBatch(tasks);
     }
 
     @Override

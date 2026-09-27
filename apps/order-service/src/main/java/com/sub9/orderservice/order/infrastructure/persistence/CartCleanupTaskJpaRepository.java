@@ -22,6 +22,16 @@ public interface CartCleanupTaskJpaRepository extends JpaRepository<CartCleanupT
             """, nativeQuery = true)
     Optional<CartCleanupTask> findDueForUpdate(@Param("id") UUID id, @Param("now") Instant now);
 
+    // 목록 조회와 점유를 한 번에 해서 다른 실행기가 잡은 행은 건너뛴다.
+    @Query(value = """
+            select * from p_order_cart_cleanup_tasks
+             where next_attempt_at <= :now
+             order by next_attempt_at, id
+             limit :limit
+             for update skip locked
+            """, nativeQuery = true)
+    List<CartCleanupTask> claimDue(@Param("now") Instant now, @Param("limit") int limit);
+
     @Modifying
     @Query("update CartCleanupTask t set t.nextAttemptAt = :nextAttemptAt where t.id = :id")
     int postpone(@Param("id") UUID id, @Param("nextAttemptAt") Instant nextAttemptAt);

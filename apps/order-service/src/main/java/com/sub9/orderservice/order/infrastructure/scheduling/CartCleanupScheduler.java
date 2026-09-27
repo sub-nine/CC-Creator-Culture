@@ -5,15 +5,15 @@ import com.sub9.orderservice.order.domain.model.CartCleanupTask;
 import com.sub9.orderservice.order.domain.repository.CartCleanupTaskRepository;
 import java.time.Clock;
 import java.time.Instant;
-import lombok.RequiredArgsConstructor;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "order.cart-cleanup", name = "enabled",
         havingValue = "true", matchIfMissing = true)
 public class CartCleanupScheduler {
@@ -21,6 +21,23 @@ public class CartCleanupScheduler {
     private final CartCleanupTransactionService transactions;
     private final Clock clock;
     private final CartCleanupMetrics metrics;
+    private final int batchSize;
+    private final int maxConsecutiveBatches;
+
+    public CartCleanupScheduler(
+            CartCleanupTaskRepository tasks,
+            CartCleanupTransactionService transactions,
+            Clock clock,
+            CartCleanupMetrics metrics,
+            @Value("${order.cart-cleanup.batch-size:100}") int batchSize,
+            @Value("${order.cart-cleanup.max-consecutive-batches:10}") int maxConsecutiveBatches) {
+        this.tasks = tasks;
+        this.transactions = transactions;
+        this.clock = clock;
+        this.metrics = metrics;
+        this.batchSize = batchSize;
+        this.maxConsecutiveBatches = maxConsecutiveBatches;
+    }
 
     @Scheduled(fixedDelayString = "${order.cart-cleanup.interval-ms:500}", initialDelay = 5_000L)
     public void cleanup() {
@@ -28,15 +45,38 @@ public class CartCleanupScheduler {
         try {
             processDue();
         } finally {
+            // 연속 배치를 포함한 이번 스케줄 실행 전체 시간을 기록한다.
             metrics.execution(System.nanoTime() - started);
         }
     }
 
     private void processDue() {
         Instant now = clock.instant();
-        for (CartCleanupTask task : tasks.findDue(now, 100)) {
+        // 스케줄러 스레드를 주문 만료와 공유하므로, 적체가 길어도 연속 배치 상한에서 양보한다.
+        for (int batch = 0; batch < maxConsecutiveBatches; batch++) {
+            if (processBatch(now) < batchSize) {
+                return;
+            }
+        }
+    }
+
+    private int processBatch(Instant now) {
+        try {
+            List<Instant> completed = transactions.processBatch(now, batchSize);
+            // 프록시의 트랜잭션 커밋이 끝난 뒤에만 실제 삭제 성공을 집계한다.
+            completed.forEach(metrics::succeeded);
+            return completed.size();
+        } catch (RuntimeException exception) {
+            log.warn("장바구니 정리 일괄 처리 실패, 건별 처리로 전환", exception);
+            return processEach(now);
+        }
+    }
+
+    // 일괄 처리가 롤백되면 건별 트랜잭션으로 다시 처리해 실패한 작업만 60초 뒤로 미룬다.
+    private int processEach(Instant now) {
+        List<CartCleanupTask> due = tasks.findDue(now, batchSize);
+        for (CartCleanupTask task : due) {
             try {
-                // 프록시의 트랜잭션 커밋이 끝난 뒤에만 실제 삭제 성공을 집계한다.
                 if (transactions.process(task.getId(), now)) {
                     metrics.succeeded(task.getCreatedAt());
                 }
@@ -50,5 +90,6 @@ public class CartCleanupScheduler {
                 }
             }
         }
+        return due.size();
     }
 }
