@@ -155,15 +155,14 @@ class MockPaymentIntegrationTest {
         } else {
             assertThat(outboxCount("order.paid", order)).isZero();
         }
-        ArgumentCaptor<String> notificationPayload = ArgumentCaptor.forClass(String.class);
-        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), notificationPayload.capture());
-        OrderNotificationEvent notification = mapper.readValue(notificationPayload.getValue(), OrderNotificationEvent.class);
+        OrderNotificationEvent notification = mapper.readValue(
+                outboxPayload("order.notification", order), OrderNotificationEvent.class);
         assertThat(notification.eventId().version()).isEqualTo(7);
         assertThat(notification).isEqualTo(new OrderNotificationEvent(notification.eventId(),
                 status == PaymentStatus.SUCCESS ? "PAYMENT_PAID" : "PAYMENT_FAILED", "ORDER_SERVICE", "ORDER",
                 order.getId(), order.getCustomerId(), order.getOrderNumber().toString(),
                 status == PaymentStatus.SUCCESS ? "PAID" : "FAILED", null, first.processedAt()));
-        verifyNoMoreInteractions(kafka);
+        verifyNoInteractions(kafka);
         Payment saved = payments.findByOrderId(order.getId()).orElseThrow();
         Order savedOrder = queries.findDetailByOrderNumber(order.getOrderNumber()).orElseThrow();
 
@@ -370,52 +369,15 @@ class MockPaymentIntegrationTest {
     }
 
     @Test
-    @DisplayName("결제 저장 중에는 발행하지 않고 커밋 후 다른 트랜잭션에서 결제 성공을 확인한다")
-    void when_payment_commits_event_is_sent_after_database_commit() {
+    @DisplayName("결제 이벤트를 Kafka로 바로 보내지 않고 결제와 같은 트랜잭션에서 Outbox에 기록한다")
+    void when_payment_commits_events_are_recorded_in_outbox_without_direct_send() {
         Order order = saveOrder(100, false);
-        doAnswer(call -> {
-            Object saved = call.callRealMethod();
-            entityManager.flush();
-            verifyNoInteractions(kafka);
-            return saved;
-        }).when(payments).save(any(Payment.class));
-        when(kafka.send(anyString(), anyString(), anyString())).thenAnswer(call -> {
-            TransactionTemplate independent = new TransactionTemplate(transactionManager);
-            independent.setPropagationBehavior(
-                    org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-            independent.executeWithoutResult(ignored -> {
-                assertThat(orderStatus(order)).isEqualTo("PAID");
-                assertThat(paymentCount()).isEqualTo(1);
-            });
-            return CompletableFuture.completedFuture(null);
-        });
 
         process(order, PaymentStatus.SUCCESS);
 
         assertThat(outboxCount("order.paid", order)).isEqualTo(1);
-        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
-    }
-
-    @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    @DisplayName("Kafka 동기 또는 비동기 발행에 실패해도 결제 성공 기록을 유지한다")
-    void when_kafka_fails_payment_remains_committed(boolean async) {
-        Order order = saveOrder(100, false);
-        CompletableFuture<SendResult<String, String>> pending = new CompletableFuture<>();
-        when(kafka.send(anyString(), anyString(), anyString())).thenAnswer(call -> {
-            if (async) return pending;
-            throw new IllegalStateException("Kafka 연결 실패");
-        });
-
-        MockPaymentResult result = process(order, PaymentStatus.SUCCESS);
-        if (async) pending.completeExceptionally(new IllegalStateException("Kafka 전송 실패"));
-
-        assertThat(result.status()).isEqualTo(PaymentStatus.SUCCESS);
-        assertThat(orderStatus(order)).isEqualTo("PAID");
-        assertThat(paymentCount()).isEqualTo(1);
-        assertThat(process(order, PaymentStatus.SUCCESS)).isEqualTo(result);
-        assertThat(outboxCount("order.paid", order)).isEqualTo(1);
-        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
+        assertThat(outboxCount("order.notification", order)).isEqualTo(1);
+        verifyNoInteractions(kafka);
     }
 
     @ParameterizedTest
@@ -462,6 +424,7 @@ class MockPaymentIntegrationTest {
         assertThat(queries.findDetailByOrderNumber(order.getOrderNumber()).orElseThrow().getPaidAt()).isNull();
         verifyNoInteractions(stock, kafka);
         assertThat(outboxCount("order.paid", order)).isZero();
+        assertThat(outboxCount("order.notification", order)).isZero();
     }
 
     private void assertBusinessError(Runnable action, OrderErrorCode expected) {

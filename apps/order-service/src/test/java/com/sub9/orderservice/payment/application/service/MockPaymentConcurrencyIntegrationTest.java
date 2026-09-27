@@ -163,8 +163,8 @@ class MockPaymentConcurrencyIntegrationTest {
         assertThat(paidOutboxCount(order)).isEqualTo(1);
         verifyNoInteractions(stock);
         assertCoupon(order, true);
-        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
-        verifyNoMoreInteractions(kafka);
+        assertThat(outboxCount("order.notification", order)).isEqualTo(1);
+        verifyNoInteractions(kafka);
     }
 
     @ParameterizedTest
@@ -201,8 +201,9 @@ class MockPaymentConcurrencyIntegrationTest {
         }
         assertCoupon(order, winner == PaymentStatus.SUCCESS);
         assertThat(jdbc.queryForObject("select status from p_payments", String.class)).isEqualTo(winner.name());
-        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
-        verifyNoMoreInteractions(stock, kafka);
+        assertThat(outboxCount("order.notification", order)).isEqualTo(1);
+        verifyNoMoreInteractions(stock);
+        verifyNoInteractions(kafka);
     }
 
     private List<Attempt<MockPaymentResult>> runConcurrent(
@@ -255,9 +256,12 @@ class MockPaymentConcurrencyIntegrationTest {
     }
 
     private int paidOutboxCount(Order order) {
-        return jdbc.queryForObject(
-                "select count(*) from p_order_event_outbox where topic = 'order.paid' and message_key = ?",
-                Integer.class, order.getId().toString());
+        return outboxCount("order.paid", order);
+    }
+
+    private int outboxCount(String topic, Order order) {
+        return jdbc.queryForObject("select count(*) from p_order_event_outbox where topic = ? and message_key = ?",
+                Integer.class, topic, order.getId().toString());
     }
 
     private String orderStatus(Order order) {

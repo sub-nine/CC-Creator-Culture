@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import com.sub9.common.kafka.event.OrderPaidEvent;
 import com.sub9.common.kafka.event.OrderNotificationEvent;
-import org.springframework.context.ApplicationEventPublisher;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,7 +34,6 @@ public class OrderPaymentResultService implements PaymentResultUseCase {
 
     private final OrderRepository orderRepository;
     private final CouponUsagePort couponUsagePort;
-    private final ApplicationEventPublisher eventPublisher;
     private final UuidV7Generator uuidGenerator;
     private final CartCleanupTaskRepository cleanupTasks;
     private final JsonMapper jsonMapper;
@@ -69,7 +67,7 @@ public class OrderPaymentResultService implements PaymentResultUseCase {
     }
 
     private void publishNotification(Order order, String eventType, String paymentStatus, Instant processedAt) {
-        eventPublisher.publishEvent(new OrderNotificationEvent(
+        outbox.write(KafkaTopics.ORDER_NOTIFICATION, order.getId().toString(), new OrderNotificationEvent(
                 uuidGenerator.generate(), eventType, "ORDER_SERVICE", "ORDER", order.getId(),
                 order.getCustomerId(), order.getOrderNumber().toString(), paymentStatus, null, processedAt));
     }

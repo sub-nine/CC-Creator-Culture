@@ -25,7 +25,6 @@ import com.sub9.common.kafka.event.OrderPaidEvent;
 import com.sub9.common.kafka.event.OrderNotificationEvent;
 import com.sub9.common.identifier.UuidV7Generator;
 import org.mockito.Spy;
-import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.ArgumentCaptor;
 import java.util.Optional;
 import java.util.UUID;
@@ -47,9 +46,6 @@ class OrderPaymentResultServiceTest {
 
     @Mock
     private CouponUsagePort couponUsagePort;
-
-    @Mock
-    private ApplicationEventPublisher eventPublisher;
 
     @Spy
     private UuidV7Generator uuidGenerator = new UuidV7Generator();
@@ -188,12 +184,13 @@ class OrderPaymentResultServiceTest {
 
         assertOrderError(() -> paymentResultService.markPaid(order.getId(), CREATED_AT.plusSeconds(2)),
                 OrderErrorCode.INVALID_ORDER_STATUS);
-        verifyNoInteractions(eventPublisher, outbox);
+        verifyNoInteractions(outbox);
     }
 
     private void assertNotification(Order order, String eventType, String status, Instant occurredAt) {
         var captured = ArgumentCaptor.forClass(OrderNotificationEvent.class);
-        verify(eventPublisher).publishEvent(captured.capture());
+        verify(outbox).write(org.mockito.ArgumentMatchers.eq("order.notification"),
+                org.mockito.ArgumentMatchers.eq(order.getId().toString()), captured.capture());
         OrderNotificationEvent event = captured.getValue();
         assertThat(event.eventId()).isNotNull();
         assertThat(event.eventId().version()).isEqualTo(7);
