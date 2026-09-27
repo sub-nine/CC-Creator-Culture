@@ -24,15 +24,17 @@ public class OrderEventOutboxRelay {
     private final TransactionTemplate transactions;
     private final Clock clock;
     private final Duration retryDelay;
+    private final OrderEventOutboxMetrics metrics;
 
     public OrderEventOutboxRelay(OrderEventOutboxJpaRepository outbox, KafkaTemplate<String, String> kafkaTemplate,
             TransactionTemplate transactions, Clock clock,
-            @Value("${order.event-outbox.retry-delay:60s}") Duration retryDelay) {
+            @Value("${order.event-outbox.retry-delay:60s}") Duration retryDelay, OrderEventOutboxMetrics metrics) {
         this.outbox = outbox;
         this.kafkaTemplate = kafkaTemplate;
         this.transactions = transactions;
         this.clock = clock;
         this.retryDelay = retryDelay;
+        this.metrics = metrics;
     }
 
     @Scheduled(fixedDelayString = "${order.event-outbox.interval-ms:500}", initialDelay = 5_000L)
@@ -45,11 +47,13 @@ public class OrderEventOutboxRelay {
                 if (exception instanceof InterruptedException) {
                     Thread.currentThread().interrupt();
                 }
+                metrics.failed();
                 // 점유할 때 미뤄 둔 다음 시도 시각이 지나면 다시 발행한다.
                 log.warn("주문 이벤트 발행 실패: id={}, topic={}, key={}",
                         record.getId(), record.getTopic(), record.getMessageKey(), exception);
                 continue;
             }
+            metrics.succeeded();
             // 브로커 기록이 확인된 뒤에만 지운다. 삭제가 실패하면 같은 이벤트가 다시 발행될 수 있다.
             outbox.deleteById(record.getId());
         }

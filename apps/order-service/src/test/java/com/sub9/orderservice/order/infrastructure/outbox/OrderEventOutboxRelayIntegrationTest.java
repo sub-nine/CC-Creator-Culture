@@ -53,6 +53,7 @@ class OrderEventOutboxRelayIntegrationTest extends AbstractIntegrationTest {
     @Autowired private OrderEventOutboxWriter writer;
     @Autowired private TransactionTemplate transactions;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private OrderEventOutboxMetrics metrics;
     // Spring Data 저장소는 JDK 프록시라 실제 저장소에 위임하는 mock으로 일부 호출만 바꾼다.
     private OrderEventOutboxJpaRepository outbox;
 
@@ -158,7 +159,8 @@ class OrderEventOutboxRelayIntegrationTest extends AbstractIntegrationTest {
     }
 
     private OrderEventOutboxRelay relayAt(Instant now) {
-        return new OrderEventOutboxRelay(outbox, kafka, transactions, Clock.fixed(now, ZoneOffset.UTC), RETRY_DELAY);
+        return new OrderEventOutboxRelay(outbox, kafka, transactions, Clock.fixed(now, ZoneOffset.UTC), RETRY_DELAY,
+                metrics);
     }
 
     private UUID insert(Instant createdAt) {

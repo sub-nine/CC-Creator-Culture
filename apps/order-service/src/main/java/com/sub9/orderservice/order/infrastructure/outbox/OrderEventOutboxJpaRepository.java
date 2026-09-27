@@ -22,4 +22,7 @@ public interface OrderEventOutboxJpaRepository extends JpaRepository<OrderEventO
     @Modifying
     @Query("update OrderEventOutbox e set e.nextAttemptAt = :nextAttemptAt where e.id in :ids")
     int postpone(@Param("ids") List<UUID> ids, @Param("nextAttemptAt") Instant nextAttemptAt);
+
+    @Query("select min(e.createdAt) from OrderEventOutbox e")
+    Instant findOldestCreatedAt();
 }
