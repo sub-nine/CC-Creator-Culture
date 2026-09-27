@@ -14,6 +14,8 @@ Grafana는 127.0.0.1:3000이라 외부에 열리지 않는다. SSM 포트 포워
 
 시드 비밀번호 해시는 `cc-test/seed` JSON `{password_hash}` 시크릿만 만든다. 값은 넣지 않는다. ECS execution role이 읽을 수 있고, 주입은 seed 일회 작업만 한다.
 
-Product 이미지에 필요한 R2 연결은 `cc-test/product-r2` JSON `{access_key,secret_key,endpoint,bucket,public_url}` 시크릿만 만든다. 값은 넣지 않는다. 실제 R2 연결 정보는 아직 확정되지 않았고, 실제 기동 시 필수 입력이다. 기존 Product 기능은 끄거나 mock으로 바꾸지 않는다.
+Product 이미지는 기존 S3 버킷과 CloudFront를 쓴다. 두 리소스는 Terraform 밖에서 관리하고, 여기서는 `product_image_bucket`(기본값 `cc-creator-culture`)과 `product_image_public_url` 변수로 이름과 URL만 받는다. 정적 키 대신 product-service 전용 Task Role `cc-test-product-service-task`가 `products/images/*` 경로의 읽기, 쓰기, 삭제와 같은 경로의 목록 조회만 허용한다. 목록 조회 권한이 있어야 없는 객체를 조회할 때 S3가 403 대신 404를 돌려주고, 앱이 업로드 누락 오류로 처리할 수 있다. 다른 서비스는 기존 `cc-test-ecs-task` 역할을 그대로 쓴다.
+
+이전 R2용 `cc-test/product-r2` 시크릿은 `removed` 블록으로 Terraform 관리에서만 뺐고 AWS에는 남아 있다. 어떤 배포도 이 시크릿을 읽지 않는 것을 확인한 뒤 수동으로 삭제한다.
 
 런타임 입력은 `terraform output -json persistent_config` 객체 하나다.

@@ -12,7 +12,7 @@
 | 인증 | JWT(jjwt), Redis 기반 세션/블랙리스트 |
 | 데이터베이스 | PostgreSQL(서비스별 분리), Flyway, Spring Data JPA, QueryDSL |
 | 캐시 / 실시간 집계 | Redis (ZSET 기반 리더보드, Lua 스크립트 원자적 연산) |
-| 오브젝트 스토리지 | Cloudflare R2 (S3 호환, AWS SDK S3 클라이언트) |
+| 오브젝트 스토리지 | AWS S3 (Presigned URL 업로드, CloudFront 공개 URL) |
 | 관측성 | Prometheus, Grafana, Zipkin(분산 트레이싱), Spring Actuator |
 | 테스트 | JUnit5, Testcontainers, EmbeddedKafka, k6(부하테스트) |
 | 인프라 / 배포 | Docker Compose(로컬), Terraform(AWS ECS), GitHub Actions(CI/CD) |
@@ -87,7 +87,7 @@ cc-service
 
 ## 로컬 실행 방법
 
-1. `.env.example`을 `.env`로 복사하고 빈 값(DB 비밀번호, JWT_SECRET, R2 키 등)을 채웁니다.
+1. `.env.example`을 `.env`로 복사하고 빈 값(DB 비밀번호, JWT_SECRET, AWS S3 키 등)을 채웁니다.
 2. 전체 스택 실행:
    ```bash
    docker compose --env-file .env -f compose.yaml -f compose.apps.yaml up -d --build --wait --wait-timeout 240
