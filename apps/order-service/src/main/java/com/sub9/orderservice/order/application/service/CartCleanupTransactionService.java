@@ -19,13 +19,14 @@ public class CartCleanupTransactionService {
     private final JsonMapper jsonMapper;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void process(UUID taskId, Instant now) {
-        tasks.findDueForUpdate(taskId, now).ifPresent(task -> {
+    public boolean process(UUID taskId, Instant now) {
+        return tasks.findDueForUpdate(taskId, now).map(task -> {
             CartCleanupCommand command = jsonMapper.readValue(task.getPayload(), CartCleanupCommand.class);
             cleanup.cleanup(command);
             // 같은 DB의 삭제와 작업 완료를 함께 커밋하여 중단 후에도 안전하게 재처리한다.
             tasks.delete(task);
-        });
+            return true;
+        }).orElse(false);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
