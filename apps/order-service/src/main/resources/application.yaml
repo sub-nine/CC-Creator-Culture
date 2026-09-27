@@ -9,6 +9,10 @@ spring:
   flyway:
     enabled: false
 
+  # 켜 두면 요청 중 처음 잡은 DB 연결을 응답이 끝날 때까지 유지해 외부 API 호출 동안에도 연결을 점유한다.
+  jpa:
+    open-in-view: false
+
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:

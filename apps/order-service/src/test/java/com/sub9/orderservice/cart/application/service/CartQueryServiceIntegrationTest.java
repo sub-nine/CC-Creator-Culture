@@ -14,6 +14,7 @@ import com.sub9.orderservice.cart.infrastructure.persistence.CartJpaRepository;
 import com.sub9.orderservice.cart.presentation.response.CartItemResponse;
 import com.sub9.orderservice.support.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,7 +24,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Transactional
 @SpringBootTest
@@ -181,6 +184,43 @@ class CartQueryServiceIntegrationTest extends AbstractIntegrationTest {
                   info.productStatus(),
                   3000L,
                   4));
+    }
+  }
+
+  @Nested
+  @DisplayName("트랜잭션 범위 테스트")
+  class TransactionScopeTests {
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DisplayName("장바구니를 조회하면 상품과 유저 서비스는 트랜잭션 밖에서 호출한다.")
+    void when_cart_is_queried_external_services_are_called_outside_transaction() {
+      // given
+      Cart cart = saveCart(userId, 1);
+      CartProductInfo info = productInfo(cart.getSkuId(), "상품", 1000L);
+      List<Boolean> transactionActive = new ArrayList<>();
+
+      given(cartProductPort.getCartItemProducts(anyList()))
+          .willAnswer(
+              invocation -> {
+                transactionActive.add(TransactionSynchronizationManager.isActualTransactionActive());
+                return List.of(info);
+              });
+      given(cartUserPort.getCreatorNamesByIds(anyList()))
+          .willAnswer(
+              invocation -> {
+                transactionActive.add(TransactionSynchronizationManager.isActualTransactionActive());
+                return List.of();
+              });
+
+      try {
+        // when
+        cartQueryService.getCart(userId);
+
+        // then
+        assertThat(transactionActive).containsExactly(false, false);
+      } finally {
+        cartRepository.deleteById(cart.getId());
+      }
     }
   }
 
