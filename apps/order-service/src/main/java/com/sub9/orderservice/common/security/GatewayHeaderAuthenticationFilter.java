@@ -26,6 +26,13 @@ public class GatewayHeaderAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        // 내부 API는 Gateway를 거치지 않는 서비스 간 호출이라 사용자 헤더가 없습니다.
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        return path.startsWith("/internal/");
+    }
+
+    @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,

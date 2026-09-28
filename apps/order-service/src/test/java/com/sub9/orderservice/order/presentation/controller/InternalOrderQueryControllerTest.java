@@ -31,7 +31,7 @@ class InternalOrderQueryControllerTest extends AbstractControllerTest {
     private OrderQueryService orderQueryService;
 
     @Test
-    @DisplayName("구매 확정 항목이면 래퍼 없이 상품 ID와 true를 반환한다")
+    @DisplayName("인증 헤더 없이 구매 확정 항목을 조회하면 래퍼 없이 상품 ID와 true를 반환한다")
     void when_item_is_purchased_product_id_and_true_are_returned() throws Exception {
         when(orderQueryService.getPurchaseStatus(USER_ID, ITEM_ID))
                 .thenReturn(new ProductPurchaseInfo(PRODUCT_ID, true));
@@ -54,23 +54,11 @@ class InternalOrderQueryControllerTest extends AbstractControllerTest {
                 .andExpect(content().json("{\"productId\":null,\"purchased\":false}"));
     }
 
-    @Test
-    @DisplayName("헤더 사용자와 조회 사용자가 다르면 조회 전에 403을 반환한다")
-    void when_user_ids_differ_forbidden_is_returned() throws Exception {
-        mockMvc.perform(get(PATH)
-                        .header("X-User-Id", PRODUCT_ID)
-                        .header("X-User-Role", "CUSTOMER")
-                        .param("userId", USER_ID.toString())
-                        .param("orderItemId", ITEM_ID.toString()))
-                .andExpect(status().isForbidden());
-        verifyNoInteractions(orderQueryService);
-    }
-
     @ParameterizedTest
     @CsvSource({"userId,", "orderItemId,", "userId,invalid", "orderItemId,invalid"})
     @DisplayName("필수 쿼리가 없거나 UUID 형식이 아니면 400을 반환한다")
     void when_query_is_invalid_bad_request_is_returned(String field, String value) throws Exception {
-        var request = get(PATH).header("X-User-Id", USER_ID).header("X-User-Role", "CUSTOMER");
+        var request = get(PATH);
         if (!field.equals("userId")) {
             request.param("userId", USER_ID.toString());
         }
@@ -84,29 +72,8 @@ class InternalOrderQueryControllerTest extends AbstractControllerTest {
         verifyNoInteractions(orderQueryService);
     }
 
-    @ParameterizedTest
-    @CsvSource({"X-User-Id,", "X-User-Role,", "X-User-Id,invalid", "X-User-Role,invalid"})
-    @DisplayName("인증 헤더가 없거나 유효하지 않으면 401을 반환한다")
-    void when_authentication_header_is_invalid_unauthorized_is_returned(String field, String value)
-            throws Exception {
-        var request = get(PATH).param("userId", USER_ID.toString()).param("orderItemId", ITEM_ID.toString());
-        if (!field.equals("X-User-Id")) {
-            request.header("X-User-Id", USER_ID);
-        }
-        if (!field.equals("X-User-Role")) {
-            request.header("X-User-Role", "CUSTOMER");
-        }
-        if (value != null) {
-            request.header(field, value);
-        }
-        mockMvc.perform(request).andExpect(status().isUnauthorized());
-        verifyNoInteractions(orderQueryService);
-    }
-
     private MockHttpServletRequestBuilder request() {
         return get(PATH)
-                .header("X-User-Id", USER_ID)
-                .header("X-User-Role", "CUSTOMER")
                 .param("userId", USER_ID.toString())
                 .param("orderItemId", ITEM_ID.toString());
     }

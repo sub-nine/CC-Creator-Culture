@@ -80,6 +80,8 @@ public class SecurityConfig {
                 .hasAnyRole(
                         GatewayAuthenticationPrincipal.Role.MANAGER.name(),
                         GatewayAuthenticationPrincipal.Role.MASTER.name())
+                .requestMatchers("/internal/**")
+                .permitAll()
                 .anyRequest()
                 .authenticated());
 
