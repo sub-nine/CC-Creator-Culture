@@ -7,7 +7,6 @@ import java.util.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-// TODO : 추후 상품 목록 조회용 Query Model 도입 예정
 public interface ProductQueryRepository {
   /**
    * 키워드와 메타데이터 검색 결과 기준으로 상품 목록 조회

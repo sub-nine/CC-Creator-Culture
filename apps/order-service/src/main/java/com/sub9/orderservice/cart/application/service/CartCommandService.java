@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional
 @RequiredArgsConstructor
 public class CartCommandService implements CartCommandUseCase, CartCleanupUseCase {
   private static final int MAX_CART_ITEM_COUNT = 70;
@@ -26,6 +25,8 @@ public class CartCommandService implements CartCommandUseCase, CartCleanupUseCas
   private final CartRepository cartRepository;
   private final CartProductPort cartProductPort;
 
+  // Product 검증 동안 DB 연결을 점유하지 않도록 개수 조회와 저장은 각각 저장소의 짧은 트랜잭션으로 처리한다.
+  // 개수 제한은 동시 등록 시 초과될 수 있고, 같은 SKU 중복 등록은 유니크 제약으로 막는다.
   @Override
   public UUID addCartItem(AddCartItemCommand command) {
     UUID cartId = new UuidV7Generator().generate();
@@ -48,6 +49,7 @@ public class CartCommandService implements CartCommandUseCase, CartCleanupUseCas
   }
 
   @Override
+  @Transactional
   public void updateCartItem(UpdateCartItemCommand command) {
     Cart cartItem =
         cartRepository
@@ -58,16 +60,19 @@ public class CartCommandService implements CartCommandUseCase, CartCleanupUseCas
   }
 
   @Override
+  @Transactional
   public void removeCartItem(DeleteCartItemCommand command) {
     cartRepository.deleteAllByUserIdAndIdIn(command.userId(), command.cartIds());
   }
 
   @Override
+  @Transactional
   public void cleanupByProductId(UUID productId) {
     cartRepository.deleteAllByProductId(productId);
   }
 
   @Override
+  @Transactional
   public void cleanupBySkuId(UUID skuId) {
     cartRepository.deleAllBySkuId(skuId);
   }

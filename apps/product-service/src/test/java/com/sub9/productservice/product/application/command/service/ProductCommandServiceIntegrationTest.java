@@ -1,29 +1,26 @@
 package com.sub9.productservice.product.application.command.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 
 import com.sub9.common.kafka.event.ProductCreatedEvent;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.product.application.command.dto.product.CreateProductCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductCommand;
 import com.sub9.productservice.product.application.command.dto.product.UpdateProductStatusCommand;
-import com.sub9.productservice.product.application.command.dto.product.UploadImageCommand;
 import com.sub9.productservice.product.application.command.dto.sku.CreateSkuCommand;
 import com.sub9.productservice.product.application.event.ProductImageUploadedEvent;
-import com.sub9.productservice.product.application.port.out.image.ImageData;
 import com.sub9.productservice.product.application.port.out.image.ImageStoragePort;
 import com.sub9.productservice.product.domain.model.Image;
 import com.sub9.productservice.product.domain.model.ImageProcessingStatus;
+import com.sub9.productservice.product.domain.model.ImageUpload;
 import com.sub9.productservice.product.domain.model.Product;
 import com.sub9.productservice.product.domain.model.ProductStatus;
 import com.sub9.productservice.product.domain.model.Sku;
 import com.sub9.productservice.product.domain.model.Stock;
 import com.sub9.productservice.product.infrastructure.persistence.command.product.ImageCommandJpaRepository;
+import com.sub9.productservice.product.infrastructure.persistence.command.product.ImageUploadJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.product.ProductCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.sku.SkuCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.stock.StockCommandJpaRepository;
@@ -40,7 +37,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -62,6 +58,7 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
   @Autowired ApplicationEvents applicationEvents;
   @Autowired EntityManager entityManager;
   @Autowired ImageCommandJpaRepository imageRepository;
+  @Autowired ImageUploadJpaRepository imageUploadRepository;
   @MockitoBean ImageStoragePort imageStoragePort;
   @MockitoBean S3Client s3Client;
 
@@ -76,7 +73,8 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
             creatorId,
             "말랑이",
             "말랑이 설명",
-            List.of(new CreateSkuCommand("핑크", 10000L, true, 10)));
+            List.of(new CreateSkuCommand("핑크", 10000L, true, 10)),
+            List.of());
 
     Product product = Product.create(command.creatorId(), command.name(), command.content());
 
@@ -92,11 +90,16 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
     skuRepository.save(dummySku);
   }
 
+  @AfterEach
+  void clearAuthentication() {
+    SecurityContextHolder.clearContext();
+  }
+
   @Nested
   @DisplayName("상품 등록 테스트")
   class CreateProductTest {
     @Test
-    @DisplayName("유효한 상품 등록 명령을 실행하면 상품, SKU, 재고를 저장하고 생성 이벤트를 발행한다")
+    @DisplayName("상품 등록에 성공하면 상품, SKU, 재고를 저장하고 이벤트를 발행한다")
     void when_command_is_valid_create_product_saves_product_skus_stocks_and_publishes_event() {
       // given
       UUID creatorId = UUID.randomUUID();
@@ -108,10 +111,11 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
               "왁뿌볼 설명",
               List.of(
                   new CreateSkuCommand("핑크", 10000L, true, 10),
-                  new CreateSkuCommand("불류", 15000L, false, 20)));
+                  new CreateSkuCommand("불류", 15000L, false, 20)),
+              List.of());
 
       // when
-      productCommandService.createProduct(command, List.of());
+      productCommandService.createProduct(command);
 
       // then
       Product product =
@@ -148,79 +152,6 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
     private Sku findSku(List<Sku> skus, String name) {
       return skus.stream().filter(sku -> sku.getName().equals(name)).findFirst().orElseThrow();
     }
-  }
-
-  @AfterEach
-  void clearAuthentication() {
-    SecurityContextHolder.clearContext();
-  }
-
-  @Test
-  @DisplayName("여러 SKU가 있는 상품에도 업로드한 이미지 개수만큼 순서대로 PENDING 기록을 저장한다.")
-  void createProduct_success_with_images() throws Exception {
-    // given
-    SecurityContextHolder.getContext()
-        .setAuthentication(CustomAuthenticationToken.of(creatorId, "CREATOR"));
-    given(imageStoragePort.upload(anyString(), any()))
-        .willAnswer(invocation -> invocation.getArgument(0));
-    var command =
-        new CreateProductCommand(
-            List.of("말랑이"),
-            creatorId,
-            "이미지 상품",
-            "상품 설명",
-            List.of(
-                new CreateSkuCommand("핑크", 10000L, true, 10),
-                new CreateSkuCommand("블루", 12000L, false, 10)));
-    List<UploadImageCommand> images =
-        List.of(
-            new UploadImageCommand(
-                "application/octet-stream",
-                com.sub9.productservice.support.ImageTestFixture.imageBytes("png")),
-            new UploadImageCommand(
-                "image/jpeg", com.sub9.productservice.support.ImageTestFixture.imageBytes("jpeg")));
-
-    // when
-    productCommandService.createProduct(command, images);
-    entityManager.flush();
-    entityManager.clear();
-
-    // then
-    Product product =
-        productRepository.findAll().stream()
-            .filter(item -> item.getName().equals("이미지 상품"))
-            .findFirst()
-            .orElseThrow();
-    List<Image> saved = imageRepository.findAllByProductIdAndDeletedAtIsNull(product.getId());
-    assertThat(saved).hasSize(2).extracting(Image::getSortOrder).containsExactlyInAnyOrder(0, 1);
-    assertThat(saved)
-        .allSatisfy(
-            image -> {
-              assertThat(image.getId()).isNotNull();
-              assertThat(image.getOriginalKey()).isNotBlank();
-              assertThat(image.getProcessedKey()).isNull();
-              assertThat(image.getStatus()).isEqualTo(ImageProcessingStatus.PENDING);
-              assertThat(image.getCreatedBy()).isEqualTo(creatorId);
-              assertThat(image.getCreatedAt()).isNotNull();
-            });
-    var events = applicationEvents.stream(ProductImageUploadedEvent.class).toList();
-    assertThat(events).hasSize(2);
-    assertThat(events)
-        .allSatisfy(
-            event -> {
-              assertThat(event.productId()).isEqualTo(product.getId());
-              assertThat(saved)
-                  .anySatisfy(
-                      image -> {
-                        assertThat(event.imageId()).isEqualTo(image.getId());
-                        assertThat(event.originalKey()).isEqualTo(image.getOriginalKey());
-                      });
-            });
-    ArgumentCaptor<ImageData> data = ArgumentCaptor.forClass(ImageData.class);
-    verify(imageStoragePort, times(2)).upload(anyString(), data.capture());
-    assertThat(data.getAllValues().get(0).contentType()).isEqualTo("image/png");
-    assertThat(data.getAllValues().get(0).data()).containsExactly(images.get(0).data());
-    assertThat(data.getAllValues().get(1).data()).containsExactly(images.get(1).data());
   }
 
   @Nested
@@ -318,7 +249,7 @@ class ProductCommandServiceIntegrationTest extends AbstractIntegrationTest {
   @DisplayName("상품 삭제 테스트")
   class DeleteProduct {
     @Test
-    @DisplayName("상품 삭제 시 상품과 SKU를 논리 삭제하고 복원을 위해 이미지는 유지한다.")
+    @DisplayName("상품과 SKU를 삭제한다.")
     void deleteProduct_success() {
       // given
       SecurityContextHolder.getContext()

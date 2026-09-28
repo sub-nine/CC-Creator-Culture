@@ -5,7 +5,6 @@ import com.sub9.productservice.product.application.command.dto.sku.CreateSkuComm
 import com.sub9.productservice.product.presentation.command.dto.sku.CreateSkuRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
-
 import java.util.List;
 import java.util.UUID;
 
@@ -22,10 +21,12 @@ public record CreateProductRequest(
         String name,
     @NotBlank(message = "상품 설명은 필수입니다.") @Size(max = 5000, message = "상품 설명은 5000자를 초과할 수 없습니다.")
         String content,
-    @Valid @NotEmpty(message = "상품 옵션은 최소 1개 이상 등록해야합니다.") List<CreateSkuRequest> skus) {
+    @Valid @NotEmpty(message = "상품 옵션은 최소 1개 이상 등록해야합니다.") List<CreateSkuRequest> skus,
+    @Size(max = 5, message = "상품 이미지는 최대 5개까지 등록할 수 있습니다.") List<UUID> imageUploadIds) {
   public CreateProductCommand toCommand(UUID creatorId) {
     List<CreateSkuCommand> skuCommands = skus.stream().map(CreateSkuRequest::toCommand).toList();
 
-    return new CreateProductCommand(hashTags, creatorId, name, content, skuCommands);
+    return new CreateProductCommand(
+        hashTags, creatorId, name, content, skuCommands, imageUploadIds);
   }
 }

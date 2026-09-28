@@ -3,7 +3,7 @@ package com.sub9.productservice.wishlist.presentation.query.controller;
 import com.sub9.common.annotation.Customer;
 import com.sub9.common.dto.response.ApiResponse;
 import com.sub9.common.dto.response.PageResponse;
-import com.sub9.productservice.common.config.r2.R2Properties;
+import com.sub9.productservice.common.config.s3.S3Properties;
 import com.sub9.productservice.common.security.AuthUser;
 import com.sub9.productservice.wishlist.application.port.in.WishlistQueryUseCase;
 import com.sub9.productservice.wishlist.presentation.query.dto.WishlistResponse;
@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/wishlist")
 public class WishlistQueryController {
   private final WishlistQueryUseCase wishlistQueryUseCase;
-  private final R2Properties r2Properties;
+  private final S3Properties s3Properties;
 
   @GetMapping
   public ApiResponse<PageResponse<WishlistResponse>> getWishlist(
@@ -33,7 +33,7 @@ public class WishlistQueryController {
     Slice<WishlistResponse> response =
         wishlistQueryUseCase
             .getWishlist(authUser.id(), pageable)
-            .map(info -> WishlistResponse.from(info, r2Properties.publicUrl()));
+            .map(info -> WishlistResponse.from(info, s3Properties.publicUrl()));
 
     return ApiResponse.success("관심상품 목록 조회 성공", PageResponse.of(response));
   }

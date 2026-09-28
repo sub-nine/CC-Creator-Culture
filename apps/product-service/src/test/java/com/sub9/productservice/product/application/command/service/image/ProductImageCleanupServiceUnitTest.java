@@ -20,11 +20,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @DisplayName("ProductImageCleanupService - 단위 테스트")
 class ProductImageCleanupServiceUnitTest {
   @Mock ImageRepository imageRepository;
+  @Mock ImageUploadRepository imageUploadRepository;
   @Mock ImageStoragePort imageStoragePort;
   @InjectMocks ProductImageCleanupService imageService;
 
   @Test
-  @DisplayName("앞쪽 파일 삭제 실패와 상관없이 다음 이미지를 정리한다.")
+  @DisplayName("삭제 실패와 상관없이 다음 이미지를 정리한다.")
   void deleteExpiredImages_fails_without_removing_failed_image() {
     // given
     Instant now = Instant.parse("2026-09-11T00:00:00Z");

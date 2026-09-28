@@ -3,12 +3,11 @@ package com.sub9.productservice.product.application.command.service.image;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.product.application.command.dto.product.*;
 import com.sub9.productservice.product.application.port.out.image.*;
-import com.sub9.productservice.product.application.support.ImageStorageRollbackCleaner;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.model.*;
 import com.sub9.productservice.product.domain.repository.*;
@@ -25,8 +24,8 @@ class ProductImageCommandServiceUnitTest {
   @Mock ProductRepository productRepository;
   @Mock ImageRepository imageRepository;
   @Mock ImageStoragePort imageStoragePort;
-  @Mock ImageStorageRollbackCleaner imageStorageRollbackCleaner;
   @Mock ApplicationEventPublisher eventPublisher;
+  @Mock ImageUploadRepository imageUploadRepository;
   @InjectMocks ProductImageCommandService imageService;
 
   private final UUID creatorId = UUID.randomUUID();
@@ -34,17 +33,18 @@ class ProductImageCommandServiceUnitTest {
 
   @Test
   @DisplayName("후속 이미지가 유효하지 않으면 앞쪽 이미지도 저장하지 않는다.")
-  void uploadImages_fails_before_any_write_when_later_image_is_invalid() throws Exception {
+  void addImages_fails_when_upload_not_found() {
     // given
-    var images =
-        List.of(
-            new UploadImageCommand(
-                "image/png", com.sub9.productservice.support.ImageTestFixture.imageBytes("png")),
-            new UploadImageCommand("image/png", new byte[0]));
+    UUID uploadId = UUID.randomUUID();
+    given(imageUploadRepository.findById(uploadId)).willReturn(Optional.empty());
 
     // when & then
-    assertThatThrownBy(() -> imageService.uploadImages(product.getId(), images))
-        .isInstanceOf(BusinessException.class);
+    assertThatThrownBy(
+            () ->
+                imageService.addImages(
+                    new AddImagesCommand(product.getId(), creatorId, List.of(uploadId))))
+        .isInstanceOf(BusinessException.class)
+        .hasMessage(ProductErrorCode.IMAGE_UPLOAD_NOT_FOUND.message());
     verifyNoInteractions(imageRepository, imageStoragePort, eventPublisher);
   }
 
@@ -82,7 +82,7 @@ class ProductImageCommandServiceUnitTest {
   }
 
   @Test
-  @DisplayName("이미지 ID가 중복되거나 누락되거나 다른 상품의 이미지이면 순서 변경에 실패한다.")
+  @DisplayName("이미지 ID가 중복 또는 누락되거나 다른 상품의 이미지이면 순서 변경에 실패한다.")
   void updateSortOrder_fails_when_image_ids_are_invalid() {
     // given
     Image first = Image.create(product.getId(), "original/first", null, 0);

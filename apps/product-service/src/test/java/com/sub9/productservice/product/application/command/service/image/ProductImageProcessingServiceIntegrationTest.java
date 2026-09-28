@@ -1,5 +1,6 @@
 package com.sub9.productservice.product.application.command.service.image;
 
+import static com.sub9.productservice.support.ImageTestFixture.imageBytes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
@@ -54,14 +55,14 @@ class ProductImageProcessingServiceIntegrationTest extends AbstractIntegrationTe
   @MockitoBean ImageProcessorPort imageProcessorPort;
 
   @Test
-  @DisplayName("리사이징에 성공하면 처리된 이미지 키와 완료 상태를 DB에 저장한다.")
-  void resizeImage_success() {
+  @DisplayName("리사이징에 성공하면 처리된 키와 완료 상태를 DB에 저장한다.")
+  void resizeImage_success() throws Exception {
     // given
     Image image = imageRepository.save(Image.create(product.getId(), "original/image", null, 0));
 
     flushAndClear();
 
-    ImageData original = new ImageData("image/png", new byte[] {1});
+    ImageData original = new ImageData("image/png", imageBytes("png"));
     ImageData processed = new ImageData("image/jpeg", new byte[] {2});
 
     given(imageStoragePort.download(image.getOriginalKey())).willReturn(original);

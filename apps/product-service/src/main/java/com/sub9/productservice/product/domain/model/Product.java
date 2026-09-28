@@ -5,6 +5,7 @@ import com.sub9.productservice.common.entity.BaseEntity;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -27,12 +28,11 @@ public class Product extends BaseEntity {
   @Column(nullable = false, columnDefinition = "TEXT")
   private String content;
 
-  private Long viewCount;
+  private long viewCount;
 
-  @Column(precision = 2, scale = 1)
-  private BigDecimal averageRating;
+  private long ratingSum;
 
-  private Long reviewCount;
+  private long reviewCount;
 
   @Column(length = 20, nullable = false)
   @Enumerated(EnumType.STRING)
@@ -44,7 +44,7 @@ public class Product extends BaseEntity {
     product.name = name;
     product.content = content;
     product.viewCount = 0L;
-    product.averageRating = null;
+    product.ratingSum = 0L;
     product.reviewCount = 0L;
     product.status = ProductStatus.ACTIVE;
 
@@ -76,8 +76,12 @@ public class Product extends BaseEntity {
     this.content = content;
   }
 
-  public void incrementViewCount(long count) {
-    this.viewCount += count;
-  }
+  public BigDecimal getAverageRating() {
+    if (reviewCount == 0) {
+      return null;
+    }
 
+    return BigDecimal.valueOf(ratingSum)
+        .divide(BigDecimal.valueOf(reviewCount), 1, RoundingMode.HALF_UP);
+  }
 }

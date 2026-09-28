@@ -238,6 +238,8 @@ Temporary Items
 Thumbs.db
 Thumbs.db:encryptable
 ehthumbs.db
+
+/load-test/data/
 ehthumbs_vista.db
 
 # Dump file

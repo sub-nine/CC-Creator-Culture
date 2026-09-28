@@ -93,6 +93,7 @@ public class GlobalExceptionHandler {
             MissingRequestHeaderException.class
     })
     public ResponseEntity<ErrorResponse> handleBadRequest(Exception exception) {
+        log.warn("Bad request: {}", exception.getMessage(), exception);
         return failure(CommonErrorCode.BAD_REQUEST);
     }
 

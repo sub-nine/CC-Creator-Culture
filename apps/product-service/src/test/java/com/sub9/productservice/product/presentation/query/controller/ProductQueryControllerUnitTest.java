@@ -9,7 +9,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.sub9.productservice.common.config.r2.R2Properties;
+import com.sub9.productservice.common.config.s3.S3Properties;
 import com.sub9.productservice.common.security.CustomAuthenticationToken;
 import com.sub9.productservice.product.application.port.in.product.ProductQueryUseCase;
 import com.sub9.productservice.product.application.query.dto.ProductDetailInfo;
@@ -39,7 +39,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @WebMvcTest(ProductQueryController.class)
 class ProductQueryControllerUnitTest extends AbstractControllerTest {
   @MockitoBean ProductQueryUseCase productQueryUseCase;
-  @MockitoBean R2Properties r2Properties;
+  @MockitoBean S3Properties s3Properties;
 
   private final UUID productId = UUID.randomUUID();
   private final String endPoint = "/api/v1/products";
@@ -63,7 +63,7 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
             10,
             "products/thumbnail.webp");
 
-    given(r2Properties.publicUrl()).willReturn("https://images.example.com");
+    given(s3Properties.publicUrl()).willReturn("https://images.example.com");
     given(productQueryUseCase.searchProducts(eq(keyword), any(Pageable.class)))
         .willReturn(new PageImpl<>(List.of(response), pageable, 1));
 
@@ -138,7 +138,7 @@ class ProductQueryControllerUnitTest extends AbstractControllerTest {
             List.of(),
             List.of(new ProductDetailInfo.ImageInfo(UUID.randomUUID(), "products/detail.webp", 0)));
 
-    given(r2Properties.publicUrl()).willReturn("https://images.example.com");
+    given(s3Properties.publicUrl()).willReturn("https://images.example.com");
     given(productQueryUseCase.getProductDetail(eq(productId), any())).willReturn(response);
 
     // when & then
