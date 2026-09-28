@@ -4,5 +4,4 @@ vpc_cidr               = "10.42.0.0/16"
 bootstrap_state_bucket = "replace-with-state-bucket"
 bootstrap_state_key    = "cc-service/aws/bootstrap/terraform.tfstate"
 
-product_image_bucket     = "cc-creator-culture"
-product_image_public_url = "https://d3hpfzm2zy1ewf.cloudfront.net"
+product_image_cors_origins = ["http://127.0.0.1:3001", "http://localhost:3001"]

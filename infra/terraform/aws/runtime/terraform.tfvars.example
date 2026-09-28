@@ -97,8 +97,8 @@ persistent_config = {
     kafka         = "replace-with-kafka-role-arn"
   }
   product_images = {
-    bucket     = "cc-creator-culture"
-    public_url = "https://d3hpfzm2zy1ewf.cloudfront.net"
+    bucket     = "replace-with-product-image-bucket"
+    public_url = "https://replace-with-product-image-distribution.cloudfront.net"
     region     = "ap-northeast-2"
   }
   cloudmap = {
