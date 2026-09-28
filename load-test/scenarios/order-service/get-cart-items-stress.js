@@ -1,5 +1,4 @@
 import http from 'k6/http';
-import exec from 'k6/execution';
 import { sleep } from 'k6';
 import config from '../../config/index.js';
 import { authHeaders, login } from '../../lib/auth.js';
@@ -8,44 +7,53 @@ import { signupApprovedCreator } from '../../lib/creator.js';
 import { createProductWithSku } from '../../lib/product.js';
 
 /**
- * 시나리오 설명: 장바구니 페이지 진입 시 담아둔 상품 목록을 조회하는 흐름
+ * 시나리오 설명: 장바구니 조회 요청을 단계적으로 늘려 처리 한계와 병목 구간을 확인하는 흐름
  * 엔드포인트: GET /api/v1/cart/items
- * 테스트 유형: 부하 테스트
- * 최대 VUser: 50명
- * 목표 TPS: 40 req/s (50 VU 유지 5분 동안 12,000건 이상)
- * 목표 P95: 100ms (50 VU 유지 구간)
- * 목표 P99: 200ms (50 VU 유지 구간)
+ * 테스트 유형: 스트레스 테스트
+ * 최대 VUser: 1,000명
+ * TPS 판단 기준: VUser 증가 대비 처리량 증가 둔화 또는 정체
+ * 목표 P95: 500ms
+ * 목표 P99: 1,000ms
  * 허용 에러: 0.1% 미만
+ * 총 테스트 시간: 15분 (setup 제외)
  *
  * 부하:
- * - 0 → 20 VU (30초)
- * - 20 VU 유지 (2분)
- * - 20 → 50 VU (1분)
- * - 50 VU 유지 (5분)
- * - 50 → 0 VU (30초)
+ * - 0 → 100 VU (1분)
+ * - 100 VU 유지 (1분)
+ * - 100 → 300 VU (1분)
+ * - 300 VU 유지 (2분)
+ * - 300 → 500 VU (1분)
+ * - 500 VU 유지 (2분)
+ * - 500 → 750 VU (1분)
+ * - 750 VU 유지 (2분)
+ * - 750 → 1,000 VU (1분)
+ * - 1,000 VU 유지 (2분)
+ * - 1,000 → 0 VU (1분)
  */
-
 export const options = {
   setupTimeout: '10m',
 
   stages: [
-    { duration: '30s', target: 20 },
-    { duration: '2m', target: 20 },
-    { duration: '1m', target: 50 },
-    { duration: '5m', target: 50 },
-    { duration: '30s', target: 0 },
+    { duration: '1m', target: 100 },
+    { duration: '1m', target: 100 },
+    { duration: '1m', target: 300 },
+    { duration: '2m', target: 300 },
+    { duration: '1m', target: 500 },
+    { duration: '2m', target: 500 },
+    { duration: '1m', target: 750 },
+    { duration: '2m', target: 750 },
+    { duration: '1m', target: 1000 },
+    { duration: '2m', target: 1000 },
+    { duration: '1m', target: 0 },
   ],
 
   thresholds: {
-    'http_req_duration{operation:get_cart_items,phase:steady_50}': [
-      'p(95)<100',
-      'p(99)<200',
+    'http_req_duration{operation:get_cart_items}': [
+      'p(95)<500',
+      'p(99)<1000',
     ],
     'http_req_failed{operation:get_cart_items}': [
       'rate<0.001',
-    ],
-    'http_reqs{operation:get_cart_items,phase:steady_50}': [
-      'count>=12000',
     ],
   },
 };
@@ -220,8 +228,6 @@ export function setup() {
 }
 
 export default function (customers) {
-  const elapsed = Date.now() - exec.scenario.startTime;
-  const phase = elapsed >= 210000 && elapsed < 510000 ? 'steady_50' : 'other';
   const customer =
       customers[(__VU - 1) % customers.length];
 
@@ -233,7 +239,6 @@ export default function (customers) {
         tags: {
           name: 'GET /api/v1/cart/items',
           operation: 'get_cart_items',
-          phase,
         },
       },
   );
