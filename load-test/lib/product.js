@@ -5,19 +5,14 @@ import { authHeaders } from './auth.js';
 function postProduct(baseUrl, creatorToken, unique, productName, hashTags, tags) {
   const productRes = http.post(
     `${baseUrl}/api/v1/products`,
-    {
-      request: http.file(
-        JSON.stringify({
-          hashTags,
-          name: `${productName} ${unique}`,
-          content: 'k6 부하 테스트용으로 생성된 상품입니다.',
-          skus: [{ name: '기본', price: 10000, isDefault: true, quantity: 1000000 }],
-        }),
-        'request.json',
-        'application/json',
-      ),
-    },
-    { headers: { Authorization: `Bearer ${creatorToken}` }, tags },
+    JSON.stringify({
+      hashTags: ['k6test'],
+      name: `${productName} ${unique}`,
+      content: 'k6 부하 테스트용으로 생성된 상품입니다.',
+      skus: [{ name: '기본', price: 10000, isDefault: true, quantity: 1000000 }],
+      imageUploadIds: [],
+    }),
+    authHeaders(creatorToken),
   );
   if (productRes.status !== 201) {
     throw new Error(`setup 실패 - 상품 등록 status=${productRes.status} body=${productRes.body}`);
