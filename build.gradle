@@ -53,4 +53,9 @@ subprojects {
     tasks.withType(Test).configureEach {
         useJUnitPlatform()
     }
+
+    // Windows 기본 플랫폼 인코딩(MS949)으로 소스를 읽으면 한글 문자열 리터럴이 깨져서 컴파일됨 - 명시적으로 고정
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
 }

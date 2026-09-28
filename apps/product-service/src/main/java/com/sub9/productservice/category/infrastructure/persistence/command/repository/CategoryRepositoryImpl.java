@@ -44,11 +44,6 @@ public class CategoryRepositoryImpl implements CategoryCommandRepository {
     }
 
     @Override
-    public void linkCategoryHashtag(CategoryHashtag categoryHashtag) {
-        categoryHashtagJpaRepository.save(categoryHashtag);
-    }
-
-    @Override
     public Optional<CategoryHashtag> findCategoryHashtagByCategoryIdAndHashtagId(UUID categoryId, UUID hashtagId) {
         return categoryHashtagJpaRepository.findByCategory_IdAndHashtag_IdAndDeletedAtIsNull(categoryId, hashtagId);
     }
