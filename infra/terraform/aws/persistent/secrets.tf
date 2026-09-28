@@ -41,12 +41,12 @@ resource "aws_secretsmanager_secret" "seed" {
   }
 }
 
-resource "aws_secretsmanager_secret" "product_r2" {
-  name                    = "${var.name_prefix}/product-r2"
-  description             = "Product R2 JSON {access_key,secret_key,endpoint,bucket,public_url}. Populate outside Terraform."
-  recovery_window_in_days = 7
+# Product images moved from R2 to S3 with the product-service task role.
+# Stop managing the old secret without deleting it; remove it manually once no deployment reads it.
+removed {
+  from = aws_secretsmanager_secret.product_r2
 
   lifecycle {
-    prevent_destroy = true
+    destroy = false
   }
 }

@@ -49,14 +49,20 @@ output "persistent_config" {
       redis      = aws_secretsmanager_secret.redis.arn
       grafana    = aws_secretsmanager_secret.grafana.arn
       seed       = aws_secretsmanager_secret.seed.arn
-      r2         = aws_secretsmanager_secret.product_r2.arn
     }
 
     roles = {
-      ecs_execution = aws_iam_role.ecs_execution.arn
-      ecs_task      = aws_iam_role.ecs_task.arn
-      observation   = aws_iam_role.observation.arn
-      kafka         = aws_iam_role.kafka.arn
+      ecs_execution   = aws_iam_role.ecs_execution.arn
+      ecs_task        = aws_iam_role.ecs_task.arn
+      product_service = aws_iam_role.product_service_task.arn
+      observation     = aws_iam_role.observation.arn
+      kafka           = aws_iam_role.kafka.arn
+    }
+
+    product_images = {
+      bucket     = var.product_image_bucket
+      public_url = var.product_image_public_url
+      region     = var.aws_region
     }
 
     cloudmap = {

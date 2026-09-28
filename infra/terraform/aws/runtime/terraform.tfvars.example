@@ -83,7 +83,6 @@ persistent_config = {
   secret_arns = {
     jwt   = "replace-with-jwt-secret-arn"
     redis = "replace-with-redis-secret-arn"
-    r2    = "replace-with-r2-secret-arn"
     rds_master = {
       user-service    = "replace-with-rds-master-user-service-secret-arn"
       product-service = "replace-with-rds-master-product-service-secret-arn"
@@ -93,8 +92,14 @@ persistent_config = {
   roles = {
     ecs_execution = "replace-with-ecs-execution-role-arn"
     ecs_task      = "replace-with-ecs-task-role-arn"
+    product_service = "replace-with-product-service-task-role-arn"
     observation   = "replace-with-observation-role-arn"
     kafka         = "replace-with-kafka-role-arn"
+  }
+  product_images = {
+    bucket     = "cc-creator-culture"
+    public_url = "https://d3hpfzm2zy1ewf.cloudfront.net"
+    region     = "ap-northeast-2"
   }
   cloudmap = {
     namespace_id   = "replace-with-cloudmap-namespace-id"

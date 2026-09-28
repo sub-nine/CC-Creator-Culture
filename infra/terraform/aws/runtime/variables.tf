@@ -162,13 +162,18 @@ variable "persistent_config" {
       redis      = string
       grafana    = string
       seed       = string
-      r2         = string
     })
     roles = object({
-      ecs_execution = string
-      ecs_task      = string
-      observation   = string
-      kafka         = optional(string)
+      ecs_execution   = string
+      ecs_task        = string
+      product_service = string
+      observation     = string
+      kafka           = optional(string)
+    })
+    product_images = object({
+      bucket     = string
+      public_url = string
+      region     = string
     })
     cloudmap = object({
       namespace_id   = string

@@ -70,7 +70,6 @@ data "aws_iam_policy_document" "ecs_execution" {
       [
         "${local.secret_prefix}*",
         aws_secretsmanager_secret.seed.arn,
-        aws_secretsmanager_secret.product_r2.arn,
       ],
       [for name, db in aws_db_instance.service : db.master_user_secret[0].secret_arn],
     )

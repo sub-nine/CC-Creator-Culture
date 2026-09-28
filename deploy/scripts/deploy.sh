@@ -34,7 +34,7 @@ done
 : "${ORDER_DB_PASSWORD_SECRET_OCID:?ORDER_DB_PASSWORD_SECRET_OCID is required}"
 : "${GRAFANA_ADMIN_PASSWORD_SECRET_OCID:?GRAFANA_ADMIN_PASSWORD_SECRET_OCID is required}"
 : "${JWT_SECRET_SECRET_OCID:?JWT_SECRET_SECRET_OCID is required}"
-: "${R2_SECRET_OCID:?R2_SECRET_OCID is required}"
+: "${S3_SECRET_OCID:?S3_SECRET_OCID is required}"
 : "${OCIR_REGISTRY:?OCIR_REGISTRY is required}"
 
 ENABLE_MESSAGING_PROFILE="${ENABLE_MESSAGING_PROFILE:-true}"
@@ -392,47 +392,47 @@ assert_https_url() {
   fi
 }
 
-read_r2_secret() {
+read_s3_secret() {
   local raw
 
-  if ! raw="$(secret_value "$R2_SECRET_OCID")"; then
-    echo "Failed to read OCI Vault Secret: R2" >&2
+  if ! raw="$(secret_value "$S3_SECRET_OCID")"; then
+    echo "Failed to read OCI Vault Secret: S3" >&2
     return 1
   fi
 
-  r2_access_key="$(printf '%s' "$raw" | jq -er '.access_key')" || {
-    echo "OCI Vault Secret R2 must contain access_key" >&2
+  s3_access_key_id="$(printf '%s' "$raw" | jq -er '.access_key_id')" || {
+    echo "OCI Vault Secret S3 must contain access_key_id" >&2
     return 1
   }
-  r2_secret_key="$(printf '%s' "$raw" | jq -er '.secret_key')" || {
-    echo "OCI Vault Secret R2 must contain secret_key" >&2
+  s3_secret_access_key="$(printf '%s' "$raw" | jq -er '.secret_access_key')" || {
+    echo "OCI Vault Secret S3 must contain secret_access_key" >&2
     return 1
   }
-  r2_endpoint="$(printf '%s' "$raw" | jq -er '.endpoint')" || {
-    echo "OCI Vault Secret R2 must contain endpoint" >&2
+  s3_region="$(printf '%s' "$raw" | jq -er '.region')" || {
+    echo "OCI Vault Secret S3 must contain region" >&2
     return 1
   }
-  r2_bucket="$(printf '%s' "$raw" | jq -er '.bucket')" || {
-    echo "OCI Vault Secret R2 must contain bucket" >&2
+  s3_bucket="$(printf '%s' "$raw" | jq -er '.bucket')" || {
+    echo "OCI Vault Secret S3 must contain bucket" >&2
     return 1
   }
-  r2_public_url="$(printf '%s' "$raw" | jq -er '.public_url')" || {
-    echo "OCI Vault Secret R2 must contain public_url" >&2
+  s3_public_url="$(printf '%s' "$raw" | jq -er '.public_url')" || {
+    echo "OCI Vault Secret S3 must contain public_url" >&2
     return 1
   }
 
-  assert_compose_safe R2_ACCESS_KEY "$r2_access_key" || return 1
-  assert_compose_safe R2_SECRET_KEY "$r2_secret_key" || return 1
-  assert_https_url R2_ENDPOINT "$r2_endpoint" || return 1
-  assert_compose_safe R2_BUCKET "$r2_bucket" || return 1
-  assert_https_url R2_PUBLIC_URL "$r2_public_url" || return 1
+  assert_compose_safe AWS_ACCESS_KEY_ID "$s3_access_key_id" || return 1
+  assert_compose_safe AWS_SECRET_ACCESS_KEY "$s3_secret_access_key" || return 1
+  assert_compose_safe AWS_REGION "$s3_region" || return 1
+  assert_compose_safe AWS_S3_BUCKET "$s3_bucket" || return 1
+  assert_https_url AWS_S3_PUBLIC_URL "$s3_public_url" || return 1
 }
 
 write_release_env() {
   local target="$1"
   local user_db_admin_password product_db_admin_password order_db_admin_password
   local user_db_password product_db_password order_db_password grafana_admin_password jwt_secret
-  local r2_access_key r2_secret_key r2_endpoint r2_bucket r2_public_url
+  local s3_access_key_id s3_secret_access_key s3_region s3_bucket s3_public_url
   local key
 
   user_db_admin_password="$(read_secret_value USER_DB_ADMIN_PASSWORD "$USER_DB_ADMIN_PASSWORD_SECRET_OCID")" || return 1
@@ -443,7 +443,7 @@ write_release_env() {
   order_db_password="$(read_secret_value ORDER_DB_PASSWORD "$ORDER_DB_PASSWORD_SECRET_OCID")" || return 1
   grafana_admin_password="$(read_secret_value GRAFANA_ADMIN_PASSWORD "$GRAFANA_ADMIN_PASSWORD_SECRET_OCID")" || return 1
   jwt_secret="$(read_secret_value JWT_SECRET "$JWT_SECRET_SECRET_OCID")" || return 1
-  read_r2_secret || return 1
+  read_s3_secret || return 1
 
   {
     printf 'CANDIDATE_SHA=%s\n' "$candidate_sha"
@@ -458,11 +458,11 @@ write_release_env() {
     printf 'ORDER_DB_PASSWORD=%s\n' "$order_db_password"
     printf 'GRAFANA_ADMIN_PASSWORD=%s\n' "$grafana_admin_password"
     printf 'JWT_SECRET=%s\n' "$jwt_secret"
-    printf 'R2_ACCESS_KEY=%s\n' "$r2_access_key"
-    printf 'R2_SECRET_KEY=%s\n' "$r2_secret_key"
-    printf 'R2_ENDPOINT=%s\n' "$r2_endpoint"
-    printf 'R2_BUCKET=%s\n' "$r2_bucket"
-    printf 'R2_PUBLIC_URL=%s\n' "$r2_public_url"
+    printf 'AWS_ACCESS_KEY_ID=%s\n' "$s3_access_key_id"
+    printf 'AWS_SECRET_ACCESS_KEY=%s\n' "$s3_secret_access_key"
+    printf 'AWS_REGION=%s\n' "$s3_region"
+    printf 'AWS_S3_BUCKET=%s\n' "$s3_bucket"
+    printf 'AWS_S3_PUBLIC_URL=%s\n' "$s3_public_url"
     for key in "${base_image_keys[@]}"; do
       printf '%s=%s\n' "$key" "$(locked_image_value "$key")"
     done
