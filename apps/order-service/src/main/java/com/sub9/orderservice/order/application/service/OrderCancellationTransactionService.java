@@ -18,7 +18,6 @@ import java.time.Clock;
 import java.time.Instant;
 import com.sub9.common.kafka.event.OrderNotificationEvent;
 import com.sub9.common.identifier.UuidV7Generator;
-import org.springframework.context.ApplicationEventPublisher;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.UUID;
@@ -31,7 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderCancellationTransactionService {
 
     private final OrderRepository orderRepository;
-    private final ApplicationEventPublisher eventPublisher;
     private final UuidV7Generator uuidGenerator;
     private final PaymentCancellationPort paymentCancellationPort;
     private final OrderCommandIdempotencyService idempotencyService;
@@ -61,7 +59,8 @@ public class OrderCancellationTransactionService {
                 .collect(Collectors.groupingBy(
                         item -> item.getProductId(),
                         Collectors.summingLong(item -> item.getProductSnapshot().getQuantity())));
-        eventPublisher.publishEvent(new OrderCanceledEvent(order.getId(), quantitiesByProduct.entrySet().stream()
+        outbox.write(KafkaTopics.ORDER_CANCELED, order.getId().toString(), new OrderCanceledEvent(order.getId(),
+                quantitiesByProduct.entrySet().stream()
                 .map(entry -> new OrderCanceledEvent.ProductQuantity(entry.getKey(), entry.getValue()))
                 .toList()));
         outbox.write(KafkaTopics.ORDER_NOTIFICATION, order.getId().toString(), new OrderNotificationEvent(

@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import com.sub9.common.identifier.UuidV7Generator;
+import com.sub9.common.kafka.event.OrderCanceledEvent;
 import com.sub9.common.kafka.event.OrderPaidEvent;
 import com.sub9.common.kafka.topic.KafkaTopics;
 import com.sub9.orderservice.order.application.port.input.PaymentResultUseCase;
+import com.sub9.orderservice.order.application.service.OrderCancellationService;
 import com.sub9.orderservice.order.domain.model.Money;
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.model.OrderItem;
@@ -61,11 +63,13 @@ import tools.jackson.databind.json.JsonMapper;
         "management.tracing.export.enabled=false"
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-@DisplayName("결제 이벤트 Kafka 발행 통합 테스트")
+@DisplayName("주문 이벤트 Kafka 발행 통합 테스트")
 class OrderPaymentEventKafkaIntegrationTest extends AbstractIntegrationTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-09-27T00:00:00Z");
-    private static final List<String> TOPICS = List.of(KafkaTopics.ORDER_PAID, KafkaTopics.ORDER_NOTIFICATION);
+    private static final List<String> PAYMENT_TOPICS = List.of(KafkaTopics.ORDER_PAID, KafkaTopics.ORDER_NOTIFICATION);
+    private static final List<String> TOPICS = List.of(
+            KafkaTopics.ORDER_PAID, KafkaTopics.ORDER_NOTIFICATION, KafkaTopics.ORDER_CANCELED);
     private static final ConcurrentLinkedQueue<String> SEND_FAILURES = new ConcurrentLinkedQueue<>();
 
     // 로컬 Compose와 같은 브로커 이미지를 사용한다.
@@ -93,6 +97,11 @@ class OrderPaymentEventKafkaIntegrationTest extends AbstractIntegrationTest {
             return TopicBuilder.name(KafkaTopics.ORDER_NOTIFICATION).partitions(1).replicas(1).build();
         }
 
+        @Bean
+        NewTopic orderCanceledTopic() {
+            return TopicBuilder.name(KafkaTopics.ORDER_CANCELED).partitions(1).replicas(1).build();
+        }
+
         // 기본 LoggingProducerListener 대신 전송 실패한 토픽과 키를 기록한다.
         @Bean
         ProducerListener<Object, Object> sendFailureRecorder() {
@@ -108,6 +117,9 @@ class OrderPaymentEventKafkaIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private PaymentResultUseCase paymentResultUseCase;
+
+    @Autowired
+    private OrderCancellationService orderCancellationService;
 
     @Autowired
     private OrderRepository orderRepository;
@@ -135,6 +147,7 @@ class OrderPaymentEventKafkaIntegrationTest extends AbstractIntegrationTest {
     @AfterEach
     void cleanDatabase() {
         jdbcTemplate.update("delete from p_order_event_outbox");
+        jdbcTemplate.update("delete from p_order_command_requests");
         jdbcTemplate.update("delete from p_order_items");
         jdbcTemplate.update("delete from p_orders");
     }
@@ -184,10 +197,45 @@ class OrderPaymentEventKafkaIntegrationTest extends AbstractIntegrationTest {
         paymentResultUseCase.markPaid(recovered.getId(), recovered.getExpiresAt().minusSeconds(1));
 
         // 장애 중 커밋된 이벤트는 Outbox에 남아 있다가 브로커 복구 후 발행된다.
-        for (String topic : TOPICS) {
+        for (String topic : PAYMENT_TOPICS) {
             assertThat(keys(recordsUntil(topic, lost.getId()))).contains(lost.getId().toString());
             assertThat(keys(recordsUntil(topic, recovered.getId()))).contains(recovered.getId().toString());
         }
+        awaitOutboxEmpty();
+    }
+
+    @Test
+    @DisplayName("브로커 장애 중 주문 취소가 커밋되면 Outbox에 남은 취소 이벤트가 복구 후 발행된다")
+    void when_broker_is_unavailable_at_cancellation_commit_canceled_event_is_published_after_recovery() {
+        Order order = saveOrder();
+        paymentResultUseCase.markPaid(order.getId(), order.getExpiresAt().minusSeconds(1));
+        // 결제 이벤트가 먼저 모두 발행돼야 장애 중 실패한 전송이 취소 이벤트인지 구분할 수 있다.
+        awaitOutboxEmpty();
+
+        producerFactory.reset();
+        KAFKA.getDockerClient().pauseContainerCmd(KAFKA.getContainerId()).exec();
+        try {
+            orderCancellationService.cancel(order.getCustomerId(), "cancel-" + order.getId(), order.getOrderNumber());
+
+            assertThat(jdbcTemplate.queryForObject(
+                    "select status from p_orders where id = ?", String.class, order.getId())).isEqualTo("CANCELED");
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(SEND_FAILURES)
+                    .contains(failure(KafkaTopics.ORDER_CANCELED, order.getId().toString())));
+        } finally {
+            KAFKA.getDockerClient().unpauseContainerCmd(KAFKA.getContainerId()).exec();
+            producerFactory.reset();
+        }
+
+        String canceledPayload = recordsUntil(KafkaTopics.ORDER_CANCELED, order.getId()).stream()
+                .filter(record -> record.key().equals(order.getId().toString()))
+                .findFirst()
+                .orElseThrow()
+                .value();
+        assertThat(jsonMapper.readValue(canceledPayload, OrderCanceledEvent.class).orderId()).isEqualTo(order.getId());
+        awaitOutboxEmpty();
+    }
+
+    private void awaitOutboxEmpty() {
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(
                 jdbcTemplate.queryForObject("select count(*) from p_order_event_outbox", Integer.class)).isZero());
     }
