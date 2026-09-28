@@ -18,6 +18,8 @@ public interface UserCouponRepository {
 
     boolean existsByCouponIdAndUserId(UUID couponId, UUID userId);
 
+    long countByCouponId(UUID couponId);
+
     int useIfAvailable(UUID userCouponId, UUID orderId, Instant usedAt);
 
     int restoreIfUsedByOrder(UUID userCouponId, UUID orderId, Instant restoredAt);

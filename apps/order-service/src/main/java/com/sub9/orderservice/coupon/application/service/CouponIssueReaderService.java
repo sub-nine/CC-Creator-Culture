@@ -6,6 +6,7 @@ import com.sub9.orderservice.coupon.application.port.CouponIssueReader;
 import com.sub9.orderservice.coupon.domain.exception.CouponErrorCode;
 import com.sub9.orderservice.coupon.domain.model.Coupon;
 import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
+import com.sub9.orderservice.coupon.domain.repository.UserCouponRepository;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CouponIssueReaderService implements CouponIssueReader {
 
     private final CouponRepository couponRepository;
+    private final UserCouponRepository userCouponRepository;
 
     @Override
     public CouponIssueTarget getIssuable(UUID couponId, Instant requestedAt) {
@@ -27,11 +29,11 @@ public class CouponIssueReaderService implements CouponIssueReader {
         if (requestedAt.isBefore(coupon.getStartedAt()) || requestedAt.isAfter(coupon.getExpiredAt())) {
             throw new BusinessException(CouponErrorCode.NOT_IN_ISSUE_PERIOD);
         }
-        if (coupon.getIssuedQuantity() >= coupon.getTotalQuantity()) {
-            throw new BusinessException(CouponErrorCode.SOLD_OUT);
-        }
+        long issuedCount = userCouponRepository.countByCouponId(couponId);
+        int remainingQuantity = (int) Math.max(
+                0L, coupon.getTotalQuantity() - issuedCount);
         return new CouponIssueTarget(
                 coupon.getId(), coupon.getExpiredAt(),
-                coupon.getTotalQuantity() - coupon.getIssuedQuantity());
+                remainingQuantity);
     }
 }

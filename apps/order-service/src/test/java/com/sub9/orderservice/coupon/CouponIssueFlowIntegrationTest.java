@@ -101,7 +101,7 @@ class CouponIssueFlowIntegrationTest {
     }
 
     @Test
-    @DisplayName("Redis 선점 후 발급 수량과 사용자 쿠폰을 DB에 커밋한다")
+    @DisplayName("Redis 선점 후 사용자 쿠폰을 DB에 커밋한다")
     void issues_coupon_through_redis_and_database() {
         when(clock.instant()).thenReturn(ISSUE_TIME);
         Coupon coupon = saveCoupon(2);
@@ -111,7 +111,7 @@ class CouponIssueFlowIntegrationTest {
 
         assertThat(result).isInstanceOf(IssueDispatchResult.Completed.class);
         assertThat(couponRepository.findActiveById(coupon.getId()).orElseThrow().getIssuedQuantity())
-                .isEqualTo(1);
+                .isZero();
         assertThat(jdbcTemplate.queryForObject(
                 "select count(*) from p_user_coupons where coupon_id = ? and user_id = ?",
                 Integer.class, coupon.getId(), userId)).isEqualTo(1);
@@ -122,25 +122,25 @@ class CouponIssueFlowIntegrationTest {
     @Test
     @DisplayName("Redis 선점 후 DB 발급 실패가 확정되면 선점과 수량을 복구한다")
     void releases_redis_reservation_when_database_issue_rolls_back() {
-        when(clock.instant()).thenReturn(
-                ISSUE_TIME,
-                ISSUE_TIME,
-                ISSUE_TIME.plusSeconds(120));
+        when(clock.instant()).thenReturn(ISSUE_TIME);
         Coupon coupon = saveCoupon(2);
         UUID userId = generator.generate();
+
+        couponIssueService.issue(coupon.getId(), userId);
+        redisTemplate.delete(CouponRedisKey.issued(coupon.getId(), userId));
 
         assertThatThrownBy(() -> couponIssueService.issue(coupon.getId(), userId))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.getErrorCode())
-                                .isEqualTo(CouponErrorCode.NOT_IN_ISSUE_PERIOD));
+                                .isEqualTo(CouponErrorCode.ALREADY_ISSUED));
 
         assertThat(couponRepository.findActiveById(coupon.getId()).orElseThrow().getIssuedQuantity())
                 .isZero();
         assertThat(jdbcTemplate.queryForObject(
                 "select count(*) from p_user_coupons where coupon_id = ?",
-                Integer.class, coupon.getId())).isZero();
+                Integer.class, coupon.getId())).isEqualTo(1);
         assertThat(redisTemplate.opsForValue().get(CouponRedisKey.remaining(coupon.getId())))
-                .isEqualTo("2");
+                .isEqualTo("1");
         assertThat(redisTemplate.hasKey(CouponRedisKey.issued(coupon.getId(), userId))).isFalse();
     }
 
@@ -206,7 +206,7 @@ class CouponIssueFlowIntegrationTest {
         assertThat(failed).hasSize(requestCount - totalQuantity)
                 .allMatch(attempt -> attempt.errorCode() == CouponErrorCode.SOLD_OUT);
         assertThat(couponRepository.findActiveById(coupon.getId()).orElseThrow().getIssuedQuantity())
-                .isEqualTo(totalQuantity);
+                .isZero();
         assertThat(persistedUserIds).hasSize(totalQuantity);
         assertThat(Set.copyOf(persistedUserIds)).isEqualTo(succeededUserIds);
         assertThat(redisTemplate.opsForValue().get(CouponRedisKey.remaining(coupon.getId())))
@@ -270,7 +270,7 @@ class CouponIssueFlowIntegrationTest {
                 .allMatch(attempt -> attempt.errorCode() == CouponErrorCode.ALREADY_ISSUED);
         // 중복 요청이 DB 발급량과 Redis 잔여 수량을 추가로 변경하지 않았는지 확인한다.
         assertThat(couponRepository.findActiveById(coupon.getId()).orElseThrow().getIssuedQuantity())
-                .isEqualTo(1);
+                .isZero();
         assertThat(jdbcTemplate.queryForObject(
                 "select count(*) from p_user_coupons where coupon_id = ? and user_id = ?",
                 Integer.class, coupon.getId(), userId)).isEqualTo(1);

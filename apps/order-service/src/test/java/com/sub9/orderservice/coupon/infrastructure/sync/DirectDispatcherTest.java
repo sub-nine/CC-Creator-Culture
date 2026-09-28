@@ -42,17 +42,19 @@ class DirectDispatcherTest {
     }
 
     @Test
-    @DisplayName("이미 발급된 실패는 쿠폰 중복 발급 오류로 변환한다")
-    void when_failure_is_already_issued_duplicate_error_is_thrown() {
+    @DisplayName("DB 중복 발급 실패는 Redis 선점 해제 후 반환할 오류로 변환한다")
+    void when_failure_is_already_issued_release_exception_with_duplicate_error_is_thrown() {
         CouponReservation reservation = reservation();
         RuntimeException failure = new RuntimeException("duplicate");
         given(processor.process(reservation)).willThrow(failure);
         given(failureClassifier.classify(failure)).willReturn(CouponIssueFailureType.ALREADY_ISSUED);
 
         assertThatThrownBy(() -> dispatcher.dispatch(reservation))
-                .isInstanceOfSatisfying(BusinessException.class,
-                        exception -> assertThat(exception.getErrorCode())
-                                .isEqualTo(CouponErrorCode.ALREADY_ISSUED));
+                .isInstanceOfSatisfying(CouponReservationReleaseRequiredException.class,
+                        exception -> assertThat(exception.getCause())
+                                .isInstanceOfSatisfying(BusinessException.class,
+                                        cause -> assertThat(cause.getErrorCode())
+                                                .isEqualTo(CouponErrorCode.ALREADY_ISSUED)));
     }
 
     @Test

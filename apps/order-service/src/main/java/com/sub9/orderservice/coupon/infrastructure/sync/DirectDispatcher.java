@@ -45,7 +45,8 @@ public class DirectDispatcher implements CouponIssueDispatcher {
     private RuntimeException classifiedException(RuntimeException exception) {
         CouponIssueFailureType failureType = failureClassifier.classify(exception);
         return switch (failureType) {
-            case ALREADY_ISSUED -> new BusinessException(CouponErrorCode.ALREADY_ISSUED);
+            case ALREADY_ISSUED -> new CouponReservationReleaseRequiredException(
+                    new BusinessException(CouponErrorCode.ALREADY_ISSUED));
             case RELEASE_REQUIRED -> new CouponReservationReleaseRequiredException(exception);
             case RESULT_UNKNOWN -> exception;
         };

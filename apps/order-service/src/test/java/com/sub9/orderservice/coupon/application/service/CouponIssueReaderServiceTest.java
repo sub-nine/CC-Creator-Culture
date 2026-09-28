@@ -9,6 +9,7 @@ import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.coupon.domain.exception.CouponErrorCode;
 import com.sub9.orderservice.coupon.domain.model.Coupon;
 import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
+import com.sub9.orderservice.coupon.domain.repository.UserCouponRepository;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,14 +26,17 @@ class CouponIssueReaderServiceTest {
     private static final Instant EXPIRED_AT = Instant.parse("2026-09-07T00:00:00Z");
     private final UuidV7Generator generator = new UuidV7Generator();
     @Mock private CouponRepository couponRepository;
+    @Mock private UserCouponRepository userCouponRepository;
 
     @Test
     @DisplayName("발급 가능한 쿠폰의 식별자와 만료 시각 및 잔여 수량을 반환한다")
     void when_coupon_is_issuable_target_is_returned() {
         Coupon coupon = coupon(2);
         when(couponRepository.findActiveById(coupon.getId())).thenReturn(Optional.of(coupon));
+        when(userCouponRepository.countByCouponId(coupon.getId())).thenReturn(0L);
 
-        var target = new CouponIssueReaderService(couponRepository).getIssuable(coupon.getId(), STARTED_AT);
+        var target = new CouponIssueReaderService(couponRepository, userCouponRepository)
+                .getIssuable(coupon.getId(), STARTED_AT);
 
         assertThat(target.couponId()).isEqualTo(coupon.getId());
         assertThat(target.expiredAt()).isEqualTo(EXPIRED_AT);
@@ -45,7 +49,7 @@ class CouponIssueReaderServiceTest {
         UUID couponId = generator.generate();
         when(couponRepository.findActiveById(couponId)).thenReturn(Optional.empty());
 
-        assertError(() -> new CouponIssueReaderService(couponRepository)
+        assertError(() -> new CouponIssueReaderService(couponRepository, userCouponRepository)
                 .getIssuable(couponId, STARTED_AT), CouponErrorCode.COUPON_NOT_FOUND);
     }
 
@@ -54,7 +58,8 @@ class CouponIssueReaderServiceTest {
     void when_requested_time_is_outside_period_period_error_is_thrown() {
         Coupon coupon = coupon(2);
         when(couponRepository.findActiveById(coupon.getId())).thenReturn(Optional.of(coupon));
-        CouponIssueReaderService reader = new CouponIssueReaderService(couponRepository);
+        CouponIssueReaderService reader = new CouponIssueReaderService(
+                couponRepository, userCouponRepository);
 
         assertError(() -> reader.getIssuable(coupon.getId(), STARTED_AT.minusNanos(1)),
                 CouponErrorCode.NOT_IN_ISSUE_PERIOD);
@@ -63,14 +68,16 @@ class CouponIssueReaderServiceTest {
     }
 
     @Test
-    @DisplayName("발급 수량이 소진되면 품절 오류를 반환한다")
-    void when_quantity_is_exhausted_sold_out_error_is_thrown() {
+    @DisplayName("발급 이력이 총수량과 같으면 Redis 초기화용 잔여 수량 0을 반환한다")
+    void when_issue_history_reaches_total_quantity_zero_remaining_target_is_returned() {
         Coupon coupon = coupon(1);
-        coupon.issue(generator.generate(), STARTED_AT);
         when(couponRepository.findActiveById(coupon.getId())).thenReturn(Optional.of(coupon));
+        when(userCouponRepository.countByCouponId(coupon.getId())).thenReturn(1L);
 
-        assertError(() -> new CouponIssueReaderService(couponRepository)
-                .getIssuable(coupon.getId(), STARTED_AT), CouponErrorCode.SOLD_OUT);
+        var target = new CouponIssueReaderService(couponRepository, userCouponRepository)
+                .getIssuable(coupon.getId(), STARTED_AT);
+
+        assertThat(target.remainingQuantity()).isZero();
     }
 
     private Coupon coupon(int totalQuantity) {

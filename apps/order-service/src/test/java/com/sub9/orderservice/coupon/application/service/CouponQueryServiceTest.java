@@ -9,6 +9,7 @@ import com.sub9.common.identifier.UuidV7Generator;
 import com.sub9.orderservice.coupon.domain.exception.CouponErrorCode;
 import com.sub9.orderservice.coupon.domain.model.Coupon;
 import com.sub9.orderservice.coupon.domain.repository.CouponRepository;
+import com.sub9.orderservice.coupon.domain.repository.UserCouponRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -30,6 +31,7 @@ class CouponQueryServiceTest {
     private static final Instant EXPIRED_AT = Instant.parse("2026-09-07T00:00:00Z");
 
     @Mock private CouponRepository couponRepository;
+    @Mock private UserCouponRepository userCouponRepository;
     private final UuidV7Generator uuidV7Generator = new UuidV7Generator();
 
     @Test
@@ -39,11 +41,13 @@ class CouponQueryServiceTest {
         Coupon coupon = coupon();
         when(couponRepository.findAllActive(pageable))
                 .thenReturn(new PageImpl<>(List.of(coupon), pageable, 1));
+        when(userCouponRepository.countByCouponId(coupon.getId())).thenReturn(37L);
 
-        var result = new CouponQueryService(couponRepository).findAll(pageable);
+        var result = new CouponQueryService(couponRepository, userCouponRepository).findAll(pageable);
 
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent().getFirst().couponId()).isEqualTo(coupon.getId());
+        assertThat(result.getContent().getFirst().issuedQuantity()).isEqualTo(37);
     }
 
     @Test
@@ -51,10 +55,13 @@ class CouponQueryServiceTest {
     void when_active_coupon_exists_detail_is_returned() {
         Coupon coupon = coupon();
         when(couponRepository.findActiveById(coupon.getId())).thenReturn(Optional.of(coupon));
+        when(userCouponRepository.countByCouponId(coupon.getId())).thenReturn(42L);
 
-        var result = new CouponQueryService(couponRepository).findById(coupon.getId());
+        var result = new CouponQueryService(couponRepository, userCouponRepository)
+                .findById(coupon.getId());
 
         assertThat(result.couponId()).isEqualTo(coupon.getId());
+        assertThat(result.issuedQuantity()).isEqualTo(42);
     }
 
     @Test
@@ -63,7 +70,8 @@ class CouponQueryServiceTest {
         UUID couponId = uuidV7Generator.generate();
         when(couponRepository.findActiveById(couponId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> new CouponQueryService(couponRepository).findById(couponId))
+        assertThatThrownBy(() -> new CouponQueryService(couponRepository, userCouponRepository)
+                .findById(couponId))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(CouponErrorCode.COUPON_NOT_FOUND));
     }

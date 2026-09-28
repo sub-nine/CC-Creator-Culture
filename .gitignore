@@ -326,3 +326,9 @@ __pycache__/
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,intellij+all,eclipse,macos,windows,gradle,java
 /skills-lock.json
+
+# k6 부하 테스트 결과물
+load-test/results/
+
+# 부하 테스트용 사용자 JWT 데이터
+load-test/data/coupon-user.csv

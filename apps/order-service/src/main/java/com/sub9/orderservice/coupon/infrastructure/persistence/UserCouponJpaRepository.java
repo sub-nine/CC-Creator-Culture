@@ -23,6 +23,8 @@ public interface UserCouponJpaRepository extends JpaRepository<UserCoupon, UUID>
 
     boolean existsByCoupon_IdAndUserId(UUID couponId, UUID userId);
 
+    long countByCoupon_Id(UUID couponId);
+
     // 주문 상태 변경도 같은 영속성 컨텍스트에 있으므로 갱신 뒤 전체 컨텍스트를 비우지 않습니다.
     @Modifying(flushAutomatically = true)
     @Query("""
