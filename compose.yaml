@@ -3,6 +3,7 @@ name: cc-service-local
 services:
   postgres:
     image: pgvector/pgvector:pg17
+    restart: unless-stopped
     ports:
       - "127.0.0.1:5432:5432"
     environment:
@@ -30,6 +31,7 @@ services:
 
   postgres-exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+    restart: unless-stopped
     environment:
       DATA_SOURCE_NAME: "postgresql://${POSTGRES_ADMIN_USER:?POSTGRES_ADMIN_USER is required}:${POSTGRES_ADMIN_PASSWORD:?POSTGRES_ADMIN_PASSWORD is required}@postgres:5432/postgres?sslmode=disable"
     ports:
@@ -40,6 +42,7 @@ services:
 
   redis:
     image: redis:7.4.11-alpine
+    restart: unless-stopped
     ports:
       - "127.0.0.1:6379:6379"
     healthcheck:
@@ -60,6 +63,7 @@ services:
   kafka:
     image: apache/kafka:3.7.2
     hostname: kafka
+    restart: unless-stopped
     ports:
       - "127.0.0.1:9092:9092"
     environment:
@@ -91,6 +95,7 @@ services:
 
   kafka-ui:
     image: provectuslabs/kafka-ui:v0.7.2
+    restart: unless-stopped
     ports:
       - "127.0.0.1:18080:8080"
     environment:
@@ -102,6 +107,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.13.1
+    restart: unless-stopped
     ports:
       - "127.0.0.1:9090:9090"
     command:
@@ -120,6 +126,7 @@ services:
 
   grafana:
     image: grafana/grafana:13.1.0
+    restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"
     environment:
@@ -136,6 +143,7 @@ services:
 
   zipkin:
     image: openzipkin/zipkin:3.6.1
+    restart: unless-stopped
     ports:
       - "127.0.0.1:9411:9411"
     environment:
@@ -144,6 +152,7 @@ services:
   embedding-service:
     build:
       context: apps/embedding-service
+    restart: unless-stopped
     ports:
       - "127.0.0.1:8000:8000"
     healthcheck:

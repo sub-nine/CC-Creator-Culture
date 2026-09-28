@@ -292,15 +292,15 @@ while [[ "$#" -gt 0 ]]; do
   shift
 done
 
-if [[ "$secret_id" == "r2" ]]; then
+if [[ "$secret_id" == "s3" ]]; then
   python3 - <<'PY'
 import base64, json, sys
 payload = {
-    "access_key": "test-access",
-    "secret_key": "test-r2-secret",
-    "endpoint": "https://example.r2.cloudflarestorage.com",
+    "access_key_id": "test-access",
+    "secret_access_key": "test-s3-secret",
+    "region": "ap-northeast-2",
     "bucket": "cc-dev-product",
-    "public_url": "https://pub-example.r2.dev",
+    "public_url": "https://images.example.cloudfront.net",
 }
 sys.stdout.write(base64.b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode())
 PY
@@ -393,7 +393,7 @@ run_deploy() {
   ORDER_DB_PASSWORD_SECRET_OCID=order \
   GRAFANA_ADMIN_PASSWORD_SECRET_OCID=grafana \
   JWT_SECRET_SECRET_OCID=jwt \
-  R2_SECRET_OCID=r2 \
+  S3_SECRET_OCID=s3 \
   OCIR_REGISTRY=nrt.ocir.io \
   ENABLE_MESSAGING_PROFILE="${TEST_ENABLE_MESSAGING_PROFILE:-true}" \
   ENABLE_OBSERVABILITY_PROFILE="${TEST_ENABLE_OBSERVABILITY_PROFILE:-true}" \
@@ -494,11 +494,11 @@ unset PROM_ATTEMPT_FILE PROM_READY_AFTER LEGACY_POSTGRES_RUNNING
 
 assert_file_line "CANDIDATE_SHA=$NEW_SHA" "$success_state/runtime/current.env"
 assert_file_line "JWT_SECRET=test-secret" "$success_state/runtime/current.env"
-assert_file_line "R2_ACCESS_KEY=test-access" "$success_state/runtime/current.env"
-assert_file_line "R2_SECRET_KEY=test-r2-secret" "$success_state/runtime/current.env"
-assert_file_line "R2_ENDPOINT=https://example.r2.cloudflarestorage.com" "$success_state/runtime/current.env"
-assert_file_line "R2_BUCKET=cc-dev-product" "$success_state/runtime/current.env"
-assert_file_line "R2_PUBLIC_URL=https://pub-example.r2.dev" "$success_state/runtime/current.env"
+assert_file_line "AWS_ACCESS_KEY_ID=test-access" "$success_state/runtime/current.env"
+assert_file_line "AWS_SECRET_ACCESS_KEY=test-s3-secret" "$success_state/runtime/current.env"
+assert_file_line "AWS_REGION=ap-northeast-2" "$success_state/runtime/current.env"
+assert_file_line "AWS_S3_BUCKET=cc-dev-product" "$success_state/runtime/current.env"
+assert_file_line "AWS_S3_PUBLIC_URL=https://images.example.cloudfront.net" "$success_state/runtime/current.env"
 assert_file_line "CONFIG_SERVER_CONFIG_LABEL=$NEW_SHA" "$success_state/runtime/current.env"
 user_up_line="$(grep -nF "candidate=$NEW_SHA command=up args=-d user-service" "$DOCKER_LOG" | head -n 1 | cut -d: -f1)"
 redis_up_line="$(grep -nF "candidate=$NEW_SHA command=up args=-d redis kafka" "$DOCKER_LOG" | head -n 1 | cut -d: -f1)"

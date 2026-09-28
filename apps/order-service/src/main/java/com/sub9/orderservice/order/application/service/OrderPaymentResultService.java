@@ -15,13 +15,14 @@ import com.sub9.orderservice.order.application.port.output.StockRestoreCommand;
 import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
+import com.sub9.orderservice.order.infrastructure.outbox.OrderEventOutboxWriter;
+import com.sub9.common.kafka.topic.KafkaTopics;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import com.sub9.common.kafka.event.OrderPaidEvent;
 import com.sub9.common.kafka.event.OrderNotificationEvent;
-import org.springframework.context.ApplicationEventPublisher;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,10 +34,10 @@ public class OrderPaymentResultService implements PaymentResultUseCase {
 
     private final OrderRepository orderRepository;
     private final CouponUsagePort couponUsagePort;
-    private final ApplicationEventPublisher eventPublisher;
     private final UuidV7Generator uuidGenerator;
     private final CartCleanupTaskRepository cleanupTasks;
     private final JsonMapper jsonMapper;
+    private final OrderEventOutboxWriter outbox;
 
     @Override
     @Transactional
@@ -49,7 +50,7 @@ public class OrderPaymentResultService implements PaymentResultUseCase {
                 .collect(Collectors.groupingBy(
                         item -> item.getProductId(),
                         Collectors.summingLong(item -> item.getProductSnapshot().getQuantity())));
-        eventPublisher.publishEvent(new OrderPaidEvent(orderId, quantities.entrySet().stream()
+        outbox.write(KafkaTopics.ORDER_PAID, orderId.toString(), new OrderPaidEvent(orderId, quantities.entrySet().stream()
                 .map(entry -> new OrderPaidEvent.ProductQuantity(entry.getKey(), entry.getValue()))
                 .toList()));
         publishNotification(order, "PAYMENT_PAID", "PAID", processedAt);
@@ -66,7 +67,7 @@ public class OrderPaymentResultService implements PaymentResultUseCase {
     }
 
     private void publishNotification(Order order, String eventType, String paymentStatus, Instant processedAt) {
-        eventPublisher.publishEvent(new OrderNotificationEvent(
+        outbox.write(KafkaTopics.ORDER_NOTIFICATION, order.getId().toString(), new OrderNotificationEvent(
                 uuidGenerator.generate(), eventType, "ORDER_SERVICE", "ORDER", order.getId(),
                 order.getCustomerId(), order.getOrderNumber().toString(), paymentStatus, null, processedAt));
     }

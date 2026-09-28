@@ -18,7 +18,7 @@ required=(
   artifact_repository_urls
   management_port
   grafana seed
-  r2 product-r2
+  product_service product_images product_image_bucket product_image_public_url
   observation_bootstrap_document
   kafka_bootstrap_document
   start-observation

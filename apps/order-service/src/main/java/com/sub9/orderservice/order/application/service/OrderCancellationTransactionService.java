@@ -11,6 +11,8 @@ import com.sub9.orderservice.order.domain.exception.OrderErrorCode;
 import com.sub9.orderservice.order.domain.model.Order;
 import com.sub9.orderservice.order.domain.model.OrderNumber;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
+import com.sub9.orderservice.order.infrastructure.outbox.OrderEventOutboxWriter;
+import com.sub9.common.kafka.topic.KafkaTopics;
 import com.sub9.orderservice.order.presentation.response.CancelOrderResponse;
 import java.time.Clock;
 import java.time.Instant;
@@ -34,6 +36,7 @@ public class OrderCancellationTransactionService {
     private final PaymentCancellationPort paymentCancellationPort;
     private final OrderCommandIdempotencyService idempotencyService;
     private final Clock clock;
+    private final OrderEventOutboxWriter outbox;
 
     @Transactional
     public CanceledOrder cancel(UUID customerId, UUID commandRequestId, OrderNumber orderNumber) {
@@ -61,7 +64,7 @@ public class OrderCancellationTransactionService {
         eventPublisher.publishEvent(new OrderCanceledEvent(order.getId(), quantitiesByProduct.entrySet().stream()
                 .map(entry -> new OrderCanceledEvent.ProductQuantity(entry.getKey(), entry.getValue()))
                 .toList()));
-        eventPublisher.publishEvent(new OrderNotificationEvent(
+        outbox.write(KafkaTopics.ORDER_NOTIFICATION, order.getId().toString(), new OrderNotificationEvent(
                 uuidGenerator.generate(), "ORDER_CANCELLED", "ORDER_SERVICE", "ORDER", order.getId(),
                 order.getCustomerId(), order.getOrderNumber().toString(), null, "FULL", canceledAt));
         return new CanceledOrder(new OrderCancellationResult(200, responseBody), stockRestore);

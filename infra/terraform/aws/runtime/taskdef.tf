@@ -27,6 +27,9 @@ locals {
       ],
       name == "product-service" ? [
         { name = "EMBEDDING_SERVICE_URL", value = local.embedding_url },
+        { name = "AWS_REGION", value = var.persistent_config.product_images.region },
+        { name = "AWS_S3_BUCKET", value = var.persistent_config.product_images.bucket },
+        { name = "AWS_S3_PUBLIC_URL", value = var.persistent_config.product_images.public_url },
       ] : [],
       contains(local.redis_clients, name) ? [
         { name = "REDIS_HOST", value = local.redis_host },
@@ -56,13 +59,6 @@ locals {
         { name = local.db_user_env[name], valueFrom = "${var.persistent_config.secret_arns.rds_master[name]}:username::" },
         { name = local.db_password_env[name], valueFrom = "${var.persistent_config.secret_arns.rds_master[name]}:password::" },
       ] : [],
-      name == "product-service" ? [
-        { name = "R2_ACCESS_KEY", valueFrom = "${var.persistent_config.secret_arns.r2}:access_key::" },
-        { name = "R2_SECRET_KEY", valueFrom = "${var.persistent_config.secret_arns.r2}:secret_key::" },
-        { name = "R2_ENDPOINT", valueFrom = "${var.persistent_config.secret_arns.r2}:endpoint::" },
-        { name = "R2_BUCKET", valueFrom = "${var.persistent_config.secret_arns.r2}:bucket::" },
-        { name = "R2_PUBLIC_URL", valueFrom = "${var.persistent_config.secret_arns.r2}:public_url::" },
-      ] : [],
     )
   }
 }
@@ -75,7 +71,8 @@ resource "aws_ecs_task_definition" "service" {
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   execution_role_arn       = var.persistent_config.roles.ecs_execution
-  task_role_arn            = var.persistent_config.roles.ecs_task
+  # Only product-service reads the product image bucket, so it alone gets the S3 task role.
+  task_role_arn = each.key == "product-service" ? var.persistent_config.roles.product_service : var.persistent_config.roles.ecs_task
 
   runtime_platform {
     operating_system_family = "LINUX"

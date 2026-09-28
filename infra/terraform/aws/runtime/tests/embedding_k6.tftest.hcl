@@ -73,12 +73,15 @@ variables {
       redis   = "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:redis-123456"
       grafana = "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:grafana-123456"
       seed    = "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:seed-123456"
-      r2      = "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:r2-123456"
     }
     roles = {
-      ecs_execution = "arn:aws:iam::123456789012:role/cc-test-ecs-execution"
-      ecs_task      = "arn:aws:iam::123456789012:role/cc-test-ecs-task"
-      observation   = "arn:aws:iam::123456789012:role/cc-test-observation"
+      ecs_execution   = "arn:aws:iam::123456789012:role/cc-test-ecs-execution"
+      ecs_task        = "arn:aws:iam::123456789012:role/cc-test-ecs-task"
+      product_service = "arn:aws:iam::123456789012:role/cc-test-product-service-task"
+      observation     = "arn:aws:iam::123456789012:role/cc-test-observation"
+    }
+    product_images = {
+      bucket = "cc-test-images", public_url = "https://images.example.cloudfront.net", region = "ap-northeast-2"
     }
     cloudmap = {
       namespace_id = "ns-test", namespace_name = "cc-test.internal", hosted_zone_id = "ZTEST"
@@ -130,6 +133,22 @@ run "running" {
   assert {
     condition     = output.k6_runner.security_group_id == "sg-88888888" && output.k6_runner.prometheus_url == "http://10.0.10.10:9090/api/v1/write"
     error_message = "Manual runner must use the dedicated SG and private receiver."
+  }
+  assert {
+    condition = (
+      aws_ecs_task_definition.service["product-service"].task_role_arn == "arn:aws:iam::123456789012:role/cc-test-product-service-task" &&
+      alltrue([for name, td in aws_ecs_task_definition.service : td.task_role_arn == "arn:aws:iam::123456789012:role/cc-test-ecs-task" if name != "product-service"])
+    )
+    error_message = "Only product-service may use the S3 product image task role."
+  }
+  assert {
+    condition = (
+      anytrue([for item in local.container_environment["product-service"] : item.name == "AWS_S3_BUCKET" && item.value == "cc-test-images"]) &&
+      anytrue([for item in local.container_environment["product-service"] : item.name == "AWS_S3_PUBLIC_URL" && item.value == "https://images.example.cloudfront.net"]) &&
+      anytrue([for item in local.container_environment["product-service"] : item.name == "AWS_REGION" && item.value == "ap-northeast-2"]) &&
+      !anytrue([for item in local.container_secrets["product-service"] : startswith(item.name, "R2_") || startswith(item.name, "AWS_")])
+    )
+    error_message = "Product must receive S3 settings as plain environment and no static storage keys."
   }
 }
 run "stopped" {

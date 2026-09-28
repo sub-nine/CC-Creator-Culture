@@ -101,6 +101,7 @@ class OrderExpirationServiceIntegrationTest {
     @AfterEach
     void cleanDatabase() {
         reset(couponUsagePort);
+        jdbcTemplate.update("delete from p_order_event_outbox");
         jdbcTemplate.update("delete from p_order_items");
         jdbcTemplate.update("delete from p_orders");
     }
@@ -131,9 +132,9 @@ class OrderExpirationServiceIntegrationTest {
         var result = expirationService.expire(order.getId(), order.getExpiresAt());
 
         assertThat(expirationService.expire(order.getId(), order.getExpiresAt().plusSeconds(1))).isEmpty();
-        var payload = ArgumentCaptor.forClass(String.class);
-        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), payload.capture());
-        var event = mapper.readValue(payload.getValue(), OrderNotificationEvent.class);
+        var event = mapper.readValue(jdbcTemplate.queryForObject(
+                "select payload from p_order_event_outbox where topic = 'order.notification' and message_key = ?",
+                String.class, order.getId().toString()), OrderNotificationEvent.class);
         assertThat(event.eventId().version()).isEqualTo(7);
         assertThat(event).isEqualTo(new OrderNotificationEvent(event.eventId(), "PAYMENT_FAILED", "ORDER_SERVICE",
                 "ORDER", order.getId(), order.getCustomerId(), order.getOrderNumber().toString(),
@@ -157,7 +158,7 @@ class OrderExpirationServiceIntegrationTest {
                 .hasMessage("쿠폰 복구 실패");
 
         assertThat(status(order.getId())).isEqualTo(OrderStatus.PENDING_PAYMENT.name());
-        verify(kafka, never()).send(anyString(), anyString(), anyString());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from p_order_event_outbox", Integer.class)).isZero();
     }
 
     private String status(UUID orderId) {
