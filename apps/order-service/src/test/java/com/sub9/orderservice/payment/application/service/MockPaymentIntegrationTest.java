@@ -132,6 +132,7 @@ class MockPaymentIntegrationTest {
 
     @AfterEach
     void cleanDatabase() {
+        jdbc.update("delete from p_order_event_outbox");
         jdbc.update("delete from public.p_payment_cancellations");
         jdbc.update("delete from public.p_payments");
         jdbc.update("delete from p_order_items");
@@ -148,21 +149,20 @@ class MockPaymentIntegrationTest {
         when(clock.instant()).thenReturn(order.getExpiresAt().plusSeconds(60));
         MockPaymentResult repeated = process(order, status);
         if (status == PaymentStatus.SUCCESS) {
-            ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
-            verify(kafka).send(eq("order.paid"), eq(order.getId().toString()), payload.capture());
-            assertThat(mapper.readValue(payload.getValue(), OrderPaidEvent.class))
+            assertThat(mapper.readValue(outboxPayload("order.paid", order), OrderPaidEvent.class))
                     .isEqualTo(new OrderPaidEvent(order.getId(),
                             List.of(new OrderPaidEvent.ProductQuantity(order.getItems().getFirst().getProductId(), 2L))));
+        } else {
+            assertThat(outboxCount("order.paid", order)).isZero();
         }
-        ArgumentCaptor<String> notificationPayload = ArgumentCaptor.forClass(String.class);
-        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), notificationPayload.capture());
-        OrderNotificationEvent notification = mapper.readValue(notificationPayload.getValue(), OrderNotificationEvent.class);
+        OrderNotificationEvent notification = mapper.readValue(
+                outboxPayload("order.notification", order), OrderNotificationEvent.class);
         assertThat(notification.eventId().version()).isEqualTo(7);
         assertThat(notification).isEqualTo(new OrderNotificationEvent(notification.eventId(),
                 status == PaymentStatus.SUCCESS ? "PAYMENT_PAID" : "PAYMENT_FAILED", "ORDER_SERVICE", "ORDER",
                 order.getId(), order.getCustomerId(), order.getOrderNumber().toString(),
                 status == PaymentStatus.SUCCESS ? "PAID" : "FAILED", null, first.processedAt()));
-        verifyNoMoreInteractions(kafka);
+        verifyNoInteractions(kafka);
         Payment saved = payments.findByOrderId(order.getId()).orElseThrow();
         Order savedOrder = queries.findDetailByOrderNumber(order.getOrderNumber()).orElseThrow();
 
@@ -369,52 +369,15 @@ class MockPaymentIntegrationTest {
     }
 
     @Test
-    @DisplayName("결제 저장 중에는 발행하지 않고 커밋 후 다른 트랜잭션에서 결제 성공을 확인한다")
-    void when_payment_commits_event_is_sent_after_database_commit() {
+    @DisplayName("결제 이벤트를 Kafka로 바로 보내지 않고 결제와 같은 트랜잭션에서 Outbox에 기록한다")
+    void when_payment_commits_events_are_recorded_in_outbox_without_direct_send() {
         Order order = saveOrder(100, false);
-        doAnswer(call -> {
-            Object saved = call.callRealMethod();
-            entityManager.flush();
-            verifyNoInteractions(kafka);
-            return saved;
-        }).when(payments).save(any(Payment.class));
-        when(kafka.send(anyString(), anyString(), anyString())).thenAnswer(call -> {
-            TransactionTemplate independent = new TransactionTemplate(transactionManager);
-            independent.setPropagationBehavior(
-                    org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-            independent.executeWithoutResult(ignored -> {
-                assertThat(orderStatus(order)).isEqualTo("PAID");
-                assertThat(paymentCount()).isEqualTo(1);
-            });
-            return CompletableFuture.completedFuture(null);
-        });
 
         process(order, PaymentStatus.SUCCESS);
 
-        verify(kafka).send(eq("order.paid"), eq(order.getId().toString()), anyString());
-        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
-    }
-
-    @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    @DisplayName("Kafka 동기 또는 비동기 발행에 실패해도 결제 성공 기록을 유지한다")
-    void when_kafka_fails_payment_remains_committed(boolean async) {
-        Order order = saveOrder(100, false);
-        CompletableFuture<SendResult<String, String>> pending = new CompletableFuture<>();
-        when(kafka.send(anyString(), anyString(), anyString())).thenAnswer(call -> {
-            if (async) return pending;
-            throw new IllegalStateException("Kafka 연결 실패");
-        });
-
-        MockPaymentResult result = process(order, PaymentStatus.SUCCESS);
-        if (async) pending.completeExceptionally(new IllegalStateException("Kafka 전송 실패"));
-
-        assertThat(result.status()).isEqualTo(PaymentStatus.SUCCESS);
-        assertThat(orderStatus(order)).isEqualTo("PAID");
-        assertThat(paymentCount()).isEqualTo(1);
-        assertThat(process(order, PaymentStatus.SUCCESS)).isEqualTo(result);
-        verify(kafka).send(eq("order.paid"), eq(order.getId().toString()), anyString());
-        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
+        assertThat(outboxCount("order.paid", order)).isEqualTo(1);
+        assertThat(outboxCount("order.notification", order)).isEqualTo(1);
+        verifyNoInteractions(kafka);
     }
 
     @ParameterizedTest
@@ -460,6 +423,8 @@ class MockPaymentIntegrationTest {
         assertThat(orderStatus(order)).isEqualTo("PENDING_PAYMENT");
         assertThat(queries.findDetailByOrderNumber(order.getOrderNumber()).orElseThrow().getPaidAt()).isNull();
         verifyNoInteractions(stock, kafka);
+        assertThat(outboxCount("order.paid", order)).isZero();
+        assertThat(outboxCount("order.notification", order)).isZero();
     }
 
     private void assertBusinessError(Runnable action, OrderErrorCode expected) {
@@ -469,6 +434,16 @@ class MockPaymentIntegrationTest {
 
     private int paymentCount() {
         return jdbc.queryForObject("select count(*) from public.p_payments", Integer.class);
+    }
+
+    private int outboxCount(String topic, Order order) {
+        return jdbc.queryForObject("select count(*) from p_order_event_outbox where topic = ? and message_key = ?",
+                Integer.class, topic, order.getId().toString());
+    }
+
+    private String outboxPayload(String topic, Order order) {
+        return jdbc.queryForObject("select payload from p_order_event_outbox where topic = ? and message_key = ?",
+                String.class, topic, order.getId().toString());
     }
 
     private String orderStatus(Order order) {

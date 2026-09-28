@@ -56,16 +56,18 @@ class MockPaymentTransactionServiceTest {
     @Mock private PaymentRepository payments;
     @Mock private CouponUsagePort coupons;
     @Mock private Clock clock;
-    @Mock private org.springframework.context.ApplicationEventPublisher events;
+    @Mock private com.sub9.orderservice.order.infrastructure.outbox.OrderEventOutboxWriter events;
 
     private MockPaymentTransactionService service;
 
     @BeforeEach
     void setUp() {
         service = new MockPaymentTransactionService(
-                orders, payments, new OrderPaymentResultService(orders, coupons, events, ids,
+                orders, payments, new OrderPaymentResultService(orders, coupons, ids,
                         org.mockito.Mockito.mock(com.sub9.orderservice.order.domain.repository.CartCleanupTaskRepository.class),
-                        tools.jackson.databind.json.JsonMapper.builder().build()), clock, ids);
+                        tools.jackson.databind.json.JsonMapper.builder().build(),
+                        events),
+                clock, ids);
     }
 
     @Test

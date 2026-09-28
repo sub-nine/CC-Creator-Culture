@@ -135,6 +135,7 @@ class OrderPaymentExpirationConcurrencyIntegrationTest {
 
     @AfterEach
     void cleanDatabase() {
+        jdbcTemplate.update("delete from p_order_event_outbox");
         jdbcTemplate.update("delete from p_payment_cancellations");
         jdbcTemplate.update("delete from p_payments");
         jdbcTemplate.update("delete from p_order_cart_cleanup_tasks");
@@ -158,11 +159,11 @@ class OrderPaymentExpirationConcurrencyIntegrationTest {
         assertFinalState(order, result == PaymentStatus.SUCCESS ? "PAID" : "FAILED", result);
         if (result == PaymentStatus.FAILED) {
             verify(stockPort).restore(eq(order.getId()), anyList(), eq(RestoreReason.PAYMENT_FAILED));
-        } else {
-            verify(kafka).send(eq("order.paid"), eq(order.getId().toString()), anyString());
         }
-        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
-        verifyNoMoreInteractions(stockPort, kafka);
+        assertThat(outboxCount("order.paid", order.getId())).isEqualTo(result == PaymentStatus.SUCCESS ? 1 : 0);
+        assertThat(outboxCount("order.notification", order.getId())).isEqualTo(1);
+        verifyNoMoreInteractions(stockPort);
+        org.mockito.Mockito.verifyNoInteractions(kafka);
     }
 
     @ParameterizedTest
@@ -176,8 +177,9 @@ class OrderPaymentExpirationConcurrencyIntegrationTest {
         assertExpiredError(race.contender().failure());
         assertFinalState(order, "EXPIRED", null);
         verify(stockPort).restore(eq(order.getId()), anyList(), eq(RestoreReason.ORDER_EXPIRED));
-        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), anyString());
-        verifyNoMoreInteractions(stockPort, kafka);
+        assertThat(outboxCount("order.notification", order.getId())).isEqualTo(1);
+        verifyNoMoreInteractions(stockPort);
+        org.mockito.Mockito.verifyNoInteractions(kafka);
     }
 
     private Void expire(Order order) {
@@ -280,6 +282,12 @@ class OrderPaymentExpirationConcurrencyIntegrationTest {
     private Object paidAt(UUID orderId) {
         return jdbcTemplate.queryForObject(
                 "select paid_at from p_orders where id = ?", Object.class, orderId);
+    }
+
+    private int outboxCount(String topic, UUID orderId) {
+        return jdbcTemplate.queryForObject(
+                "select count(*) from p_order_event_outbox where topic = ? and message_key = ?",
+                Integer.class, topic, orderId.toString());
     }
 
     private static void assertExpiredError(RuntimeException exception) {

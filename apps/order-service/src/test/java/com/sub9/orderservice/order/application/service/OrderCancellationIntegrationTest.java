@@ -159,6 +159,7 @@ class OrderCancellationIntegrationTest {
     void cleanDatabase() {
         jdbcTemplate.execute("alter table p_orders drop constraint if exists ck_orders_test_reject_cancel");
         jdbcTemplate.update("delete from payment_cancellation_probe");
+        jdbcTemplate.update("delete from p_order_event_outbox");
         jdbcTemplate.update("delete from p_order_command_requests");
         jdbcTemplate.update("delete from p_order_items");
         jdbcTemplate.update("delete from p_orders");
@@ -188,9 +189,9 @@ class OrderCancellationIntegrationTest {
         assertThat(response.get("data").get("orderNumber").asString()).isEqualTo(order.getOrderNumber().toString());
         assertThat(response.get("data").get("status").asString()).isEqualTo("CANCELED");
         Instant canceledAt = Instant.parse(response.get("data").get("canceledAt").asString());
-        var payload = ArgumentCaptor.forClass(String.class);
-        verify(kafka).send(eq("order.notification"), eq(order.getId().toString()), payload.capture());
-        var event = mapper.readValue(payload.getValue(), OrderNotificationEvent.class);
+        var event = mapper.readValue(jdbcTemplate.queryForObject(
+                "select payload from p_order_event_outbox where topic = 'order.notification' and message_key = ?",
+                String.class, order.getId().toString()), OrderNotificationEvent.class);
         assertThat(event.eventId().version()).isEqualTo(7);
         assertThat(event).isEqualTo(new OrderNotificationEvent(event.eventId(), "ORDER_CANCELLED", "ORDER_SERVICE",
                 "ORDER", order.getId(), CUSTOMER_ID, order.getOrderNumber().toString(), null, "FULL", canceledAt));
@@ -238,6 +239,7 @@ class OrderCancellationIntegrationTest {
         verify(paymentPort, times(1)).cancel(eq(order.getId()), any(), any());
         verifyNoInteractions(stockPort, couponUsagePort);
         verify(kafka, never()).send(anyString(), anyString(), anyString());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from p_order_event_outbox", Integer.class)).isZero();
     }
 
     @Test

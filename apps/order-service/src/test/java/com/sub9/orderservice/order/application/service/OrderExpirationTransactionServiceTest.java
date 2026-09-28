@@ -16,7 +16,7 @@ import com.sub9.orderservice.order.domain.model.ShippingAddress;
 import com.sub9.orderservice.order.domain.repository.OrderRepository;
 import java.time.Instant;
 import com.sub9.common.identifier.UuidV7Generator;
-import org.springframework.context.ApplicationEventPublisher;
+import com.sub9.orderservice.order.infrastructure.outbox.OrderEventOutboxWriter;
 import org.mockito.Spy;
 import java.util.List;
 import java.util.Optional;
@@ -41,7 +41,7 @@ class OrderExpirationTransactionServiceTest {
     private CouponUsagePort couponUsagePort;
 
     @Mock
-    private ApplicationEventPublisher eventPublisher;
+    private OrderEventOutboxWriter outbox;
 
     @Spy
     private UuidV7Generator uuidGenerator = new UuidV7Generator();
@@ -76,7 +76,7 @@ class OrderExpirationTransactionServiceTest {
 
         assertThat(result).isEmpty();
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
-        verifyNoInteractions(couponUsagePort, eventPublisher);
+        verifyNoInteractions(couponUsagePort, outbox);
     }
 
     @Test
@@ -91,7 +91,7 @@ class OrderExpirationTransactionServiceTest {
 
         assertThat(result).isEmpty();
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
-        verifyNoInteractions(couponUsagePort, eventPublisher);
+        verifyNoInteractions(couponUsagePort, outbox);
     }
 
     @Test
@@ -101,7 +101,7 @@ class OrderExpirationTransactionServiceTest {
         when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.empty());
 
         assertThat(expirationService.expire(orderId, CREATED_AT)).isEmpty();
-        verifyNoInteractions(couponUsagePort, eventPublisher);
+        verifyNoInteractions(couponUsagePort, outbox);
     }
 
     private static Order order(long sequence, OrderItem... items) {
