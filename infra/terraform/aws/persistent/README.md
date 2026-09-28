@@ -14,7 +14,13 @@ Grafana는 127.0.0.1:3000이라 외부에 열리지 않는다. SSM 포트 포워
 
 시드 비밀번호 해시는 `cc-test/seed` JSON `{password_hash}` 시크릿만 만든다. 값은 넣지 않는다. ECS execution role이 읽을 수 있고, 주입은 seed 일회 작업만 한다.
 
-Product 이미지는 기존 S3 버킷과 CloudFront를 쓴다. 두 리소스는 Terraform 밖에서 관리하고, 여기서는 `product_image_bucket`(기본값 `cc-creator-culture`)과 `product_image_public_url` 변수로 이름과 URL만 받는다. 정적 키 대신 product-service 전용 Task Role `cc-test-product-service-task`가 `products/images/*` 경로의 읽기, 쓰기, 삭제와 같은 경로의 목록 조회만 허용한다. 목록 조회 권한이 있어야 없는 객체를 조회할 때 S3가 403 대신 404를 돌려주고, 앱이 업로드 누락 오류로 처리할 수 있다. 다른 서비스는 기존 `cc-test-ecs-task` 역할을 그대로 쓴다.
+Product 이미지는 이 계정의 비공개 S3 버킷 `cc-test-product-images-<계정 ID>`에 저장하고 CloudFront로만 공개한다. 버킷 정책은 이 CloudFront 배포의 읽기만 허용하고, 버킷과 URL은 `persistent_config.product_images`로 런타임에 전달한다. 버킷은 `prevent_destroy`로 보호한다.
+
+쓰기 권한은 두 곳에만 있다. AWS에서는 product-service 전용 Task Role `cc-test-product-service-task`를 쓰고, OCI 개발 서버는 Task Role을 쓸 수 없어 IAM 사용자 `cc-test-oci-product-images`의 액세스 키를 쓴다. 두 주체 모두 `products/images/*` 경로의 읽기, 쓰기, 삭제와 같은 경로의 목록 조회만 허용한다. 목록 조회 권한이 있어야 없는 객체를 조회할 때 S3가 403 대신 404를 돌려주고, 앱이 업로드 누락 오류로 처리할 수 있다. 다른 서비스는 기존 `cc-test-ecs-task` 역할을 그대로 쓴다.
+
+액세스 키는 state에 값이 남지 않도록 Terraform 밖에서 만들고 OCI Vault `cc-dev-s3` 시크릿에만 저장한다. GitHub `development` 환경의 `S3_SECRET_OCID`가 이 시크릿을 가리킨다.
+
+브라우저가 Presigned URL로 직접 업로드하므로 `product_image_cors_origins`에 프론트엔드 주소를 넣어야 한다. 기본값은 로컬 프론트엔드 주소다.
 
 이전 R2용 `cc-test/product-r2` 시크릿은 `removed` 블록으로 Terraform 관리에서만 뺐고 AWS에는 남아 있다. 어떤 배포도 이 시크릿을 읽지 않는 것을 확인한 뒤 수동으로 삭제한다.
 

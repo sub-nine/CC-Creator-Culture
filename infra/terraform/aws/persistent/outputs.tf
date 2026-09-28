@@ -60,8 +60,8 @@ output "persistent_config" {
     }
 
     product_images = {
-      bucket     = var.product_image_bucket
-      public_url = var.product_image_public_url
+      bucket     = aws_s3_bucket.product_images.bucket
+      public_url = "https://${aws_cloudfront_distribution.product_images.domain_name}"
       region     = var.aws_region
     }
 
