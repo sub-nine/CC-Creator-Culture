@@ -1,9 +1,5 @@
 package com.sub9.productservice.product;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
-
 import com.sub9.common.exception.BusinessException;
 import com.sub9.common.exception.ErrorCode;
 import com.sub9.productservice.product.application.command.dto.sku.AddSkuCommand;
@@ -21,6 +17,7 @@ import com.sub9.productservice.product.infrastructure.persistence.command.produc
 import com.sub9.productservice.product.infrastructure.persistence.command.sku.SkuCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.stock.StockCommandJpaRepository;
 import com.sub9.productservice.product.infrastructure.persistence.command.stock.StockHistoryCommandJpaRepository;
+import com.sub9.productservice.product.infrastructure.persistence.command.stock.StockRepositoryImpl;
 import com.sub9.productservice.review.application.command.dto.CreateReviewCommand;
 import com.sub9.productservice.review.application.port.in.ReviewCommandUseCase;
 import com.sub9.productservice.review.application.port.out.ReviewOrderQueryPort;
@@ -29,232 +26,295 @@ import com.sub9.productservice.review.domain.exception.ReviewErrorCode;
 import com.sub9.productservice.review.infrastructure.persistence.command.ReviewJpaRepository;
 import com.sub9.productservice.support.AbstractIntegrationTest;
 import com.sub9.productservice.support.ConcurrencyTestingUtil;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.NestedExceptionUtils;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doAnswer;
 
 @DisplayName("Product - 동시성 테스트")
 @SpringBootTest(properties = "spring.kafka.listener.auto-startup=false")
 public class ProductConcurrencyTest extends AbstractIntegrationTest {
-  @Autowired ProductCommandJpaRepository productRepository;
-  @Autowired SkuCommandJpaRepository skuRepository;
-  @Autowired SkuCommandUseCase skuCommandUseCase;
-  @Autowired StockHistoryCommandJpaRepository stockHistoryRepository;
-  @Autowired StockCommandJpaRepository stockRepository;
-  @Autowired OrderStockUseCase orderStockUseCase;
-  @MockitoBean ReviewOrderQueryPort reviewOrderQueryPort;
-  @Autowired ReviewCommandUseCase reviewCommandUseCase;
-  @Autowired ReviewJpaRepository reviewRepository;
+    @Autowired
+    ProductCommandJpaRepository productRepository;
+    @Autowired
+    SkuCommandJpaRepository skuRepository;
+    @Autowired
+    SkuCommandUseCase skuCommandUseCase;
+    @Autowired
+    StockHistoryCommandJpaRepository stockHistoryRepository;
+    @Autowired
+    StockCommandJpaRepository stockRepository;
+    @Autowired
+    OrderStockUseCase orderStockUseCase;
+    @MockitoBean
+    ReviewOrderQueryPort reviewOrderQueryPort;
+    @Autowired
+    ReviewCommandUseCase reviewCommandUseCase;
+    @Autowired
+    ReviewJpaRepository reviewRepository;
+    @MockitoSpyBean
+    StockRepositoryImpl stockRepositorySpy;
 
-  private UUID creatorId;
-  private Product product;
-  private Stock stock;
+    private UUID creatorId;
+    private Product product;
+    private Stock stock;
 
-  @BeforeEach
-  void setUp() {
-    creatorId = UUID.randomUUID();
-    product = productRepository.save(Product.create(creatorId, "말랑이", "설명"));
-    Sku sku = skuRepository.save(Sku.create(product.getId(), "핑크 | M", 10000L, true));
-    stock = stockRepository.save(Stock.create(sku.getId(), 10));
-  }
-
-  @AfterEach
-  void tearDown() {
-    reviewRepository.deleteAllInBatch();
-    stockHistoryRepository.deleteAllInBatch();
-    stockRepository.deleteAllInBatch();
-    skuRepository.deleteAllInBatch();
-    productRepository.deleteAllInBatch();
-  }
-
-  @Nested
-  @DisplayName("SkuCommandService - 동시성 테스트")
-  class SkuConcurrencyTests {
-    @Test
-    @DisplayName("대표 SKU를 동시에 등록해도 대표 SKU는 하나만 유지한다.")
-    void addSku_success_when_default_skus_are_added_concurrently() throws Exception {
-      // given
-      int threadCount = 3;
-
-      // when
-      ConcurrencyTestingUtil.run(
-          threadCount,
-          () ->
-              skuCommandUseCase.addSku(
-                  new AddSkuCommand(product.getId(), creatorId, "옵션", 10000L, true, 10)));
-
-      // then
-      var skus = skuRepository.findAll();
-      assertThat(skus).filteredOn(Sku::isDefault).hasSize(1);
-      assertThat(skus).hasSize(4);
+    @BeforeEach
+    void setUp() {
+        creatorId = UUID.randomUUID();
+        product = productRepository.save(Product.create(creatorId, "말랑이", "설명"));
+        Sku sku = skuRepository.save(Sku.create(product.getId(), "핑크 | M", 10000L, true));
+        stock = stockRepository.save(Stock.create(sku.getId(), 10));
     }
 
-    @Test
-    @DisplayName("대표가 아닌 서로 다른 SKU를 동시에 대표로 변경해도 최종적으로 대표 SKU는 하나여야 한다.")
-    void updateSku_success_when_default_skus_are_changed_concurrently() throws Exception {
-      // given
-      AtomicInteger index = new AtomicInteger();
-
-      List<Sku> updateSkus =
-          List.of(
-              Sku.create(product.getId(), "1번", 10000L, false),
-              Sku.create(product.getId(), "2번", 10000L, false));
-
-      skuRepository.saveAll(updateSkus);
-
-      // when
-      ConcurrencyTestingUtil.run(
-          updateSkus.size(),
-          () -> {
-            Sku sku = updateSkus.get(index.getAndIncrement());
-
-            skuCommandUseCase.updateSku(
-                new UpdateSkuCommand(
-                    creatorId, product.getId(), sku.getId(), sku.getName(), sku.getPrice(), true));
-          });
-
-      // then
-      var skus = skuRepository.findAllByProductIdAndDeletedAtIsNull(product.getId());
-      assertThat(skus).filteredOn(Sku::isDefault).hasSize(1);
-    }
-  }
-
-  @Nested
-  @DisplayName("StockCommandService - 동시성 테스트")
-  class StockConcurrencyTests {
-    @Test
-    @DisplayName("동시에 재고를 차감해도 재고 수량의 정합성을 유지한다.")
-    void deduct_success_when_requested_concurrently() throws Exception {
-      // given
-      int threadCount = 3;
-
-      // when
-      ConcurrencyTestingUtil.run(
-          threadCount,
-          () ->
-              orderStockUseCase.deduct(
-                  new DeductStockCommand(
-                      UUID.randomUUID(),
-                      List.of(new DeductStockCommand.Item(stock.getSkuId(), 3)))));
-
-      // then
-      assertThat(stockRepository.findById(stock.getId()).orElseThrow().getQuantity()).isEqualTo(1);
+    @AfterEach
+    void tearDown() {
+        reviewRepository.deleteAllInBatch();
+        stockHistoryRepository.deleteAllInBatch();
+        stockRepository.deleteAllInBatch();
+        skuRepository.deleteAllInBatch();
+        productRepository.deleteAllInBatch();
     }
 
-    @Test
-    @DisplayName("동시에 차감 요청이 들어왔을 때 재고를 초과한 요청은 실패한다.")
-    void deduct_fails_when_concurrent_requests_exceed_stock() throws Exception {
-      // given
-      Queue<ErrorCode> errorCodes = new ConcurrentLinkedQueue<>();
-      int threadCount = 5;
+    @Nested
+    @DisplayName("SkuCommandService - 동시성 테스트")
+    class SkuConcurrencyTests {
+        @Test
+        @DisplayName("대표 SKU를 동시에 등록해도 대표 SKU는 하나만 유지한다.")
+        void addSku_success_when_default_skus_are_added_concurrently() throws Exception {
+            // given
+            int threadCount = 3;
 
-      // when
-      ConcurrencyTestingUtil.run(
-          threadCount,
-          () -> {
-            try {
-              orderStockUseCase.deduct(
-                  new DeductStockCommand(
-                      UUID.randomUUID(),
-                      List.of(new DeductStockCommand.Item(stock.getSkuId(), 3))));
-            } catch (BusinessException e) {
-              errorCodes.add(e.getErrorCode());
-            }
-          });
+            // when
+            ConcurrencyTestingUtil.run(
+                threadCount,
+                () ->
+                    skuCommandUseCase.addSku(
+                        new AddSkuCommand(product.getId(), creatorId, "옵션", 10000L, true, 10)));
 
-      // then
-      assertThat(stockRepository.findById(stock.getId()).orElseThrow().getQuantity()).isEqualTo(1);
-      assertThat(errorCodes).hasSize(2).containsOnly(StockErrorCode.INSUFFICIENT_STOCK);
+            // then
+            var skus = skuRepository.findAll();
+            assertThat(skus).filteredOn(Sku::isDefault).hasSize(1);
+            assertThat(skus).hasSize(4);
+        }
+
+        @Test
+        @DisplayName("대표가 아닌 서로 다른 SKU를 동시에 대표로 변경해도 최종적으로 대표 SKU는 하나여야 한다.")
+        void updateSku_success_when_default_skus_are_changed_concurrently() throws Exception {
+            // given
+            AtomicInteger index = new AtomicInteger();
+
+            List<Sku> updateSkus =
+                List.of(
+                    Sku.create(product.getId(), "1번", 10000L, false),
+                    Sku.create(product.getId(), "2번", 10000L, false));
+
+            skuRepository.saveAll(updateSkus);
+
+            // when
+            ConcurrencyTestingUtil.run(
+                updateSkus.size(),
+                () -> {
+                    Sku sku = updateSkus.get(index.getAndIncrement());
+
+                    skuCommandUseCase.updateSku(
+                        new UpdateSkuCommand(
+                            creatorId, product.getId(), sku.getId(), sku.getName(), sku.getPrice(), true));
+                });
+
+            // then
+            var skus = skuRepository.findAllByProductIdAndDeletedAtIsNull(product.getId());
+            assertThat(skus).filteredOn(Sku::isDefault).hasSize(1);
+        }
     }
 
-    @Test
-    @DisplayName("동일 주문의 재고 차감을 동시에 요청해도 한 번만 반영한다.")
-    void deduct_success_when_same_order_is_requested_concurrently() throws Exception {
-      // given
-      UUID orderId = UUID.randomUUID();
-      int threadCount = 5;
+    @Nested
+    @DisplayName("StockCommandService - 동시성 테스트")
+    class StockConcurrencyTests {
+        @Test
+        @DisplayName("동시에 재고를 차감해도 재고 수량의 정합성을 유지한다.")
+        void deduct_success_when_requested_concurrently() throws Exception {
+            // given
+            int threadCount = 3;
 
-      // when
-      ConcurrencyTestingUtil.run(
-          threadCount,
-          () ->
-              orderStockUseCase.deduct(
-                  new DeductStockCommand(
-                      orderId, List.of(new DeductStockCommand.Item(stock.getSkuId(), 3)))));
+            // when
+            ConcurrencyTestingUtil.run(
+                threadCount,
+                () ->
+                    orderStockUseCase.deduct(
+                        new DeductStockCommand(
+                            UUID.randomUUID(),
+                            List.of(new DeductStockCommand.Item(stock.getSkuId(), 3)))));
 
-      // then
-      assertThat(stockRepository.findById(stock.getId()).orElseThrow().getQuantity()).isEqualTo(7);
-      assertThat(stockHistoryRepository.count()).isEqualTo(1);
+            // then
+            assertThat(stockRepository.findById(stock.getId()).orElseThrow().getQuantity()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("동시에 차감 요청이 들어왔을 때 재고를 초과한 요청은 실패한다.")
+        void deduct_fails_when_concurrent_requests_exceed_stock() throws Exception {
+            // given
+            Queue<ErrorCode> errorCodes = new ConcurrentLinkedQueue<>();
+            int threadCount = 5;
+
+            // when
+            ConcurrencyTestingUtil.run(
+                threadCount,
+                () -> {
+                    try {
+                        orderStockUseCase.deduct(
+                            new DeductStockCommand(
+                                UUID.randomUUID(),
+                                List.of(new DeductStockCommand.Item(stock.getSkuId(), 3))));
+                    } catch (BusinessException e) {
+                        errorCodes.add(e.getErrorCode());
+                    }
+                });
+
+            // then
+            assertThat(stockRepository.findById(stock.getId()).orElseThrow().getQuantity()).isEqualTo(1);
+            assertThat(errorCodes).hasSize(2).containsOnly(StockErrorCode.INSUFFICIENT_STOCK);
+        }
+
+        @Test
+        @DisplayName("동일 주문의 재고 차감을 동시에 요청해도 한 번만 반영한다.")
+        void deduct_success_when_same_order_is_requested_concurrently() throws Exception {
+            // given
+            UUID orderId = UUID.randomUUID();
+            int threadCount = 5;
+
+            // when
+            ConcurrencyTestingUtil.run(
+                threadCount,
+                () ->
+                    orderStockUseCase.deduct(
+                        new DeductStockCommand(
+                            orderId, List.of(new DeductStockCommand.Item(stock.getSkuId(), 3)))));
+
+            // then
+            assertThat(stockRepository.findById(stock.getId()).orElseThrow().getQuantity()).isEqualTo(7);
+            assertThat(stockHistoryRepository.count()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("동일 주문의 재고 복구를 동시에 요청해도 한 번만 반영한다.")
+        void restore_success_when_same_order_is_requested_concurrently() throws Exception {
+            // given
+            UUID orderId = UUID.randomUUID();
+            int threadCount = 5;
+
+            orderStockUseCase.deduct(
+                new DeductStockCommand(
+                    orderId, List.of(new DeductStockCommand.Item(stock.getSkuId(), 3))));
+
+            // when
+            ConcurrencyTestingUtil.run(
+                threadCount,
+                () ->
+                    orderStockUseCase.restore(
+                        new RestoreStockCommand(
+                            orderId,
+                            List.of(new RestoreStockCommand.Item(stock.getSkuId(), 3)),
+                            StockHistoryReason.ORDER_CANCEL)));
+
+            // then
+            assertThat(stockRepository.findById(stock.getId()).orElseThrow().getQuantity()).isEqualTo(10);
+            assertThat(stockHistoryRepository.count()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("두 주문이 SKU를 반대 순서로 차감하면 데드락이 발생한다.")
+        void deduct_deadlock() throws Exception {
+            // given
+            var sku =
+                skuRepository.save(Sku.create(product.getId(), "옵션", 10000L, false));
+            stockRepository.save(Stock.create(sku.getId(), 10));
+
+            var a = new DeductStockCommand.Item(sku.getId(), 1);
+            var b = new DeductStockCommand.Item(stock.getSkuId(), 1);
+
+            var barrier = new CyclicBarrier(2);
+            var updateCount = new AtomicInteger();
+            var requests = new AtomicInteger();
+            Queue<RuntimeException> failures = new ConcurrentLinkedQueue<>();
+
+            doAnswer(invocation -> {
+                var result = invocation.callRealMethod();
+
+                if (updateCount.getAndIncrement() < 2) {
+                    barrier.await(5, TimeUnit.SECONDS);
+                }
+                return result;
+            }).when(stockRepositorySpy).decreaseStock(any(), anyInt());
+
+            ConcurrencyTestingUtil.run(2, () -> {
+                try {
+                    orderStockUseCase.deduct(new DeductStockCommand(
+                        UUID.randomUUID(),
+                        requests.getAndIncrement() == 0 ? List.of(a, b) : List.of(b, a)
+                    ));
+                } catch (RuntimeException e) {
+                    failures.add(e);
+                }
+            });
+            assertThat(failures).hasSize(1);
+
+            Throwable cause =
+                NestedExceptionUtils.getMostSpecificCause(failures.element());
+
+            assertThat(cause).isInstanceOf(SQLException.class);
+            assertThat(((SQLException) cause).getSQLState()).isEqualTo("40P01");
+        }
     }
 
-    @Test
-    @DisplayName("동일 주문의 재고 복구를 동시에 요청해도 한 번만 반영한다.")
-    void restore_success_when_same_order_is_requested_concurrently() throws Exception {
-      // given
-      UUID orderId = UUID.randomUUID();
-      int threadCount = 5;
+    @Nested
+    @DisplayName("ReviewCommandService - 동시성 테스트")
+    class ReviewConcurrencyTests {
+        @Test
+        @DisplayName("같은 주문건에 대해 리뷰를 동시에 등록하면 하나만 성공해야한다.")
+        void createReview() throws Exception {
+            // given
+            Queue<ErrorCode> errorCodes = new ConcurrentLinkedQueue<>();
+            UUID orderItemId = UUID.randomUUID();
+            int threadCount = 3;
 
-      orderStockUseCase.deduct(
-          new DeductStockCommand(
-              orderId, List.of(new DeductStockCommand.Item(stock.getSkuId(), 3))));
+            CreateReviewCommand command =
+                new CreateReviewCommand(UUID.randomUUID(), orderItemId, 5, "리뷰");
 
-      // when
-      ConcurrencyTestingUtil.run(
-          threadCount,
-          () ->
-              orderStockUseCase.restore(
-                  new RestoreStockCommand(
-                      orderId,
-                      List.of(new RestoreStockCommand.Item(stock.getSkuId(), 3)),
-                      StockHistoryReason.ORDER_CANCEL)));
+            ProductPurchaseInfo purchaseInfo = new ProductPurchaseInfo(UUID.randomUUID(), true);
+            given(reviewOrderQueryPort.getPurchaseInfo(any(), any())).willReturn(purchaseInfo);
 
-      // then
-      assertThat(stockRepository.findById(stock.getId()).orElseThrow().getQuantity()).isEqualTo(10);
-      assertThat(stockHistoryRepository.count()).isEqualTo(2);
+            // when
+            ConcurrencyTestingUtil.run(
+                threadCount,
+                () -> {
+                    try {
+                        reviewCommandUseCase.createReview(command);
+                    } catch (BusinessException e) {
+                        errorCodes.add(e.getErrorCode());
+                    }
+                });
+
+            // then
+            assertThat(reviewRepository.findAll()).hasSize(1);
+            assertThat(errorCodes).hasSize(2).containsOnly(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
+        }
     }
-  }
-
-  @Nested
-  @DisplayName("ReviewCommandService - 동시성 테스트")
-  class ReviewConcurrencyTests {
-    @Test
-    @DisplayName("같은 주문건에 대해 리뷰를 동시에 등록하면 하나만 성공해야한다.")
-    void createReview() throws Exception {
-      // given
-      Queue<ErrorCode> errorCodes = new ConcurrentLinkedQueue<>();
-      UUID orderItemId = UUID.randomUUID();
-      int threadCount = 3;
-
-      CreateReviewCommand command =
-          new CreateReviewCommand(UUID.randomUUID(), orderItemId, 5, "리뷰");
-
-      ProductPurchaseInfo purchaseInfo = new ProductPurchaseInfo(UUID.randomUUID(), true);
-      given(reviewOrderQueryPort.getPurchaseInfo(any(), any())).willReturn(purchaseInfo);
-
-      // when
-      ConcurrencyTestingUtil.run(
-          threadCount,
-          () -> {
-            try {
-              reviewCommandUseCase.createReview(command);
-            } catch (BusinessException e) {
-              errorCodes.add(e.getErrorCode());
-            }
-          });
-
-      // then
-      assertThat(reviewRepository.findAll()).hasSize(1);
-      assertThat(errorCodes).hasSize(2).containsOnly(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
-    }
-  }
 }
