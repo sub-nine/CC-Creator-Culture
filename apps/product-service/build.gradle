@@ -76,6 +76,27 @@ dependencies {
     testImplementation 'org.testcontainers:postgresql:1.21.4'
 }
 
-tasks.withType(Test).configureEach {
+tasks.named('test', Test) {
+    useJUnitPlatform {
+        excludeTags 'integration'
+    }
+
     maxParallelForks = Math.min(2, Runtime.runtime.availableProcessors())
+}
+
+tasks.register('integrationTest', Test) {
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    useJUnitPlatform {
+        includeTags 'integration'
+    }
+
+    maxParallelForks = 1
+
+    shouldRunAfter tasks.named('test')
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('integrationTest')
 }
