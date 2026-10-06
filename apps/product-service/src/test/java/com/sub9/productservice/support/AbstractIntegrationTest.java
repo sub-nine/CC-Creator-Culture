@@ -1,5 +1,6 @@
 package com.sub9.productservice.support;
 
+import org.junit.jupiter.api.Tag;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -9,6 +10,7 @@ import org.testcontainers.utility.DockerImageName;
 
 /** 테스트 컨테이너 상속해서 사용 */
 // @Testcontainers
+@Tag("integration")
 @ActiveProfiles("test")
 public abstract class AbstractIntegrationTest {
   // pgvector 확장을 미리 설치한 이미지 - 순정 postgres 이미지는 CREATE EXTENSION vector 자체가 실패함

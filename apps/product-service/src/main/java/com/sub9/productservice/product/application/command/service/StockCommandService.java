@@ -11,11 +11,13 @@ import com.sub9.productservice.product.domain.exception.ProductErrorCode;
 import com.sub9.productservice.product.domain.exception.StockErrorCode;
 import com.sub9.productservice.product.domain.model.StockHistory;
 import com.sub9.productservice.product.domain.model.StockHistoryReason;
-import com.sub9.productservice.product.domain.repository.StockRepository;
 import com.sub9.productservice.product.domain.repository.StockHistoryRepository;
+import com.sub9.productservice.product.domain.repository.StockRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Comparator;
 
 @Service
 @Transactional
@@ -46,7 +48,11 @@ public class StockCommandService implements AdjustStockUseCase, OrderStockUseCas
 
   @Override
   public void deduct(DeductStockCommand command) {
-    for (var item : command.items()) {
+    var sortedItems = command.items().stream()
+        .sorted(Comparator.comparing(DeductStockCommand.Item::skuId))
+        .toList();
+
+    for (var item : sortedItems) {
       var history =
           StockHistory.create(
               command.orderId(), item.skuId(), item.quantity(), StockHistoryReason.ORDER);
@@ -61,7 +67,11 @@ public class StockCommandService implements AdjustStockUseCase, OrderStockUseCas
 
   @Override
   public void restore(RestoreStockCommand command) {
-    for (var item : command.items()) {
+    var sortedItems = command.items().stream()
+        .sorted(Comparator.comparing(RestoreStockCommand.Item::skuId))
+        .toList();
+
+    for (var item : sortedItems) {
       var history =
           StockHistory.create(command.orderId(), item.skuId(), item.quantity(), command.reason());
 

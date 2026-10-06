@@ -8,6 +8,7 @@ import com.sub9.productservice.category.domain.entity.Hashtag;
 import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.CategoryHashtagJpaRepository;
 import com.sub9.productservice.category.infrastructure.persistence.command.repository.jpa.CategoryJpaRepository;
 import com.sub9.productservice.support.AbstractIntegrationTest;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,7 @@ import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
+@Disabled("임베딩 서버 의존성과 테스트 데이터 격리 문제 해결 전까지 비활성화")
 @DisplayName("CategoryHashtagLinkFacade - 동시성 통합 테스트")
 class CategoryHashtagLinkFacadeConcurrencyTest extends AbstractIntegrationTest {
 
