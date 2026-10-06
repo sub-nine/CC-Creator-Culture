@@ -4,7 +4,7 @@ spring:
       on-profile: test
   datasource:
     hikari:
-      maximum-pool-size: 3
+      maximum-pool-size: 10
       minimum-idle: 1
   cloud:
     discovery:
@@ -22,10 +22,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
 
   flyway:
     enabled: true
