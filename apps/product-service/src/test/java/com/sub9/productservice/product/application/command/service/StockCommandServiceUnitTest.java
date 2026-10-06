@@ -1,25 +1,15 @@
 package com.sub9.productservice.product.application.command.service;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-
 import com.sub9.common.exception.BusinessException;
 import com.sub9.productservice.product.application.command.dto.stock.AdjustStockCommand;
 import com.sub9.productservice.product.application.command.dto.stock.DeductStockCommand;
 import com.sub9.productservice.product.application.command.dto.stock.RestoreStockCommand;
 import com.sub9.productservice.product.application.port.out.product.ProductQueryRepository;
-import com.sub9.productservice.product.domain.exception.SkuErrorCode;
-import com.sub9.productservice.product.domain.exception.StockErrorCode;
 import com.sub9.productservice.product.domain.exception.ProductErrorCode;
+import com.sub9.productservice.product.domain.exception.StockErrorCode;
 import com.sub9.productservice.product.domain.model.StockHistoryReason;
 import com.sub9.productservice.product.domain.repository.StockHistoryRepository;
 import com.sub9.productservice.product.domain.repository.StockRepository;
-import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -28,13 +18,25 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.*;
+
 @ExtendWith(MockitoExtension.class)
 @DisplayName("StockCommandService - 단위 테스트")
 class StockCommandServiceUnitTest {
-  @Mock private StockRepository stockRepository;
-  @Mock private StockHistoryRepository stockHistoryRepository;
-  @Mock private ProductQueryRepository productQueryRepository;
-  @InjectMocks private StockCommandService stockCommandService;
+  @Mock
+  private StockRepository stockRepository;
+  @Mock
+  private StockHistoryRepository stockHistoryRepository;
+  @Mock
+  private ProductQueryRepository productQueryRepository;
+  @InjectMocks
+  private StockCommandService stockCommandService;
 
   private final UUID creatorId = UUID.randomUUID();
   private final UUID skuId = UUID.randomUUID();
@@ -95,16 +97,18 @@ class StockCommandServiceUnitTest {
     @DisplayName("재고가 부족하면 INSUFFICIENT_STOCK 예외가 발생하고 다음 SKU를 처리하지 않는다.")
     void deduct_fails_when_stock_is_insufficient() {
       // given
-      UUID nextSkuId = UUID.randomUUID();
+      UUID firstSkuId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+      UUID nextSkuId = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
       DeductStockCommand command =
           new DeductStockCommand(
               orderId,
               List.of(
-                  new DeductStockCommand.Item(skuId, 11),
+                  new DeductStockCommand.Item(firstSkuId, 11),
                   new DeductStockCommand.Item(nextSkuId, 2)));
 
       given(stockHistoryRepository.insertIfAbsent(any())).willReturn(true);
-      given(stockRepository.decreaseStock(skuId, 11)).willReturn(false);
+      given(stockRepository.decreaseStock(firstSkuId, 11)).willReturn(false);
 
       // when & then
       assertThatThrownBy(() -> stockCommandService.deduct(command))
@@ -121,17 +125,19 @@ class StockCommandServiceUnitTest {
     @DisplayName("복구할 재고가 없으면 SKU_NOT_FOUND 예외가 발생하고 다음 SKU를 처리하지 않는다.")
     void restore_fails_when_stock_not_found() {
       // given
-      UUID nextSkuId = UUID.randomUUID();
+      UUID firstSkuId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+      UUID nextSkuId = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
       RestoreStockCommand command =
           new RestoreStockCommand(
               orderId,
               List.of(
-                  new RestoreStockCommand.Item(skuId, 3),
+                  new RestoreStockCommand.Item(firstSkuId, 3),
                   new RestoreStockCommand.Item(nextSkuId, 2)),
               StockHistoryReason.ORDER_CANCEL);
 
       given(stockHistoryRepository.insertIfAbsent(any())).willReturn(true);
-      given(stockRepository.increaseStock(skuId, 3)).willReturn(false);
+      given(stockRepository.increaseStock(firstSkuId, 3)).willReturn(false);
 
       // when & then
       assertThatThrownBy(() -> stockCommandService.restore(command))
